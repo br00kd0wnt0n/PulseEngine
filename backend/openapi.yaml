@@ -56,10 +56,19 @@ paths:
       security: [ { bearerAuth: [] } ]
       summary: Generate narrative from trend graph
       responses: { '200': { description: OK } }
+  /status/overview:
+    get:
+      security: [ { bearerAuth: [] } ]
+      summary: Status overview (services, db, stats)
+      responses: { '200': { description: OK } }
+  /status/preflight:
+    get:
+      security: [ { bearerAuth: [] } ]
+      summary: Preflight check (env, DB, ingestion)
+      responses: { '200': { description: OK } }
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-

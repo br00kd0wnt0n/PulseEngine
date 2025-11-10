@@ -19,6 +19,11 @@ const logger = pino({ level: process.env.NODE_ENV === 'production' ? 'info' : 'd
 
 async function main() {
   await AppDataSource.initialize()
+  try {
+    await AppDataSource.runMigrations()
+  } catch (e) {
+    logger.warn({ err: e }, 'Migration run skipped or failed; proceeding')
+  }
   const app = express()
   app.use(helmet())
   app.use(cors())
