@@ -1,12 +1,19 @@
-// Placeholder for future backend integration
-export type ApiResponse<T> = { ok: true; data: T } | { ok: false; error: string }
+// Simple fetch wrapper with optional API base url
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 
-export async function get<T>(_path: string): Promise<ApiResponse<T>> {
-  // Implement with fetch once backend is available
-  return { ok: false, error: 'Not implemented' }
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const url = `${API_BASE}${path}`
+  const res = await fetch(url, init)
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  return res.json() as Promise<T>
 }
 
-export async function post<T>(_path: string, _body: unknown): Promise<ApiResponse<T>> {
-  return { ok: false, error: 'Not implemented' }
+export type StatusOverview = {
+  services: { api: { ok: boolean; status: string }; ingestion: { ok: boolean; status: string } }
+  database: { sizeBytes: number | null; tables: { name: string; bytes: number }[] }
+  stats: { users: number; creators: number; trends: number; assets: number }
 }
 
+export const api = {
+  statusOverview: () => request<StatusOverview>('/status/overview'),
+}

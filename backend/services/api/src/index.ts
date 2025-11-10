@@ -11,6 +11,7 @@ import creatorRoutes from './routes/creators'
 import trendRoutes from './routes/trends'
 import assetRoutes from './routes/assets'
 import aiRoutes from './routes/ai'
+import statusRoutes from './routes/status'
 import { authMiddleware, attachRls } from './middleware/auth'
 
 dotenv.config()
@@ -34,6 +35,7 @@ async function main() {
   app.use('/trends', trendRoutes)
   app.use('/assets', assetRoutes)
   app.use('/ai', aiRoutes)
+  app.use('/status', statusRoutes)
 
   // error handler
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -53,4 +55,3 @@ main().catch((e) => {
   logger.error(e, 'Fatal startup error')
   process.exit(1)
 })
-

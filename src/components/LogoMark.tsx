@@ -12,7 +12,7 @@ export default function LogoMark({ size = 32, className = '' }: Props) {
     >
       {ok && (
         <img
-          src="/pulse-icon.png"
+          src="/pulseblackicon.png"
           alt="Pulse Icon"
           width={size}
           height={size}
@@ -24,4 +24,3 @@ export default function LogoMark({ size = 32, className = '' }: Props) {
     </div>
   )
 }
-
