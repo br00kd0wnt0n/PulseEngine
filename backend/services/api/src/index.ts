@@ -12,6 +12,7 @@ import trendRoutes from './routes/trends'
 import assetRoutes from './routes/assets'
 import aiRoutes from './routes/ai'
 import statusRoutes from './routes/status'
+import ingestionRoutes from './routes/ingestion'
 import { authMiddleware, attachRls } from './middleware/auth'
 
 dotenv.config()
@@ -41,6 +42,7 @@ async function main() {
   app.use('/assets', assetRoutes)
   app.use('/ai', aiRoutes)
   app.use('/status', statusRoutes)
+  app.use('/ingest', ingestionRoutes)
 
   // error handler
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

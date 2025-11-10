@@ -18,21 +18,6 @@
           "NODE_ENV": "production"
         }
       }
-    },
-    {
-      "name": "ingestion",
-      "rootDir": "services/ingestion",
-      "build": {
-        "cmd": "npm ci && npm run build"
-      },
-      "deploy": {
-        "startCommand": "node dist/src/index.js",
-        "healthcheckPath": "/health",
-        "env": {
-          "PORT": "8081",
-          "NODE_ENV": "production"
-        }
-      }
     }
   ]
 }
