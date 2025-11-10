@@ -7,7 +7,7 @@ async function runMigrations() {
   console.log('Starting database migrations...');
 
   try {
-    const { AppDataSource } = require('./dist/db/data-source');
+    const { AppDataSource } = require('./dist/src/db/data-source');
 
     console.log('Initializing database connection...');
     await AppDataSource.initialize();

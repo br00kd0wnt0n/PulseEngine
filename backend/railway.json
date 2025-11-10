@@ -11,7 +11,7 @@
         "cmd": "npm ci && npm run build"
       },
       "deploy": {
-        "startCommand": "node dist/index.js",
+        "startCommand": "node dist/src/index.js",
         "healthcheckPath": "/health",
         "env": {
           "PORT": "8080",
@@ -26,7 +26,7 @@
         "cmd": "npm ci && npm run build"
       },
       "deploy": {
-        "startCommand": "node dist/index.js",
+        "startCommand": "node dist/src/index.js",
         "healthcheckPath": "/health",
         "env": {
           "PORT": "8081",
