@@ -1,0 +1,39 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "plugins": [
+    { "name": "postgres" }
+  ],
+  "services": [
+    {
+      "name": "api",
+      "rootDir": "backend/services/api",
+      "build": { "cmd": "npm ci && npm run build" },
+      "deploy": {
+        "startCommand": "node dist/index.js",
+        "healthcheckPath": "/health",
+        "env": { "PORT": "8080", "NODE_ENV": "production" }
+      }
+    },
+    {
+      "name": "ingestion",
+      "rootDir": "backend/services/ingestion",
+      "build": { "cmd": "npm ci && npm run build" },
+      "deploy": {
+        "startCommand": "node dist/index.js",
+        "healthcheckPath": "/health",
+        "env": { "PORT": "8081", "NODE_ENV": "production" }
+      }
+    },
+    {
+      "name": "web",
+      "rootDir": ".",
+      "build": { "cmd": "npm ci && npm run build" },
+      "deploy": {
+        "startCommand": "vite preview --host 0.0.0.0 --port $PORT",
+        "env": { "PORT": "3000", "NODE_ENV": "production" },
+        "healthcheckPath": "/"
+      }
+    }
+  ]
+}
+

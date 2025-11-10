@@ -1,0 +1,65 @@
+openapi: 3.0.3
+info:
+  title: Pulse API
+  version: 0.1.0
+servers:
+  - url: https://api.example.com
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses: { '200': { description: OK } }
+  /auth/register:
+    post:
+      summary: Register user
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { email: { type: string }, password: { type: string } }, required: [email, password] } } } }
+      responses: { '200': { description: Registered } }
+  /auth/login:
+    post:
+      summary: Login
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { email: { type: string }, password: { type: string } }, required: [email, password] } } } }
+      responses: { '200': { description: Token } }
+  /creators:
+    get:
+      security: [ { bearerAuth: [] } ]
+      summary: List creators
+      responses: { '200': { description: OK } }
+    post:
+      security: [ { bearerAuth: [] } ]
+      summary: Create creator
+      responses: { '201': { description: Created } }
+  /trends:
+    get:
+      security: [ { bearerAuth: [] } ]
+      summary: List trends
+      responses: { '200': { description: OK } }
+    post:
+      security: [ { bearerAuth: [] } ]
+      summary: Create trend
+      responses: { '201': { description: Created } }
+  /trends/score:
+    post:
+      security: [ { bearerAuth: [] } ]
+      summary: Score a trend concept
+      responses: { '200': { description: OK } }
+  /assets:
+    get:
+      security: [ { bearerAuth: [] } ]
+      summary: List assets
+      responses: { '200': { description: OK } }
+    post:
+      security: [ { bearerAuth: [] } ]
+      summary: Create asset record
+      responses: { '201': { description: Created } }
+  /ai/narrative:
+    post:
+      security: [ { bearerAuth: [] } ]
+      summary: Generate narrative from trend graph
+      responses: { '200': { description: OK } }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+

@@ -1,0 +1,270 @@
+import { useState, useRef, useEffect } from 'react'
+import { useDashboard } from '../../context/DashboardContext'
+import { usePreferences } from '../../context/PreferencesContext'
+import { useUpload } from '../../context/UploadContext'
+
+const examples = [
+  'Launch a dance challenge using AI music loops',
+  'Retro gaming remix trend for Shorts',
+  'Creator collab for tutorial-to-trend pipeline',
+]
+
+export default function StoryPromptHero() {
+  const { concept, setConcept, activated, setActivated } = useDashboard()
+  const prefs = usePreferences()
+  const { processed, addFiles, addUrl, removeContent } = useUpload()
+  const [value, setValue] = useState(concept || '')
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const dragCounterRef = useRef(0)
+  const [currentMessage, setCurrentMessage] = useState(0)
+
+  const messages = [
+    "Share your concept and I'll help you shape it into something extraordinary.",
+    "Powered by community-built database of proven work",
+    "Drop files, links, and screengrabs to add context"
+  ]
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentMessage((prev) => (prev + 1) % messages.length)
+    }, 4000) // Change message every 4 seconds
+
+    return () => clearInterval(interval)
+  }, [])
+
+  const submit = () => {
+    const text = value.trim()
+    if (!text) return
+    setConcept(text)
+    setActivated(true)
+    const el = document.getElementById('dashboard-main')
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounterRef.current++
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounterRef.current--
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    dragCounterRef.current = 0
+
+    const { files, items } = e.dataTransfer
+
+    // Handle files
+    if (files && files.length > 0) {
+      addFiles(Array.from(files))
+    }
+
+    // Handle URLs from drag
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === 'string' && items[i].type === 'text/uri-list') {
+          items[i].getAsString((url) => {
+            try {
+              new URL(url)
+              addUrl(url)
+            } catch {}
+          })
+        }
+      }
+    }
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const text = e.clipboardData.getData('text')
+    // Check if pasted text is a URL
+    try {
+      const url = new URL(text.trim())
+      if (url.protocol === 'http:' || url.protocol === 'https:') {
+        e.preventDefault()
+        addUrl(text.trim())
+      }
+    } catch {
+      // Not a URL, let default paste behavior happen
+    }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      addFiles(Array.from(e.target.files))
+    }
+  }
+
+  if (activated && concept) {
+    return (
+      <div className="panel p-4 flex items-start justify-between">
+        <div>
+          <div className="text-xs text-white/60 mb-1">Current Story</div>
+          <div className="font-semibold">{concept}</div>
+          <div className="mt-2 text-xs text-white/60">Persona: {prefs.persona} • Focus: {prefs.platforms.join(', ')} • Areas: {prefs.areasOfInterest.join(', ')}</div>
+        </div>
+        <button onClick={() => setActivated(false)} className="px-3 py-2 rounded-md text-sm border border-white/10 bg-white/5 hover:bg-white/10">Edit</button>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="text-center relative"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-ralph-pink/10 backdrop-blur-sm border-2 border-dashed border-ralph-pink rounded-2xl flex items-center justify-center animate-in fade-in duration-200">
+          <div className="text-center">
+            <div className="text-6xl mb-4">📎</div>
+            <div className="text-2xl font-semibold text-ralph-pink">Drop your content here</div>
+            <div className="text-white/60 mt-2">Files, images, links, or documents</div>
+          </div>
+        </div>
+      )}
+
+      {/* Claude-like greeting */}
+      <div className="mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <h1 className="text-4xl md:text-5xl font-semibold mb-3 bg-gradient-to-r from-ralph-pink to-ralph-teal bg-clip-text text-transparent">
+          What story do you want to tell?
+        </h1>
+        {/* Rotating messages */}
+        <div className="relative h-14 flex items-center justify-center">
+          {messages.map((message, index) => (
+            <p
+              key={index}
+              className={`absolute text-white/60 text-lg transition-all duration-700 ${
+                currentMessage === index
+                  ? 'opacity-100 translate-y-0'
+                  : 'opacity-0 translate-y-4 pointer-events-none'
+              }`}
+            >
+              {message}
+            </p>
+          ))}
+        </div>
+      </div>
+
+      {/* Input area - Claude-like */}
+      <div className="panel module p-6 md:p-8 transform-gpu animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
+        <textarea
+          className="w-full bg-charcoal-800/50 border border-white/10 rounded-lg p-4 text-base placeholder-white/40 resize-none focus:border-ralph-pink/50 focus:bg-charcoal-800/70 transition-all min-h-[120px]"
+          placeholder="Describe your story concept, creative idea, or project vision..."
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onPaste={handlePaste}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault()
+              submit()
+            }
+          }}
+        />
+
+        {/* Uploaded content chips */}
+        {processed.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {processed.map((item) => (
+              <div
+                key={item.id}
+                className="group relative flex items-center gap-2 px-3 py-2 bg-charcoal-700/50 border border-white/10 rounded-lg text-xs hover:border-ralph-pink/30 transition-all"
+              >
+                {/* Icon based on type */}
+                <span className="text-lg">
+                  {item.type === 'image' ? '🖼️' : item.type === 'document' ? '📄' : item.type === 'url' ? '🔗' : '📁'}
+                </span>
+                {/* Preview for images */}
+                {item.preview && (
+                  <img src={item.preview} alt="" className="w-6 h-6 rounded object-cover" />
+                )}
+                <span className="text-white/80 max-w-[150px] truncate">{item.name}</span>
+                {/* Remove button */}
+                <button
+                  onClick={() => removeContent(item.id)}
+                  className="opacity-0 group-hover:opacity-100 ml-1 text-white/40 hover:text-ralph-pink transition-all"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Example prompts */}
+        <div className="mt-4 mb-4">
+          <div className="text-xs text-white/50 mb-3 text-left">Try an example:</div>
+          <div className="flex flex-wrap gap-2 justify-start">
+            {examples.map(e => (
+              <button
+                key={e}
+                onClick={() => setValue(e)}
+                className="px-3 py-2 rounded-lg text-sm border border-white/10 bg-charcoal-700/30 hover:bg-charcoal-700/50 hover:border-ralph-pink/30 transition-all"
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Submit button and upload hint */}
+        <div className="flex items-center justify-between mt-6">
+          <div className="flex items-center gap-3">
+            <div className="text-xs text-white/40">
+              {prefs.persona} • {prefs.platforms.join(', ')}
+            </div>
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={handleFileSelect}
+              accept="image/*,.pdf,.doc,.docx,.txt,.md"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="text-xs text-white/40 hover:text-ralph-pink flex items-center gap-1 transition-all"
+              title="Upload files"
+            >
+              📎 Upload
+            </button>
+          </div>
+          <button
+            onClick={submit}
+            disabled={!value.trim()}
+            className="px-6 py-3 rounded-lg text-sm font-medium bg-gradient-to-r from-ralph-pink to-ralph-teal hover:shadow-glow disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          >
+            Start Exploring →
+          </button>
+        </div>
+      </div>
+
+      {/* Hint */}
+      <div className="mt-4 text-xs text-white/40 animate-in fade-in duration-700 delay-300">
+        Press <kbd className="px-2 py-1 rounded bg-white/5 border border-white/10">⌘ Enter</kbd> or <kbd className="px-2 py-1 rounded bg-white/5 border border-white/10">Ctrl Enter</kbd> to submit
+      </div>
+    </div>
+  )
+}

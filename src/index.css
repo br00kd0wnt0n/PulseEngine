@@ -1,0 +1,93 @@
+@import './styles/ralph-tv.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+
+html, body, #root {
+  height: 100%;
+}
+
+/* Smooth focus styles */
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--brand-pink), 0 0 0 4px rgba(255,255,255,0.06);
+}
+
+.accent-gradient { background: linear-gradient(135deg, var(--brand-pink), var(--brand-teal)); }
+
+.panel { @apply bg-charcoal-800/80 border border-white/5 rounded-xl; }
+
+/* Tactile modules */
+.module {
+  position: relative;
+  transition: transform 180ms ease, box-shadow 200ms ease, border-color 200ms ease;
+  box-shadow: var(--shadow-md, 0 2px 8px rgba(0,0,0,0.35));
+}
+.module:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg, 0 6px 24px rgba(0,0,0,0.45)); }
+.module::before {
+  content: '';
+  position: absolute; left: 0; right: 0; top: 0; height: 2px;
+  background: linear-gradient(90deg, var(--brand-pink, #EB008B), var(--brand-teal, #31BDBF));
+  opacity: 0.7; border-top-left-radius: 0.75rem; border-top-right-radius: 0.75rem;
+}
+
+/* Progressive disclosure animations */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in-from-bottom {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in {
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fade-in;
+}
+
+.slide-in-from-bottom-2 {
+  animation-name: slide-in-from-bottom;
+  --tw-translate-y: 0.5rem;
+}
+
+.slide-in-from-bottom-4 {
+  animation-name: slide-in-from-bottom;
+  --tw-translate-y: 1rem;
+}
+
+.duration-500 {
+  animation-duration: 500ms;
+}
+
+.duration-700 {
+  animation-duration: 700ms;
+}
+
+.delay-150 {
+  animation-delay: 150ms;
+}
+
+.delay-300 {
+  animation-delay: 300ms;
+}
+
+/* Gradient text for headings */
+.bg-clip-text {
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}

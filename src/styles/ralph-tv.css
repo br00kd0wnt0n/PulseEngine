@@ -1,0 +1,51 @@
+/* RalphTV-inspired tokens and surface styles */
+:root {
+  /* Brand */
+  --brand-pink: #EB008B;
+  --brand-teal: #31BDBF;
+
+  /* Surfaces */
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #1a1a1a;
+  --bg-tertiary: #252525;
+  --bg-elevated: #2a2a2a;
+
+  /* Text */
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0b0;
+  --text-tertiary: #808080;
+
+  /* Borders */
+  --border-subtle: #2a2a2a;
+  --border-default: #3a3a3a;
+  --border-strong: #4a4a4a;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.7);
+
+  --glow-pink: 0 0 12px rgba(235, 0, 139, 0.5);
+  --glow-pink-strong: 0 0 20px rgba(235, 0, 139, 0.8);
+  --glow-teal: 0 0 12px rgba(49, 189, 191, 0.5);
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); border-left: 1px solid var(--border-default); }
+::-webkit-scrollbar-thumb {
+  background: #3a3a3a; border: 2px solid var(--bg-primary); border-radius: 6px; transition: all 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover { background: #4a4a4a; box-shadow: 0 0 8px rgba(235, 0, 139, 0.4); border-color: var(--brand-pink); }
+::-webkit-scrollbar-thumb:active { background: var(--brand-pink); box-shadow: 0 0 12px rgba(235, 0, 139, 0.8); }
+* { scrollbar-width: thin; scrollbar-color: #3a3a3a var(--bg-primary); }
+
+/* Optional utility surfaces to mirror broadcaster panels */
+.surface-secondary { background: var(--bg-secondary); border: 1px solid var(--border-default); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
+.btn-ghost { background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 6px 14px; font-size: 12px; }
+.btn-ghost:hover { background: var(--bg-tertiary); border-color: var(--brand-pink); box-shadow: var(--glow-pink); }
+
