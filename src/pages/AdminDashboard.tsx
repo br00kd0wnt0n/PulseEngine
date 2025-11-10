@@ -32,9 +32,8 @@ export default function AdminDashboard() {
         {loading ? (<div className="text-white/60 text-sm">Loading…</div>) : error ? (
           <div className="text-red-400 text-sm">{error}</div>
         ) : data ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid sm:grid-cols-2 gap-3">
             <ServiceCard name="API" ok={data.services.api.ok} detail={data.services.api.status} />
-            <ServiceCard name="Ingestion" ok={data.services.ingestion.ok} detail={data.services.ingestion.status} />
             <ServiceCard name="Database" ok={true} detail={`Size ${bytes(data.database.sizeBytes)}`} />
           </div>
         ) : null}

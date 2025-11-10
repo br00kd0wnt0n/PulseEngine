@@ -9,7 +9,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export type StatusOverview = {
-  services: { api: { ok: boolean; status: string }; ingestion: { ok: boolean; status: string } }
+  services: { api: { ok: boolean; status: string } }
   database: { sizeBytes: number | null; tables: { name: string; bytes: number }[] }
   stats: { users: number; creators: number; trends: number; assets: number }
 }

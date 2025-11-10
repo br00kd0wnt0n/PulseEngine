@@ -25,25 +25,9 @@ router.get('/overview', async (_req, res) => {
     ORDER BY bytes DESC
   `)
 
-  // Ingestion service health (optional)
-  let ingestion = { ok: false, status: 'unknown' as string }
-  const base = process.env.INGESTION_URL
-  if (base) {
-    try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 2500)
-      const r = await fetch(`${base.replace(/\/$/, '')}/health`, { signal: ctrl.signal })
-      clearTimeout(t)
-      ingestion = { ok: r.ok, status: r.ok ? 'healthy' : `http ${r.status}` }
-    } catch (e: any) {
-      ingestion = { ok: false, status: e?.name === 'AbortError' ? 'timeout' : 'error' }
-    }
-  }
-
   res.json({
     services: {
       api: { ok: true, status: 'healthy' },
-      ingestion,
     },
     database: {
       sizeBytes: dbSize?.bytes ?? null,
@@ -95,28 +79,11 @@ router.get('/preflight', async (_req, res) => {
     issues.push(`db:error ${e?.message || e}`)
   }
 
-  // Ingestion health
-  let ingestion = { ok: false, status: 'unset' as string }
-  if (process.env.INGESTION_URL) {
-    try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 2500)
-      const r = await fetch(`${process.env.INGESTION_URL!.replace(/\/$/, '')}/health`, { signal: ctrl.signal })
-      clearTimeout(t)
-      ingestion = { ok: r.ok, status: r.ok ? 'healthy' : `http ${r.status}` }
-      if (!r.ok) issues.push(`ingestion:${ingestion.status}`)
-    } catch (e: any) {
-      ingestion = { ok: false, status: 'unreachable' }
-      issues.push('ingestion:unreachable')
-    }
-  }
-
   res.json({
     ok: issues.length === 0,
     issues,
     env,
     db: { ok: dbOk, schema, rls },
-    services: { ingestion },
   })
 })
 
