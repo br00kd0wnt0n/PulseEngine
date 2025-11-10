@@ -56,10 +56,10 @@ railway run --service api npm run migration:run
 2. Click "Settings" → "Deploy"
 3. Add a one-time deployment command:
    ```bash
-   npm run migration:run
+   node migrate.cjs
    ```
 4. After migrations complete, remove this command
-5. Redeploy with normal start command: `node dist/index.js`
+5. Redeploy with normal start command: `node dist/src/index.js`
 
 **Option C: Temporary Migration Service**
 
