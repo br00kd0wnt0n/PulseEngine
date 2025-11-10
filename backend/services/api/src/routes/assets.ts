@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { AppDataSource } from '../db/data-source'
-import { ContentAsset } from '../db/entities/ContentAsset'
+import { AppDataSource } from '../db/data-source.js'
+import { ContentAsset } from '../db/entities/ContentAsset.js'
 
 const router = Router()
 

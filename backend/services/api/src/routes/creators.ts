@@ -1,7 +1,7 @@
 import { Router } from 'express'
-import { AppDataSource } from '../db/data-source'
-import { Creator } from '../db/entities/Creator'
-import { JwtClaims } from '../middleware/auth'
+import { AppDataSource } from '../db/data-source.js'
+import { Creator } from '../db/entities/Creator.js'
+import { JwtClaims } from '../middleware/auth.js'
 
 const router = Router()
 

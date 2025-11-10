@@ -1,6 +1,6 @@
 import { Router } from 'express'
-import { AppDataSource } from '../db/data-source'
-import { Trend } from '../db/entities/Trend'
+import { AppDataSource } from '../db/data-source.js'
+import { Trend } from '../db/entities/Trend.js'
 
 const router = Router()
 

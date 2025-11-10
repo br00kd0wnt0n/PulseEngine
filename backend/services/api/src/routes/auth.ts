@@ -1,8 +1,8 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { AppDataSource } from '../db/data-source'
-import { User } from '../db/entities/User'
+import { AppDataSource } from '../db/data-source.js'
+import { User } from '../db/entities/User.js'
 
 const router = Router()
 

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
-import { AppDataSource } from '../db/data-source'
+import { AppDataSource } from '../db/data-source.js'
 
 export type JwtClaims = { sub: string; role: 'user' | 'admin'; email: string }
 

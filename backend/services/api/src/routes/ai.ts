@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { narrativeFromTrends } from '../services/ai'
+import { narrativeFromTrends } from '../services/ai.js'
 
 const router = Router()
 

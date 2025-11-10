@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { AppDataSource } from '../db/data-source'
+import { AppDataSource } from '../db/data-source.js'
 
 async function run() {
   await AppDataSource.initialize()
