@@ -33,15 +33,16 @@ async function main() {
 
   app.get('/health', (_req, res) => res.json({ ok: true }))
 
+  // Public routes
   app.use('/auth', authRoutes)
+  app.use('/status', statusRoutes)
 
-  // secure routes
+  // Secure routes (require authentication)
   app.use(authMiddleware, attachRls)
   app.use('/creators', creatorRoutes)
   app.use('/trends', trendRoutes)
   app.use('/assets', assetRoutes)
   app.use('/ai', aiRoutes)
-  app.use('/status', statusRoutes)
   app.use('/ingest', ingestionRoutes)
 
   // error handler
