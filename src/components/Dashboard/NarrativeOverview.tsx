@@ -63,10 +63,21 @@ export default function NarrativeOverview() {
             const platformFit = 60 + (t.id.charCodeAt(0) % 35)
 
             return (
-              <Tooltip
-                key={t.id}
-                position="left"
-                content={
+              <div key={t.id} className="flex items-start gap-2">
+                <div className="flex-1 text-xs cursor-help transition-all hover:bg-white/5 hover:border-ralph-pink/30 rounded-lg p-2 border border-transparent">
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/80 font-medium">{t.label}</span>
+                    <span className="text-white/50 text-[10px]">platform fit</span>
+                  </div>
+                  <div className="mt-1.5 h-2 w-full bg-charcoal-700/50 rounded overflow-hidden">
+                    <div
+                      className="h-2 rounded accent-gradient transition-all duration-300"
+                      style={{ width: `${platformFit}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 text-[10px] text-white/40 text-right">{platformFit}%</div>
+                </div>
+                <Tooltip label={t.label}>
                   <div className="space-y-2">
                     <div className="font-semibold text-sm text-white border-b border-white/10 pb-2">
                       {t.label}
@@ -100,22 +111,8 @@ export default function NarrativeOverview() {
                       </div>
                     </div>
                   </div>
-                }
-              >
-                <div className="text-xs cursor-help transition-all hover:bg-white/5 hover:border-ralph-pink/30 rounded-lg p-2 border border-transparent">
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/80 font-medium">{t.label}</span>
-                    <span className="text-white/50 text-[10px]">platform fit</span>
-                  </div>
-                  <div className="mt-1.5 h-2 w-full bg-charcoal-700/50 rounded overflow-hidden">
-                    <div
-                      className="h-2 rounded accent-gradient transition-all duration-300"
-                      style={{ width: `${platformFit}%` }}
-                    />
-                  </div>
-                  <div className="mt-1 text-[10px] text-white/40 text-right">{platformFit}%</div>
-                </div>
-              </Tooltip>
+                </Tooltip>
+              </div>
             )
           })}
         </div>
