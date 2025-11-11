@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { AppDataSource } from '../db/data-source'
+import { AppDataSource } from '../db/data-source.js'
 import { AICache } from '../db/entities/AICache.js'
 
 export type TrendGraph = { nodes: { id: string; label: string; kind: 'trend'|'creator'|'content' }[]; links: { source: string; target: string }[] }
