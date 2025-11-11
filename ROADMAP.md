@@ -320,3 +320,276 @@ Cache aggressively:
 2. Implement OpenAI-powered narrative generation
 3. Create Projects model and endpoints
 4. Build seed data script
+
+---
+
+## Architecture & Technical Stack
+
+### Current MVP Architecture
+
+**Database: PostgreSQL on Railway**
+- Users, Creators, Trends, ContentAssets, Projects tables
+- Row-Level Security (RLS) for multi-tenant isolation
+- TypeORM for entity management and migrations
+
+**Backend: Monolithic Node.js/Express API**
+- TypeScript for type safety
+- Single API service (`backend/services/api`)
+- Routes: `/auth`, `/ai`, `/projects`, `/creators`, `/trends`, `/assets`, `/ingest`, `/status`
+- Multer for in-memory file uploads (temporary storage)
+
+**Frontend: React + Vite + TypeScript**
+- Tailwind CSS with custom design system
+- Context-based state management
+- Progressive disclosure UI pattern
+- Deployed to Railway
+
+**AI Integration: OpenAI**
+- Model: `gpt-4o-mini` (cost-effective, fast)
+- Embeddings: `text-embedding-3-small` (optional, Phase 3)
+- Caching strategy with hash-based deduplication
+
+**Authentication**
+- JWT-based authentication
+- bcryptjs for password hashing
+- Row-Level Security enforcement per user
+
+**Deployment**
+- Railway (single region)
+- Automatic deployments from GitHub
+- Environment-based configuration
+
+---
+
+### Content Processing Pipeline (MVP)
+
+**Multiformat Content Ingestion**
+- **Direct uploads:** Text, PDFs, images via multer
+- **URL parsing:** Fetch metadata (title, description, og:tags) from web links
+- **Platform detection:** TikTok, YouTube, Instagram, Twitter/X
+- **Metadata storage:** All stored in PostgreSQL `content_assets` table
+
+**Content Assessment Service**
+- **Phase 2:** Basic keyword matching and tagging
+- **Phase 3:** AI-powered content analysis using OpenAI
+  - Extract topics and themes
+  - Generate contextual tags
+  - Calculate narrative potential
+  - Link to relevant trends and creators
+
+**Text Extraction (Phase 2+)**
+- **PDFs:** Basic metadata extraction initially, full text extraction in Phase 2
+- **Images:** Filename-based tagging initially, OCR/vision models later
+- **Documents:** Direct text extraction for .txt, .docx support in Phase 2
+
+---
+
+### AI Integration Layer (Phase 0-3)
+
+**Model Selection Framework**
+- **Primary:** OpenAI GPT-4o-mini (narrative generation, content analysis)
+- **Embeddings:** OpenAI text-embedding-3-small (similarity search, recommendations)
+- **Future consideration:** Anthropic Claude, Google Gemini (multi-model support)
+
+**Narrative Generation Service (Phase 3)**
+- Structured prompts with context from:
+  - Current trends from database
+  - Creator profiles and resonance scores
+  - User's concept text and preferences
+- Output: Narrative, "why now", hooks, time-to-peak prediction
+- Caching by input hash to reduce API costs
+
+**Content Analysis Service (Phase 3)**
+- `/ai/score` endpoint for predictive scoring:
+  - `audiencePotential`: Target audience size and engagement likelihood
+  - `narrativeStrength`: Story coherence and cultural relevance
+  - `timeToPeak`: Predicted timeline to maximum virality
+  - `collaborationOpportunity`: Recommended creator partnerships
+
+**Smart Recommendations (Phase 3 - Optional)**
+- Embeddings-based similarity for:
+  - Trend-to-trend connections
+  - Creator-to-concept matching
+  - Content-to-audience alignment
+- Cosine similarity search beyond simple keyword matching
+
+---
+
+### Authentication & User Management
+
+**Current Implementation**
+- JWT tokens with expiry
+- bcryptjs password hashing (cost factor: 12)
+- Row-Level Security (RLS) enforces data isolation per user
+- Simple role field (`user` | `admin`)
+
+**Creator Profile System (Phase 2+)**
+- Extended user profiles with creator-specific metadata
+- Portfolio/work showcase references
+- Social media integration for verification
+
+**Future: Social Authentication**
+- OAuth integration (Google, Twitter, TikTok)
+- Social media profile import
+- Creator verification badges
+
+---
+
+### Data Processing Pipelines (Phase 1-3)
+
+**Trend Mapping Service (Phase 1-2)**
+- Cross-platform trend correlation via `platform_metrics` table
+- Temporal trend analysis (createdAt, updatedAt tracking)
+- Narrative potential scoring in `trends.metrics` JSONB field
+
+**Creator Matching Engine (Phase 3)**
+- Skill-based matching using creator tags
+- Collaboration potential assessment from historical data
+- Dynamic recommendations via embeddings similarity
+
+**Ingestion Pipeline (Phase 2)**
+- URL scraping with metadata extraction
+- Platform detection and normalization
+- Automatic tagging and trend linkage
+- Update trend metrics when new content is added
+
+---
+
+### Monitoring & Observability (Phase 5)
+
+**Logging**
+- Pino structured logging (JSON format)
+- Request/response logging via pino-http
+- Error tracking with stack traces
+- AI API call logging (inputs/outputs for prompt tuning)
+
+**Performance Metrics**
+- Database query performance (TypeORM logging)
+- API endpoint response times
+- AI API latency and cost tracking
+- User interaction analytics (future)
+
+**Health Checks**
+- `/health` endpoint for service availability
+- `/status/overview` for dashboard monitoring
+- `/status/preflight` for comprehensive system checks
+
+**Rate Limiting & Cost Control (Phase 5)**
+- Rate limit AI endpoints to prevent abuse
+- Daily API call caps with feature flags
+- Exponential backoff on client for retries
+- Cache-first strategy to minimize repeat calls
+
+---
+
+### Security & Compliance
+
+**Data Security**
+- PostgreSQL RLS for multi-tenant isolation
+- JWT tokens for stateless authentication
+- bcryptjs for secure password storage
+- Environment variables for secrets (never in code)
+
+**API Security**
+- Helmet.js for HTTP security headers
+- CORS configuration for frontend origin
+- Input validation with Zod schemas
+- SQL injection prevention via TypeORM parameterization
+
+**Privacy Considerations**
+- User data belongs to user (enforced by RLS)
+- Optional PII redaction for ingested content
+- GDPR/CCPA compliance considerations for future
+
+**OpenAI Security**
+- API key stored as server-side environment variable only
+- Never exposed to frontend
+- Content sanitization before sending to API
+- Audit logging of AI requests
+
+---
+
+### Storage Strategy
+
+**Current (MVP): Database-Only Storage**
+- Content metadata in PostgreSQL `content_assets` table
+- File uploads stored in-memory (Multer) then discarded
+- URLs referenced, not downloaded/stored
+
+**Phase 2: Persistent File Storage**
+- Consider Railway Volume for uploaded files
+- Or integrate AWS S3/CloudFlare R2 for scalable object storage
+- Store references in database, actual files in object storage
+- Tiered storage: hot (recent), cold (archived)
+
+**Future: Content Processing Bucket**
+- Temporary staging for AI processing jobs
+- Queue-based processing for heavy operations (PDF OCR, video analysis)
+- Webhook notifications when processing completes
+
+---
+
+### Future Architecture Considerations (Post-MVP)
+
+**Scalability Path**
+- Horizontal scaling: Deploy multiple API instances behind load balancer
+- Database read replicas for high-traffic scenarios
+- Redis caching layer for frequently accessed data
+- Message queue (RabbitMQ/BullMQ) for async processing
+
+**Microservices Decomposition (if needed)**
+- Auth service (authentication/authorization)
+- Ingestion service (content upload/processing)
+- AI service (narrative generation, scoring)
+- Analytics service (metrics, trends)
+
+**Infrastructure Evolution**
+- **Phase 1-3:** Monolith on Railway (current)
+- **Phase 4+:** Consider containerization (Docker)
+- **Scale phase:** Kubernetes orchestration (if traffic warrants)
+- **Multi-region:** CDN for static assets, regional database replicas
+
+**Advanced AI Features**
+- Multi-model ensemble (OpenAI + Anthropic + Google)
+- Fine-tuned models for domain-specific narrative generation
+- RAG (Retrieval-Augmented Generation) with vector database
+- Real-time trend prediction models
+
+---
+
+### Technology Stack Summary
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Database** | PostgreSQL | Relational data with RLS |
+| **Backend** | Node.js + Express + TypeScript | API server |
+| **ORM** | TypeORM | Database entity management |
+| **Frontend** | React + Vite + TypeScript | User interface |
+| **Styling** | Tailwind CSS | Design system |
+| **Authentication** | JWT + bcryptjs | User auth |
+| **AI** | OpenAI (gpt-4o-mini) | Narrative generation |
+| **File Upload** | Multer | In-memory processing |
+| **Logging** | Pino | Structured logs |
+| **Deployment** | Railway | Hosting + CI/CD |
+| **Version Control** | Git + GitHub | Source control |
+
+---
+
+## Evolution Notes
+
+**MVP → Phase 2 Transition:**
+- Add persistent file storage (Railway Volume or S3)
+- Implement content processing queue
+- Enhance metadata extraction
+
+**Phase 3 → Scaling:**
+- Add Redis caching layer
+- Implement embeddings for smart recommendations
+- Optimize database queries with indexes
+
+**Post-MVP Considerations:**
+- Microservices architecture (if complexity grows)
+- Message queue for async jobs
+- Multiple AI model support
+- Advanced analytics and monitoring
+
