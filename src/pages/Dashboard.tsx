@@ -1,10 +1,11 @@
 import NarrativeOverview from '../components/Dashboard/NarrativeOverview'
-import ProjectPotentialCalculator from '../components/Dashboard/ProjectPotentialCalculator'
+import GuidedCalculator from '../components/Dashboard/GuidedCalculator'
 import CreatorPanel from '../components/Dashboard/CreatorPanel'
 import TrendEcosystem from '../components/Dashboard/TrendEcosystem'
 import ContentIngest from '../components/Dashboard/ContentIngest'
 import StoryPromptHero from '../components/Dashboard/StoryPromptHero'
 import AtAGlance from '../components/Dashboard/AtAGlance'
+import AtAGlanceV2 from '../components/Dashboard/AtAGlanceV2'
 import { useDashboard } from '../context/DashboardContext'
 
 export default function Dashboard() {
@@ -28,12 +29,12 @@ export default function Dashboard() {
       {/* Full-width primary insight modules for strong hierarchy */}
       <div className="space-y-6 mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
         <NarrativeOverview />
-        <AtAGlance />
+        <AtAGlanceV2 />
       </div>
       {/* Two-column insight/workflow modules */}
       <div id="dashboard-main" className="grid xl:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
         <div className="space-y-6">
-          <ProjectPotentialCalculator />
+          <GuidedCalculator />
           <TrendEcosystem />
         </div>
         <div className="space-y-6">

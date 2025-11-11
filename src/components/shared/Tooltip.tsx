@@ -1,37 +1,23 @@
-import { ReactNode, useState } from 'react'
+import { useState } from 'react'
 
-type TooltipProps = {
-  children: ReactNode
-  content: ReactNode
-  position?: 'top' | 'bottom' | 'left' | 'right'
-}
-
-export default function Tooltip({ children, content, position = 'top' }: TooltipProps) {
-  const [isVisible, setIsVisible] = useState(false)
-
-  const positionClasses = {
-    top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
-    bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
-    left: 'right-full top-1/2 -translate-y-1/2 mr-2',
-    right: 'left-full top-1/2 -translate-y-1/2 ml-2',
-  }
-
+export default function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
   return (
-    <div
-      className="relative inline-block"
-      onMouseEnter={() => setIsVisible(true)}
-      onMouseLeave={() => setIsVisible(false)}
-    >
-      {children}
-      {isVisible && (
-        <div
-          className={`absolute z-50 ${positionClasses[position]} animate-in fade-in slide-in-from-bottom-2 duration-200`}
-        >
-          <div className="bg-charcoal-800 border border-white/20 rounded-lg shadow-lg p-3 min-w-[200px] max-w-[300px]">
-            {content}
-          </div>
-        </div>
+    <span className="relative inline-flex items-center">
+      <button
+        aria-label={label}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        className="ml-1 inline-flex items-center justify-center h-4 w-4 rounded-full text-[10px] bg-white/10 border border-white/20"
+      >
+        ?
+      </button>
+      {open && (
+        <span className="absolute z-50 top-5 right-0 w-56 p-2 rounded-md text-[11px] bg-charcoal-800 border border-white/10 shadow-md">
+          {children}
+        </span>
       )}
-    </div>
+    </span>
   )
 }
+
