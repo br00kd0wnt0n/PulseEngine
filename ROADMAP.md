@@ -304,7 +304,7 @@ Cache aggressively:
 
 ## Current Status
 
-### ✅ Completed
+### ✅ Completed - Infrastructure & Core Services
 - Backend API deployed on Railway
 - PostgreSQL database with RLS policies
 - Frontend deployed and connected
@@ -312,14 +312,61 @@ Cache aggressively:
 - Consolidated ingestion service into API
 - Basic health checks and status monitoring
 
-### 🚧 In Progress
-- Phase 0: OpenAI integration setup
+### ✅ Completed - Phase 0: OpenAI Integration
+- OpenAI SDK integrated (gpt-4o-mini)
+- AI service with narrative generation
+- Scoring endpoint for concept evaluation
+- Caching layer for AI responses (AICache table)
+- Fallback to mock data when API key missing
+- Frontend connected to `/ai/narrative` and `/ai/score`
+
+### ✅ Completed - Phase 1: Projects & Seed Data
+- **Database Schema:**
+  - `projects` table for saving story concepts and outputs
+  - `ai_cache` table for response caching
+  - `platform_metrics` table for engagement tracking
+  - MvpExtras migration applied with RLS policies
+
+- **Backend Endpoints:**
+  - `POST /projects` - Create project with concept
+  - `GET /projects/:id` - Retrieve project
+  - `GET /projects` - List user's projects
+  - `POST /admin/seed` - Load realistic demo data
+  - `GET /status/preflight` - System health check
+  - `GET /public/*` - Public unauthenticated routes
+
+- **Seed Data System:**
+  - JSON seed files (creators, trends, assets)
+  - Seed runner with cross-linking logic
+  - 50+ creators, 30+ trends, 100+ content assets
+  - AI-enhanced seeding with `withAI` flag
+  - Dry-run mode for testing
+
+- **Document Processing:**
+  - Word document support (mammoth)
+  - PDF text extraction (pdf-parse)
+  - Platform detection for social URLs
+
+- **Frontend Enhancements:**
+  - "Run Preflight" button in admin dashboard
+  - "Load Demo Data" button to populate database
+  - Story Prompt Hero integrated with projects API
+  - Project Potential Calculator with live AI scoring
+  - Narrative Overview with AI-generated content
+  - Enhanced Trend Map visualization
+
+### 🚧 In Progress - Phase 2: Ingestion Enrichment
+- URL metadata extraction (og:tags, titles)
+- Enhanced platform detection
+- Content tagging and trend linkage
 
 ### 📋 Next Steps
-1. Add `OPENAI_API_KEY` to Railway environment
-2. Implement OpenAI-powered narrative generation
-3. Create Projects model and endpoints
-4. Build seed data script
+1. **Deploy Phase 0-1:** Merge feature branches to main
+2. **Run Migration:** Execute MvpExtras migration on production
+3. **Configure OpenAI:** Set `OPENAI_API_KEY` in Railway environment
+4. **Load Demo Data:** Use admin dashboard to seed database
+5. **Test End-to-End:** Verify narrative generation with real OpenAI API
+6. **Phase 2:** Begin URL ingestion enhancements
 
 ---
 
