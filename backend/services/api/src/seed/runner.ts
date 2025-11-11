@@ -20,7 +20,8 @@ function rng(seed: string) {
 }
 
 export async function runSeed({ dry = false, withAI = true }: { dry?: boolean; withAI?: boolean }) {
-  const seedDir = path.resolve(process.cwd(), 'seed')
+  // Find seed files relative to the project root (3 levels up from dist/src/seed, then down to seed/)
+  const seedDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..', '..', 'seed')
   const trends: TrendSeed[] = JSON.parse(fs.readFileSync(path.join(seedDir, 'trends.json'), 'utf-8'))
   const creators: CreatorSeed[] = JSON.parse(fs.readFileSync(path.join(seedDir, 'creators.json'), 'utf-8'))
   const assets: AssetSeed[] = JSON.parse(fs.readFileSync(path.join(seedDir, 'assets.json'), 'utf-8'))
