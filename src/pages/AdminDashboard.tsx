@@ -28,7 +28,21 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <div className="panel module p-4">
-        <div className="font-semibold mb-3">Service Status</div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-semibold">Service Status</div>
+          <div className="flex gap-2">
+            <button className="px-2 py-1 text-xs rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={async () => {
+              setLoading(true)
+              try { const pf = await api.preflight(); alert(`Preflight: ${pf.ok ? 'OK' : 'Issues'}\n` + ((pf.issues||[]).join('\n') || '')) } catch (e:any) { alert('Preflight failed: ' + String(e)) }
+              setLoading(false)
+            }}>Run Preflight</button>
+            <button className="px-2 py-1 text-xs rounded border border-white/10 bg-ralph-pink/60 hover:bg-ralph-pink" onClick={async () => {
+              setLoading(true)
+              try { const r = await api.adminSeed({ dry: false, withAI: true }); alert('Seed complete: ' + JSON.stringify(r.result || r)) } catch (e:any) { alert('Seed failed: ' + String(e)) }
+              setLoading(false)
+            }}>Load Demo Data</button>
+          </div>
+        </div>
         {loading ? (<div className="text-white/60 text-sm">Loading…</div>) : error ? (
           <div className="text-red-400 text-sm">{error}</div>
         ) : data ? (
@@ -90,4 +104,3 @@ function Stat({ label, value }: { label: string; value: number | string }) {
     </div>
   )
 }
-

@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useDashboard } from '../../context/DashboardContext'
+import { api } from '../../services/api'
+import { useTrends } from '../../context/TrendContext'
 import { usePreferences } from '../../context/PreferencesContext'
 import { useUpload } from '../../context/UploadContext'
 
@@ -33,11 +35,19 @@ export default function StoryPromptHero() {
     return () => clearInterval(interval)
   }, [])
 
-  const submit = () => {
+  const { snapshot } = useTrends()
+
+  const submit = async () => {
     const text = value.trim()
     if (!text) return
     setConcept(text)
     setActivated(true)
+    try {
+      // create a project to persist and generate narrative/scores on backend
+      await api.createProject({ concept: text, graph: snapshot(), focusId: null })
+    } catch (_e) {
+      // ignore on MVP if API not configured
+    }
     const el = document.getElementById('dashboard-main')
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }

@@ -2,6 +2,7 @@ import { DragEvent, useMemo, useState, useEffect } from 'react'
 import { useTrends } from '../../context/TrendContext'
 import { useCreators } from '../../context/CreatorContext'
 import { scoreConcept, potentialColor } from '../../services/scoring'
+import { api } from '../../services/api'
 import { useDashboard } from '../../context/DashboardContext'
 
 export default function ProjectPotentialCalculator() {
@@ -12,7 +13,19 @@ export default function ProjectPotentialCalculator() {
   useEffect(() => { if (sharedConcept) setConcept(sharedConcept) }, [sharedConcept])
   const [drag, setDrag] = useState(false)
 
-  const analysis = useMemo(() => scoreConcept(concept, snapshot(), creators), [concept, snapshot, creators])
+  const localAnalysis = useMemo(() => scoreConcept(concept, snapshot(), creators), [concept, snapshot, creators])
+  const [remote, setRemote] = useState<any | null>(null)
+  useEffect(() => {
+    let cancel = false
+    ;(async () => {
+      try {
+        const r = await api.score(concept, snapshot())
+        if (!cancel) setRemote(r)
+      } catch { setRemote(null) }
+    })()
+    return () => { cancel = true }
+  }, [concept, snapshot])
+  const analysis = remote || localAnalysis
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault(); e.stopPropagation(); setDrag(false)
@@ -50,6 +63,17 @@ export default function ProjectPotentialCalculator() {
           <div className="text-lg font-semibold">{analysis.scores.timeToPeakWeeks} weeks</div>
         </div>
       </div>
+
+      {analysis.ralph && (
+        <div className="mt-4 panel p-3">
+          <div className="text-xs text-white/60 mb-2">Ralph Scoring</div>
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <Score label="Adaptability" value={analysis.ralph.narrativeAdaptability} />
+            <Score label="Cross-Platform" value={analysis.ralph.crossPlatformPotential} />
+            <Score label="Cultural Relevance" value={analysis.ralph.culturalRelevance} />
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 grid md:grid-cols-2 gap-3">
         <div className="panel p-3">

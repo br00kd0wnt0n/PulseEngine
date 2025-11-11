@@ -56,6 +56,20 @@ paths:
       security: [ { bearerAuth: [] } ]
       summary: Generate narrative from trend graph
       responses: { '200': { description: OK } }
+  /ai/score:
+    post:
+      security: [ { bearerAuth: [] } ]
+      summary: Score a concept (MVP Scoring)
+      responses: { '200': { description: OK } }
+  /projects:
+    get:
+      security: [ { bearerAuth: [] } ]
+      summary: List projects
+      responses: { '200': { description: OK } }
+    post:
+      security: [ { bearerAuth: [] } ]
+      summary: Create project (story + persona) and generate narrative/scores
+      responses: { '201': { description: Created } }
   /status/overview:
     get:
       security: [ { bearerAuth: [] } ]

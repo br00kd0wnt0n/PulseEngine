@@ -3,6 +3,7 @@ import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
 import multer from 'multer'
+// lazy import heavy parsers
 import dotenv from 'dotenv'
 import pino from 'pino'
 import pinoHttp from 'pino-http'
@@ -46,7 +47,7 @@ async function main() {
     const repo = ds.getRepository(ContentAsset)
     const saved = [] as ContentAsset[]
     for (const f of files) {
-      const meta = analyzeBuffer(f)
+      const meta = await analyzeFile(f)
       const a = repo.create({ name: f.originalname, url: null, tags: meta.tags, metadata: meta.metadata, ownerId })
       saved.push(await repo.save(a))
     }
@@ -58,7 +59,7 @@ async function main() {
     const ownerId = (req.body?.ownerId as string) || ''
     if (!ownerId || !req.file) return res.status(400).json({ error: 'ownerId and file required' })
     await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
-    const meta = { tags: { type: 'pdf' }, metadata: { bytes: req.file.size } }
+    const meta = await analyzeFile(req.file)
     const repo = ds.getRepository(ContentAsset)
     const a = repo.create({ name: req.file.originalname, tags: meta.tags, metadata: meta.metadata, ownerId })
     await repo.save(a)
@@ -79,11 +80,27 @@ function parseUrl(url: string) {
   return { title, tags, metadata }
 }
 
-function analyzeBuffer(f: Express.Multer.File) {
+async function analyzeFile(f: Express.Multer.File) {
   const ext = (f.originalname.split('.').pop() || '').toLowerCase()
   const type = f.mimetype
   const tags: Record<string, any> = { ext, type }
   const metadata: Record<string, any> = { bytes: f.size }
+  try {
+    if (ext === 'txt') {
+      const text = f.buffer.toString('utf-8')
+      metadata.text = text.slice(0, 2000)
+    } else if (ext === 'docx') {
+      const mammoth = await import('mammoth') as any
+      const result = await mammoth.extractRawText({ buffer: f.buffer })
+      metadata.text = String(result.value || '').slice(0, 4000)
+    } else if (ext === 'pdf') {
+      const pdfParse = (await import('pdf-parse')).default as any
+      const result = await pdfParse(f.buffer)
+      metadata.text = String(result.text || '').slice(0, 4000)
+    }
+  } catch {
+    // ignore parse errors in MVP
+  }
   return { tags, metadata }
 }
 

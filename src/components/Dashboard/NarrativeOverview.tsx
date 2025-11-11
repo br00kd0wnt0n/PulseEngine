@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTrends } from '../../context/TrendContext'
 import { generateNarrative } from '../../services/ai'
+import { api } from '../../services/api'
 import Tooltip from '../shared/Tooltip'
 
 export default function NarrativeOverview() {
@@ -8,8 +9,10 @@ export default function NarrativeOverview() {
   const [text, setText] = useState('')
 
   useEffect(() => {
-    // Generate once on mount for snapshot feel
-    generateNarrative(snapshot(), null).then(setText)
+    // Try backend OpenAI narrative first; fallback to local mock
+    api.narrative(snapshot(), null)
+      .then((r) => setText(r.text))
+      .catch(() => generateNarrative(snapshot(), null).then(setText))
   }, [snapshot])
 
   const trends = snapshot().nodes.filter(n => n.kind === 'trend')

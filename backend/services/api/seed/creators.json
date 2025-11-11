@@ -1,0 +1,9 @@
+[
+  { "name": "Nova Quinn", "platform": "TikTok", "category": "Comedy", "tags": ["comedy","sketch","viral"] },
+  { "name": "Echo Vale", "platform": "YouTube", "category": "Tech", "tags": ["ai","gadgets","review"] },
+  { "name": "Rae Lyric", "platform": "Instagram", "category": "Fashion", "tags": ["streetwear","aesthetic","editorial"] },
+  { "name": "Kai Drift", "platform": "Twitch", "category": "Gaming", "tags": ["gaming","esports","retro"] },
+  { "name": "Luna Voss", "platform": "TikTok", "category": "Dance", "tags": ["dance","challenge","loop"] },
+  { "name": "Milo Crest", "platform": "YouTube", "category": "DIY", "tags": ["maker","build","how-to"] }
+]
+

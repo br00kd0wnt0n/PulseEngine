@@ -1,0 +1,7 @@
+[
+  { "name": "ai-music-loop-01.mp3", "tags": ["ai","music","loop"], "metadata": {"type":"audio/mpeg"} },
+  { "name": "dance-challenge-quick-guide.txt", "tags": ["dance","challenge","how-to"], "metadata": {"type":"text/plain"} },
+  { "name": "retro-gaming-edit-ideas.pdf", "tags": ["gaming","retro","edit"], "metadata": {"type":"application/pdf"} },
+  { "name": "streetwear-lookbook.jpg", "tags": ["fashion","streetwear","visual"], "metadata": {"type":"image/jpeg"} }
+]
+
