@@ -79,13 +79,13 @@ export default function ProjectPotentialCalculator() {
         <div className="panel p-3">
           <div className="text-xs text-white/60 mb-2">Key Drivers</div>
           <div className="flex flex-wrap gap-2">
-            {analysis.keyDrivers.map(k => <span key={k} className="px-2 py-1 rounded border border-white/10 text-xs bg-charcoal-700/40">{k}</span>)}
+            {analysis.keyDrivers.map((k: string) => <span key={k} className="px-2 py-1 rounded border border-white/10 text-xs bg-charcoal-700/40">{k}</span>)}
           </div>
         </div>
         <div className="panel p-3">
           <div className="text-xs text-white/60 mb-2">Recommended Collaborators</div>
           <div className="flex flex-wrap gap-2">
-            {analysis.recommendedCreators.map(c => (
+            {analysis.recommendedCreators.map((c: any) => (
               <span key={c.id} className="px-2 py-1 rounded border border-white/10 text-xs bg-ralph-purple/20">{c.name}</span>
             ))}
           </div>
