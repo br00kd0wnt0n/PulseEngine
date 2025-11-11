@@ -1,5 +1,6 @@
 import NarrativeOverview from '../components/Dashboard/NarrativeOverview'
 import GuidedCalculator from '../components/Dashboard/GuidedCalculator'
+import ProjectPotentialCalculator from '../components/Dashboard/ProjectPotentialCalculator'
 import CreatorPanel from '../components/Dashboard/CreatorPanel'
 import TrendEcosystem from '../components/Dashboard/TrendEcosystem'
 import ContentIngest from '../components/Dashboard/ContentIngest'
