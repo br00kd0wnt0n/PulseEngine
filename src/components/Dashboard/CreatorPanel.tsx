@@ -6,7 +6,8 @@ export default function CreatorPanel() {
   const { selected } = useTrends()
   return (
     <div className="panel module p-4 transform-gpu">
-      <div className="font-semibold mb-3">Creator Intelligence</div>
+      <div className="font-semibold mb-1">Creator Intelligence</div>
+      <div className="text-xs text-white/60 mb-3">Top creator matches for your current story, based on tag overlap and collaboration potential. “Why” explains the match.</div>
       <div className="grid lg:grid-cols-1 md:grid-cols-2 gap-3">
         {recommended.map(c => {
           const why = explainWhyMatch(selected?.kind === 'trend' ? selected.label : undefined, c as any)

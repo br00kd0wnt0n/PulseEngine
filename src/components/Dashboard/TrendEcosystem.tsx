@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import TrendMap from '../TrendMap/TrendMap'
 
-export default function TrendEcosystem() {
-  const [open, setOpen] = useState(false)
+export default function TrendEcosystem({ defaultOpen = false }: { defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(!!defaultOpen)
   return (
     <div className="panel module p-4 transform-gpu">
       <div className="flex items-center justify-between mb-3">

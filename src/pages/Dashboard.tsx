@@ -26,20 +26,30 @@ export default function Dashboard() {
   return (
     <div className="animate-in fade-in duration-500">
       <div className="mb-6"><StoryPromptHero /></div>
-      {/* Full-width primary insight modules for strong hierarchy */}
+      {/* At‑a‑Glance strip at the very top */}
       <div className="space-y-6 mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
-        <NarrativeOverview />
         <AtAGlanceV2 />
       </div>
-      {/* Two-column insight/workflow modules */}
-      <div id="dashboard-main" className="grid xl:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+      {/* Narrative (left) and Trend Ecosystem (right, expanded) */}
+      <div id="dashboard-main" className="grid xl:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
         <div className="space-y-6">
-          <GuidedCalculator />
-          <TrendEcosystem />
+          <NarrativeOverview />
+        </div>
+        <div className="space-y-6">
+          <TrendEcosystem defaultOpen={true} />
+        </div>
+      </div>
+      {/* Guided calculator as a full-width section to anchor CTA */}
+      <div id="calc" className="mt-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-250">
+        <GuidedCalculator />
+      </div>
+      {/* Creator Intelligence (left) and Content Upload (right) */}
+      <div className="grid xl:grid-cols-2 gap-6 mt-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+        <div className="space-y-6">
+          <CreatorPanel />
         </div>
         <div className="space-y-6">
           <ContentIngest />
-          <CreatorPanel />
         </div>
       </div>
     </div>

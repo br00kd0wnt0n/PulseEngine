@@ -5,7 +5,7 @@ import { api } from '../../services/api'
 import Tooltip from '../shared/Tooltip'
 
 export default function NarrativeOverview() {
-  const { snapshot } = useTrends()
+  const { snapshot, selectNode } = useTrends() as any
   const [text, setText] = useState('')
 
   useEffect(() => {
@@ -60,19 +60,21 @@ export default function NarrativeOverview() {
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <div className="text-xs text-white/60 flex items-center">Cross-platform Vectors<Tooltip label="Vectors"><span>Top trends relevant to your story; bar shows platform fit. Click ? to view quick details.
-            </span></Tooltip></div>
+            <div className="text-xs text-white/60 flex items-center">Cross-platform Vectors<Tooltip label="Vectors"><span>Top trends relevant to your story; bar shows platform fit. Click ? to view quick details.</span></Tooltip></div>
             {trends.length > 8 && (
               <button className="text-[11px] px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={() => setExpanded(e => !e)}>{expanded ? 'Show less' : 'Show more'}</button>
             )}
           </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {visible.map(t => {
             const details = getVectorDetails(t)
             const platformFit = 60 + (t.id.charCodeAt(0) % 35)
 
             return (
               <div key={t.id} className="flex items-start gap-2">
-                <div className="flex-1 text-xs cursor-help transition-all hover:bg-white/5 hover:border-ralph-pink/30 rounded-lg p-2 border border-transparent">
+                <div
+                  onClick={() => selectNode(t.id)}
+                  className="flex-1 text-xs cursor-pointer transition-all hover:bg-white/5 hover:border-ralph-pink/30 rounded-lg p-2 border border-white/10">
                   <div className="flex items-center justify-between">
                     <span className="text-white/80 font-medium">{t.label}</span>
                     <span className="text-white/50 text-[10px]">platform fit</span>
@@ -123,6 +125,7 @@ export default function NarrativeOverview() {
               </div>
             )
           })}
+          </div>
         </div>
       </div>
     </div>

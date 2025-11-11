@@ -8,6 +8,7 @@ export default function AtAGlanceV2() {
   const { concept } = useDashboard()
   const { snapshot } = useTrends()
   const [vals, setVals] = useState<{ narrative: number; peak: number; cross: number }>({ narrative: 0, peak: 0, cross: 0 })
+  const [howOpen, setHowOpen] = useState(false)
 
   const analysis = useMemo(() => scoreConcept(concept || 'AI loop dance challenge', snapshot(), []), [concept, snapshot])
 
@@ -26,8 +27,18 @@ export default function AtAGlanceV2() {
     <div className="panel module p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="font-semibold">At‑a‑Glance</div>
-        <div className="text-xs text-white/50">High‑level snapshot</div>
+        <div className="flex items-center gap-2">
+          <button className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={() => {
+            const el = document.getElementById('calc'); if (el) el.scrollIntoView({ behavior: 'smooth' })
+          }}>Go to Calculator</button>
+          <button className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={() => setHowOpen(o => !o)}>How it works</button>
+        </div>
       </div>
+      {howOpen && (
+        <div className="mb-3 text-[12px] bg-white/5 border border-white/10 rounded p-3">
+          We analyze your story for: Narrative Potential (how strong the story reads), Time to Peak (when it’s likely to crest), and Cross‑platform Readiness (fit across TikTok/Shorts/Reels). Submit your story, then use the calculator for deeper guidance.
+        </div>
+      )}
       <div className="grid sm:grid-cols-3 gap-3">
         <KpiCard label="Narrative Potential" value={vals.narrative} tooltip="How strong this story reads at a glance." color="#EB008B" />
         <KpiCard label="Time to Peak" value={vals.peak} unit="wks" tooltip="Estimated weeks until the concept crests." color="#8a63ff" />
@@ -58,4 +69,3 @@ function KpiCard({ label, value, unit, tooltip, color }: { label: string; value:
       </div>
     </div>
   )}
-
