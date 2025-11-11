@@ -9,7 +9,7 @@ export default function ContentIngest() {
         <div className="font-semibold">Content Upload & Processing</div>
         <div className="text-xs text-white/60">{processed.length} item{processed.length === 1 ? '' : 's'} processed</div>
       </div>
-      <div className="text-xs text-white/60 mb-3">We extract tags and context from your files to enhance trend matching and creator alignment.</div>
+      <div className="text-xs text-white/60 mb-3">Want to provide more context to refine recommendations? Drag & drop media, PDFs, text files or links here — we’ll extract tags and key text to improve trend + creator matching.</div>
       <UploadDropzone />
       {processed.length > 0 && (
         <div className="mt-4">

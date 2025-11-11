@@ -5,7 +5,7 @@ import { scoreConcept, potentialColor } from '../../services/scoring'
 import { api } from '../../services/api'
 import { useDashboard } from '../../context/DashboardContext'
 
-export default function ProjectPotentialCalculator() {
+export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: 'full' | 'viz' }) {
   const { snapshot } = useTrends()
   const { creators } = useCreators()
   const { concept: sharedConcept, setConcept: setSharedConcept } = useDashboard()
@@ -47,22 +47,24 @@ export default function ProjectPotentialCalculator() {
   return (
     <div className="panel module p-4 transform-gpu">
       <div className="flex items-center justify-between mb-3">
-        <div className="font-semibold">Project Potential Calculator</div>
-        <div className="text-xs text-white/50">Drop a text brief</div>
+        <div className="font-semibold">Project Potential</div>
+        {mode === 'full' && <div className="text-xs text-white/50">Drop a text brief</div>}
       </div>
 
-      <div
-        onDragEnter={() => setDrag(true)} onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
-        onDragLeave={() => setDrag(false)} onDrop={onDrop}
-        className={`rounded-md border ${drag ? 'border-ralph-pink bg-charcoal-700/30' : 'border-white/10 bg-charcoal-800/50'} p-3 mb-3`}
-      >
-        <textarea
-          className="w-full bg-transparent outline-none text-sm min-h-[80px]"
-          value={concept}
-          onChange={(e) => { setConcept(e.target.value); setSharedConcept(e.target.value) }}
-          placeholder="Describe your concept..."
-        />
-      </div>
+      {mode === 'full' && (
+        <div
+          onDragEnter={() => setDrag(true)} onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
+          onDragLeave={() => setDrag(false)} onDrop={onDrop}
+          className={`rounded-md border ${drag ? 'border-ralph-pink bg-charcoal-700/30' : 'border-white/10 bg-charcoal-800/50'} p-3 mb-3`}
+        >
+          <textarea
+            className="w-full bg-transparent outline-none text-sm min-h-[80px]"
+            value={concept}
+            onChange={(e) => { setConcept(e.target.value); setSharedConcept(e.target.value) }}
+            placeholder="Describe your concept..."
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 text-sm">
         <Score label="Audience Potential" value={analysis.scores.audiencePotential} />
@@ -82,6 +84,23 @@ export default function ProjectPotentialCalculator() {
             <Score label="Cross-Platform" value={analysis.ralph.crossPlatformPotential} />
             <Score label="Cultural Relevance" value={analysis.ralph.culturalRelevance} />
           </div>
+        </div>
+      )}
+
+      {mode === 'viz' && (
+        <div className="mt-4">
+          <details className="panel p-3">
+            <summary className="text-xs text-white/70 cursor-pointer">Refine story idea</summary>
+            <div className="mt-2 text-xs text-white/60">Adjust your concept to see updated insights.</div>
+            <div className="mt-2 rounded-md border border-white/10 bg-charcoal-800/50 p-2">
+              <textarea
+                className="w-full bg-transparent outline-none text-sm min-h-[60px]"
+                value={concept}
+                onChange={(e) => { setConcept(e.target.value); setSharedConcept(e.target.value) }}
+                placeholder="Describe your concept..."
+              />
+            </div>
+          </details>
         </div>
       )}
 

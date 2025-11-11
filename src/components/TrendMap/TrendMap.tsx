@@ -54,8 +54,15 @@ export default function TrendMap({ height = 360 }: Props) {
   const color = (k: TrendNode['kind']) => k === 'trend' ? '#EB008B' : k === 'creator' ? '#8a63ff' : '#3be8ff'
 
   function Ring({ value, radius, color, width = 3 }: { value: number; radius: number; color: string; width?: number }) {
+    const [display, setDisplay] = useState(0)
+    useEffect(() => {
+      // animate from 0 to target on mount and on value change
+      const id = requestAnimationFrame(() => setDisplay(value))
+      return () => cancelAnimationFrame(id)
+    }, [value])
     const c = 2 * Math.PI * radius
-    const offset = c * (1 - Math.max(0, Math.min(100, value)) / 100)
+    const pct = Math.max(0, Math.min(100, display))
+    const offset = c * (1 - pct / 100)
     return (
       <circle
         r={radius}
@@ -66,7 +73,7 @@ export default function TrendMap({ height = 360 }: Props) {
         strokeDasharray={c}
         strokeDashoffset={offset}
         transform="rotate(-90)"
-        style={{ transition: 'stroke-dashoffset 400ms ease' }}
+        style={{ transition: 'stroke-dashoffset 600ms ease' }}
         opacity={0.9}
       />
     )
