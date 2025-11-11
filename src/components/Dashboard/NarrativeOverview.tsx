@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTrends } from '../../context/TrendContext'
 import { generateNarrative } from '../../services/ai'
 import { api } from '../../services/api'
@@ -15,7 +15,9 @@ export default function NarrativeOverview() {
       .catch(() => generateNarrative(snapshot(), null).then(setText))
   }, [snapshot])
 
-  const trends = snapshot().nodes.filter(n => n.kind === 'trend')
+  const [expanded, setExpanded] = useState(false)
+  const trends = useMemo(() => snapshot().nodes.filter(n => n.kind === 'trend'), [snapshot])
+  const visible = expanded ? trends : trends.slice(0, 8)
 
   // Mock data for snapshot date/time
   const snapshotDate = new Date().toLocaleDateString('en-US', {
@@ -56,9 +58,15 @@ export default function NarrativeOverview() {
         <div className="md:col-span-2 text-sm leading-relaxed whitespace-pre-wrap min-h-[140px]">
           {text || 'Generating narrative...'}
         </div>
-        <div className="space-y-3">
-          <div className="text-xs text-white/60">Cross-platform Vectors</div>
-          {trends.map(t => {
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-white/60 flex items-center">Cross-platform Vectors<Tooltip label="Vectors"><span>Top trends relevant to your story; bar shows platform fit. Click ? to view quick details.
+            </span></Tooltip></div>
+            {trends.length > 8 && (
+              <button className="text-[11px] px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={() => setExpanded(e => !e)}>{expanded ? 'Show less' : 'Show more'}</button>
+            )}
+          </div>
+          {visible.map(t => {
             const details = getVectorDetails(t)
             const platformFit = 60 + (t.id.charCodeAt(0) % 35)
 
