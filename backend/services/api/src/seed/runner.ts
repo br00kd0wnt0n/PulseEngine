@@ -26,7 +26,7 @@ export async function runSeed({ dry = false, withAI = true }: { dry?: boolean; w
   const creators: CreatorSeed[] = JSON.parse(fs.readFileSync(path.join(seedDir, 'creators.json'), 'utf-8'))
   const assets: AssetSeed[] = JSON.parse(fs.readFileSync(path.join(seedDir, 'assets.json'), 'utf-8'))
 
-  await AppDataSource.initialize()
+  // AppDataSource already initialized by API server
   const userRepo = AppDataSource.getRepository(User)
   const trendRepo = AppDataSource.getRepository(Trend)
   const creatorRepo = AppDataSource.getRepository(Creator)
@@ -80,7 +80,7 @@ export async function runSeed({ dry = false, withAI = true }: { dry?: boolean; w
     try { await narrativeFromTrends(graph, null) } catch {}
   }
 
-  await AppDataSource.destroy()
+  // Don't destroy AppDataSource - API server is still using it
   return { trends: trendRows.length, creators: creatorRows.length, assets: assets.length }
 }
 
