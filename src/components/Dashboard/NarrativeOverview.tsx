@@ -16,7 +16,7 @@ export default function NarrativeOverview() {
   }, [snapshot])
 
   const [expanded, setExpanded] = useState(false)
-  const trends = useMemo(() => snapshot().nodes.filter(n => n.kind === 'trend'), [snapshot])
+  const trends = useMemo(() => snapshot().nodes.filter((n: any) => n.kind === 'trend'), [snapshot])
   const visible = expanded ? trends : trends.slice(0, 8)
 
   // Mock data for snapshot date/time
@@ -66,7 +66,7 @@ export default function NarrativeOverview() {
             )}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {visible.map(t => {
+          {visible.map((t: any) => {
             const details = getVectorDetails(t)
             const platformFit = 60 + (t.id.charCodeAt(0) % 35)
 
