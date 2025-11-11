@@ -43,10 +43,13 @@ export default function StoryPromptHero() {
     setConcept(text)
     setActivated(true)
     try {
-      // create a project to persist and generate narrative/scores on backend
-      await api.createProject({ concept: text, graph: snapshot(), focusId: null })
+      const allowSave = ((import.meta as any).env?.VITE_PUBLIC_PROJECTS === '1')
+      if (allowSave) {
+        // create a project to persist and generate narrative/scores on backend
+        await api.createProject({ concept: text, graph: snapshot(), focusId: null })
+      }
     } catch (_e) {
-      // ignore on MVP if API not configured
+      // ignore on MVP if API not configured or protected
     }
     const el = document.getElementById('dashboard-main')
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
