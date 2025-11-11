@@ -10,6 +10,7 @@ import Creators from './pages/Creators'
 import Insights from './pages/Insights'
 import AdminDashboard from './pages/AdminDashboard'
 import Projects from './pages/Projects'
+import ProjectDetail from './pages/ProjectDetail'
 import { ThemeProvider } from './context/ThemeContext'
 import { TrendProvider } from './context/TrendContext'
 import { CreatorProvider } from './context/CreatorContext'
@@ -17,6 +18,7 @@ import { UploadProvider } from './context/UploadContext'
 import { LayoutProvider } from './context/LayoutContext'
 import { PreferencesProvider } from './context/PreferencesContext'
 import { DashboardProvider } from './context/DashboardContext'
+import { ToastProvider } from './context/ToastContext'
 
 const router = createBrowserRouter([
   {
@@ -29,6 +31,7 @@ const router = createBrowserRouter([
       { path: 'creators', element: <Creators /> },
       { path: 'insights', element: <Insights /> },
       { path: 'projects', element: <Projects /> },
+      { path: 'projects/:id', element: <ProjectDetail /> },
       { path: 'admin', element: <AdminDashboard /> },
     ],
   },
@@ -40,13 +43,15 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <PreferencesProvider>
         <LayoutProvider>
           <DashboardProvider>
-            <TrendProvider>
-              <CreatorProvider>
-                <UploadProvider>
-                  <RouterProvider router={router} />
-                </UploadProvider>
-              </CreatorProvider>
-            </TrendProvider>
+            <ToastProvider>
+              <TrendProvider>
+                <CreatorProvider>
+                  <UploadProvider>
+                    <RouterProvider router={router} />
+                  </UploadProvider>
+                </CreatorProvider>
+              </TrendProvider>
+            </ToastProvider>
           </DashboardProvider>
         </LayoutProvider>
       </PreferencesProvider>

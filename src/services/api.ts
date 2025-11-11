@@ -26,6 +26,8 @@ export const api = {
   ),
   createProject: (payload: { concept: string; persona?: string; platforms?: string[]; areasOfInterest?: string[]; graph?: any; focusId?: string | null }) =>
     request<any>('/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
+  createPublicProject: (payload: any) =>
+    request<any>('/public/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
   preflight: () => request<any>('/status/preflight'),
   adminSeed: (opts: { dry?: boolean; withAI?: boolean }) => request<any>(
     '/admin/seed',

@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, useEffect } from 'react'
 import { TrendNode } from '../../types'
 import { useTrends } from '../../context/TrendContext'
 import Legend from './Legend'
 import { computeMetrics } from '../../services/trends'
 import { potentialColor } from '../../services/scoring'
+import { useToast } from '../../context/ToastContext'
 
 type Props = {
   height?: number
@@ -12,8 +13,23 @@ type Props = {
 // Minimal interactive SVG graph (no external libs)
 export default function TrendMap({ height = 360 }: Props) {
   const { nodes, links, selectNode, selected, metricsFor } = useTrends()
+  const { snapshot } = useTrends()
   const [hover, setHover] = useState<string | null>(null)
   const [whatIf, setWhatIf] = useState<Record<string, { potential: number; longevity: number; resonance: number }>>({})
+  const { show } = useToast()
+
+  // Load saved what-if values per trend id
+  useEffect(() => {
+    if (selected && selected.kind === 'trend') {
+      try {
+        const raw = localStorage.getItem(`whatif:${selected.id}`)
+        if (raw) {
+          const vals = JSON.parse(raw)
+          setWhatIf((m) => ({ ...m, [selected.id]: vals }))
+        }
+      } catch {}
+    }
+  }, [selected?.id])
 
   const box = { w: 800, h: height }
 
@@ -96,6 +112,16 @@ export default function TrendMap({ height = 360 }: Props) {
                 {/* Activity-style rings for trend metrics */}
                 {n.kind === 'trend' && (
                   <g>
+                    {/* Glow overlays when what‑if increases */}
+                    {metrics.potential > base.potential && (
+                      <circle r={r + 8} fill="none" stroke="#EB008B" strokeWidth={5} opacity={0.4} className="ring-glow" transform="rotate(-90)" />
+                    )}
+                    {metrics.longevity > base.longevity && (
+                      <circle r={r + 5} fill="none" stroke="#8a63ff" strokeWidth={5} opacity={0.4} className="ring-glow" transform="rotate(-90)" />
+                    )}
+                    {metrics.resonance > base.resonance && (
+                      <circle r={r + 2} fill="none" stroke="#3be8ff" strokeWidth={5} opacity={0.4} className="ring-glow" transform="rotate(-90)" />
+                    )}
                     <Ring value={metrics.potential} radius={r + 8} color="#EB008B" width={3} />
                     <Ring value={metrics.longevity} radius={r + 5} color="#8a63ff" width={3} />
                     <Ring value={metrics.resonance} radius={r + 2} color="#3be8ff" width={3} />
@@ -122,14 +148,22 @@ export default function TrendMap({ height = 360 }: Props) {
           })}
         </svg>
       </div>
-      {selected && selected.kind === 'trend' && (
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-          <Metric label="Potential" value={(whatIf[selected.id]?.potential ?? metricsFor(selected.id).potential)} />
-          <Metric label="Longevity" value={(whatIf[selected.id]?.longevity ?? metricsFor(selected.id).longevity)} />
-          <Metric label="Resonance" value={(whatIf[selected.id]?.resonance ?? metricsFor(selected.id).resonance)} />
-          <Metric label="Velocity" value={metricsFor(selected.id).velocity} />
-        </div>
-      )}
+      {selected && selected.kind === 'trend' && (() => {
+        const baseM = metricsFor(selected.id)
+        const cur = {
+          potential: (whatIf[selected.id]?.potential ?? baseM.potential),
+          longevity: (whatIf[selected.id]?.longevity ?? baseM.longevity),
+          resonance: (whatIf[selected.id]?.resonance ?? baseM.resonance),
+        }
+        return (
+          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <Metric label="Potential" value={cur.potential} base={Math.round(baseM.potential)} />
+            <Metric label="Longevity" value={cur.longevity} base={Math.round(baseM.longevity)} />
+            <Metric label="Resonance" value={cur.resonance} base={Math.round(baseM.resonance)} />
+            <Metric label="Velocity" value={baseM.velocity} />
+          </div>
+        )
+      })()}
       {selected && selected.kind === 'trend' && (
         <WhatIfPanel
           values={{
@@ -137,41 +171,78 @@ export default function TrendMap({ height = 360 }: Props) {
             longevity: whatIf[selected.id]?.longevity ?? Math.round(metricsFor(selected.id).longevity),
             resonance: whatIf[selected.id]?.resonance ?? Math.round(metricsFor(selected.id).resonance),
           }}
+          base={{
+            potential: Math.round(metricsFor(selected.id).potential),
+            longevity: Math.round(metricsFor(selected.id).longevity),
+            resonance: Math.round(metricsFor(selected.id).resonance),
+          }}
           onChange={(next) => setWhatIf((m) => ({ ...m, [selected.id]: next }))}
-          onReset={() => setWhatIf((m) => { const c = { ...m }; delete c[selected.id]; return c })}
+          onReset={() => {
+            setWhatIf((m) => { const c = { ...m }; delete c[selected.id]; return c })
+            try { localStorage.removeItem(`whatif:${selected.id}`) } catch {}
+            show('Cleared What‑if', 'info')
+          }}
+          onSave={async () => {
+            try {
+              const vals = whatIf[selected.id] || { potential: Math.round(metricsFor(selected.id).potential), longevity: Math.round(metricsFor(selected.id).longevity), resonance: Math.round(metricsFor(selected.id).resonance) }
+              const concept = `What-if: Adjusted ${selected.label} P/L/R ${vals.potential}/${vals.longevity}/${vals.resonance}`
+              await (await import('../../services/api')).api.createPublicProject({ concept, graph: snapshot(), adjustments: { trendId: selected.id, ...vals } })
+              try { localStorage.setItem(`whatif:${selected.id}`, JSON.stringify(vals)) } catch {}
+              show('Saved What‑if as Project', 'success')
+            } catch (e: any) {
+              show('Failed to save What‑if', 'error')
+            }
+          }}
         />
       )}
     </div>
   )
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ label, value, base }: { label: string; value: number; base?: number }) {
+  const delta = base == null ? 0 : Math.round(value - base)
+  const deltaLabel = base == null ? '' : delta === 0 ? '±0' : delta > 0 ? `+${delta}` : `${delta}`
+  const deltaClass = delta > 0 ? 'text-emerald-300' : delta < 0 ? 'text-red-300' : 'text-white/60'
   return (
     <div className="panel p-3">
       <div className="text-white/60 mb-1">{label}</div>
-      <div className="text-lg font-semibold">{Math.round(value)}</div>
+      <div className="flex items-center gap-2">
+        <div className="text-lg font-semibold">{Math.round(value)}</div>
+        {base != null && (
+          <span className={`px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-xs ${deltaClass}`}>{deltaLabel}</span>
+        )}
+      </div>
     </div>
   )
 }
 
-function WhatIfPanel({ values, onChange, onReset }: { values: { potential: number; longevity: number; resonance: number }; onChange: (v: { potential: number; longevity: number; resonance: number }) => void; onReset: () => void }) {
+function WhatIfPanel({ values, base, onChange, onReset, onSave }: { values: { potential: number; longevity: number; resonance: number }; base: { potential: number; longevity: number; resonance: number }; onChange: (v: { potential: number; longevity: number; resonance: number }) => void; onReset: () => void; onSave: () => void }) {
   return (
     <div className="mt-4 panel p-4">
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold text-sm">What‑if adjustments</div>
-        <button onClick={onReset} className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10">Reset</button>
+        <div className="flex gap-2">
+          <button onClick={onReset} className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10">Reset</button>
+          <button onClick={onSave} className="text-xs px-2 py-1 rounded border border-white/10 bg-ralph-pink/60 hover:bg-ralph-pink">Save What‑if as Project</button>
+        </div>
       </div>
-      <Slider label="Potential" color="#EB008B" value={values.potential} onChange={(v) => onChange({ ...values, potential: v })} />
-      <Slider label="Longevity" color="#8a63ff" value={values.longevity} onChange={(v) => onChange({ ...values, longevity: v })} />
-      <Slider label="Resonance" color="#3be8ff" value={values.resonance} onChange={(v) => onChange({ ...values, resonance: v })} />
+      <Slider label="Potential" color="#EB008B" value={values.potential} onChange={(v) => onChange({ ...values, potential: v })} base={base.potential} />
+      <Slider label="Longevity" color="#8a63ff" value={values.longevity} onChange={(v) => onChange({ ...values, longevity: v })} base={base.longevity} />
+      <Slider label="Resonance" color="#3be8ff" value={values.resonance} onChange={(v) => onChange({ ...values, resonance: v })} base={base.resonance} />
     </div>
   )
 }
 
-function Slider({ label, value, onChange, color }: { label: string; value: number; onChange: (v: number) => void; color: string }) {
+function Slider({ label, value, onChange, color, base }: { label: string; value: number; onChange: (v: number) => void; color: string; base?: number }) {
+  const delta = base == null ? 0 : Math.round(value - base)
+  const deltaLabel = delta === 0 ? '±0' : delta > 0 ? `+${delta}` : `${delta}`
+  const deltaClass = delta > 0 ? 'text-emerald-300' : delta < 0 ? 'text-red-300' : 'text-white/60'
   return (
     <div className="mb-2">
-      <div className="flex items-center justify-between text-xs text-white/70"><span>{label}</span><span>{Math.round(value)}</span></div>
+      <div className="flex items-center justify-between text-xs text-white/70">
+        <span>{label}</span>
+        <span className={`px-1.5 py-0.5 rounded bg-white/5 border border-white/10 ${deltaClass}`}>{deltaLabel}</span>
+      </div>
       <input type="range" min={0} max={100} value={Math.round(value)} onChange={(e) => onChange(Number(e.target.value))}
         className="w-full" style={{ accentColor: color }} />
     </div>

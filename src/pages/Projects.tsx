@@ -8,7 +8,7 @@ export default function Projects() {
   useEffect(() => {
     let cancel = false
     setLoading(true)
-    fetch((import.meta as any).env?.VITE_API_BASE + '/projects')
+    fetch((import.meta as any).env?.VITE_API_BASE + '/public/projects')
       .then(r => r.ok ? r.json() : Promise.reject(r.statusText))
       .then(d => { if (!cancel) setItems(d) })
       .catch(e => setError(String(e)))
@@ -23,14 +23,13 @@ export default function Projects() {
       {error && <div className="text-red-400 text-sm">{error}</div>}
       <div className="grid md:grid-cols-2 gap-3">
         {items.map(p => (
-          <div key={p.id} className="panel p-4">
+          <a href={`/projects/${p.id}`} key={p.id} className="panel p-4 block hover:bg-charcoal-700/30">
             <div className="font-medium">{p.concept}</div>
             <div className="text-xs text-white/60">Persona: {p.persona}</div>
             {p.narrative && <div className="mt-2 text-sm whitespace-pre-wrap line-clamp-5">{p.narrative}</div>}
-          </div>
+          </a>
         ))}
       </div>
     </div>
   )
 }
-

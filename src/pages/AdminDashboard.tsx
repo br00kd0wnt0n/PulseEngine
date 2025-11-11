@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, StatusOverview } from '../services/api'
+import { useToast } from '../context/ToastContext'
 
 function bytes(n: number | null) {
   if (n == null) return '—'
@@ -14,6 +15,7 @@ export default function AdminDashboard() {
   const [data, setData] = useState<StatusOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const { show } = useToast()
 
   useEffect(() => {
     let mounted = true
@@ -33,13 +35,24 @@ export default function AdminDashboard() {
           <div className="flex gap-2">
             <button className="px-2 py-1 text-xs rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={async () => {
               setLoading(true)
-              try { const pf = await api.preflight(); alert(`Preflight: ${pf.ok ? 'OK' : 'Issues'}\n` + ((pf.issues||[]).join('\n') || '')) } catch (e:any) { alert('Preflight failed: ' + String(e)) }
-              setLoading(false)
+              try {
+                const pf = await api.preflight()
+                if (pf.ok) show('Preflight OK ✅', 'success')
+                else show(`Preflight issues: ${(pf.issues||[]).length}`, 'error')
+              } catch (e:any) {
+                show('Preflight failed', 'error')
+              } finally { setLoading(false) }
             }}>Run Preflight</button>
             <button className="px-2 py-1 text-xs rounded border border-white/10 bg-ralph-pink/60 hover:bg-ralph-pink" onClick={async () => {
               setLoading(true)
-              try { const r = await api.adminSeed({ dry: false, withAI: true }); alert('Seed complete: ' + JSON.stringify(r.result || r)) } catch (e:any) { alert('Seed failed: ' + String(e)) }
-              setLoading(false)
+              try {
+                const r = await api.adminSeed({ dry: false, withAI: true })
+                const res = (r.result || r)
+                const msg = res && res.trends != null ? `Seeded T${res.trends}/C${res.creators}/A${res.assets}` : 'Seed complete'
+                show(msg, 'success')
+              } catch (e:any) {
+                show('Seed failed', 'error')
+              } finally { setLoading(false) }
             }}>Load Demo Data</button>
           </div>
         </div>
@@ -56,7 +69,7 @@ export default function AdminDashboard() {
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="panel module p-4">
           <div className="font-semibold mb-3">Usage & Tables</div>
-          {data ? (
+          {data && Array.isArray(data.database?.tables) ? (
             <div className="space-y-2 text-sm">
               {data.database.tables.map(t => (
                 <div key={t.name} className="flex items-center justify-between">

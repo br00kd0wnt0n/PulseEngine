@@ -34,6 +34,14 @@ html, body, #root {
   opacity: 0.7; border-top-left-radius: 0.75rem; border-top-right-radius: 0.75rem;
 }
 
+@keyframes ring-glow {
+  0% { opacity: 0.35 }
+  50% { opacity: 0.9 }
+  100% { opacity: 0.35 }
+}
+
+.ring-glow { animation: ring-glow 1.2s ease-in-out infinite; }
+
 /* Progressive disclosure animations */
 @keyframes fade-in {
   from { opacity: 0; }
