@@ -13,7 +13,7 @@ async function cacheGet<T>(key: string): Promise<T | null> {
 }
 async function cacheSet<T>(key: string, value: T) {
   const repo = AppDataSource.getRepository(AICache)
-  await repo.upsert({ key, value }, ['key'])
+  await repo.upsert({ key, value: value as any }, ['key'])
 }
 
 async function callOpenAI(prompt: string): Promise<string> {
