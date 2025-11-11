@@ -17,6 +17,7 @@ const TrendCtx = createContext<Ctx | null>(null)
 export function TrendProvider({ children }: { children: React.ReactNode }) {
   const [graph, setGraph] = useState<TrendGraph>(() => mockGraph())
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [serverMetrics, setServerMetrics] = useState<Record<string, ReturnType<typeof computeMetrics> | undefined>>({})
 
   // Try to hydrate from API (trends + creators), fallback to mock
   useEffect(() => {
@@ -43,6 +44,21 @@ export function TrendProvider({ children }: { children: React.ReactNode }) {
             })
           })
           setGraph({ nodes, links })
+          // capture server metrics if present
+          const sm: Record<string, ReturnType<typeof computeMetrics>> = {}
+          trends.forEach((t: any) => {
+            const m = t.metrics || {}
+            const hasAny = ['potential','longevity','resonance','velocity'].some(k => typeof m[k] === 'number')
+            if (hasAny) {
+              sm[t.id || t.label] = {
+                potential: Number(m.potential ?? 0),
+                longevity: Number(m.longevity ?? 0),
+                resonance: Number(m.resonance ?? 0),
+                velocity: Number(m.velocity ?? 0),
+              }
+            }
+          })
+          setServerMetrics(sm)
         }
       } catch {
         // ignore, stay on mock graph
@@ -57,6 +73,8 @@ export function TrendProvider({ children }: { children: React.ReactNode }) {
 
   const metricsCache = useMemo(() => new Map<string, ReturnType<typeof computeMetrics>>(), [])
   const metricsFor = (id: string) => {
+    const srv = serverMetrics[id]
+    if (srv) return srv
     if (!metricsCache.has(id)) metricsCache.set(id, computeMetrics(graph, id))
     return metricsCache.get(id)!
   }

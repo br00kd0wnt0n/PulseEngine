@@ -12,6 +12,7 @@ import trendRoutes from './routes/trends.js'
 import assetRoutes from './routes/assets.js'
 import aiRoutes from './routes/ai.js'
 import statusRoutes from './routes/status.js'
+import publicRoutes from './routes/public.js'
 import adminRoutes from './routes/admin.js'
 import projectRoutes from './routes/projects.js'
 import ingestionRoutes from './routes/ingestion.js'
@@ -41,6 +42,7 @@ async function main() {
   app.use('/admin', adminRoutes)
   // Public AI endpoints for MVP (no auth required)
   app.use('/ai', aiRoutes)
+  app.use('/public', publicRoutes)
 
   // Secure routes (require authentication)
   app.use(authMiddleware, attachRls)
