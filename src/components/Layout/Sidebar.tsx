@@ -9,6 +9,7 @@ const nav = [
   { to: '/upload', label: 'Upload' },
   { to: '/creators', label: 'Creators' },
   { to: '/insights', label: 'Insights' },
+  { to: '/projects', label: 'Projects' },
   { to: '/admin', label: 'Backend' },
 ]
 

@@ -38,4 +38,6 @@ export const api = {
       body: JSON.stringify(opts || {}),
     }
   ),
+  trends: () => request<any[]>('/trends'),
+  creators: () => request<any[]>('/creators'),
 }

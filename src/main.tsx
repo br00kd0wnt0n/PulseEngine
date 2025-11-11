@@ -9,6 +9,7 @@ import Upload from './pages/Upload'
 import Creators from './pages/Creators'
 import Insights from './pages/Insights'
 import AdminDashboard from './pages/AdminDashboard'
+import Projects from './pages/Projects'
 import { ThemeProvider } from './context/ThemeContext'
 import { TrendProvider } from './context/TrendContext'
 import { CreatorProvider } from './context/CreatorContext'
@@ -27,6 +28,7 @@ const router = createBrowserRouter([
       { path: 'upload', element: <Upload /> },
       { path: 'creators', element: <Creators /> },
       { path: 'insights', element: <Insights /> },
+      { path: 'projects', element: <Projects /> },
       { path: 'admin', element: <AdminDashboard /> },
     ],
   },
