@@ -41,14 +41,19 @@ async function main() {
 
   // URL parsing and social link extraction (lightweight placeholder)
   app.post('/ingest/url', async (req, res) => {
-    const { url, ownerId } = req.body || {}
-    if (!url || !ownerId) return res.status(400).json({ error: 'url and ownerId required' })
-    await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
-    const parsed = parseUrl(url)
-    const repo = ds.getRepository(ContentAsset)
-    const a = repo.create({ name: parsed.title, url, tags: parsed.tags, metadata: parsed.metadata, ownerId })
-    await repo.save(a)
-    res.status(201).json(a)
+    try {
+      const { url, ownerId } = req.body || {}
+      if (!url || !ownerId) return res.status(400).json({ error: 'url and ownerId required' })
+      await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
+      const parsed = parseUrl(url)
+      const repo = ds.getRepository(ContentAsset)
+      const a = repo.create({ name: parsed.title, url, tags: parsed.tags, metadata: parsed.metadata, ownerId })
+      await repo.save(a)
+      res.status(201).json(a)
+    } catch (e: any) {
+      req.log?.error({ err: e }, 'ingest-url-failed')
+      res.status(500).json({ error: 'url-ingestion-failed', detail: e?.message || 'unknown' })
+    }
   })
 
   // Secure in-memory processing + minimal encrypted metadata storage
@@ -107,14 +112,19 @@ async function main() {
 
   // PDF/document analysis placeholder
   app.post('/ingest/pdf', upload.single('file'), async (req, res) => {
-    const ownerId = (req.body?.ownerId as string) || ''
-    if (!ownerId || !req.file) return res.status(400).json({ error: 'ownerId and file required' })
-    await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
-    const meta = await analyzeFile(req.file)
-    const repo = ds.getRepository(ContentAsset)
-    const a = repo.create({ name: req.file.originalname, tags: meta.tags, metadata: meta.metadata, ownerId })
-    await repo.save(a)
-    res.status(201).json(a)
+    try {
+      const ownerId = (req.body?.ownerId as string) || ''
+      if (!ownerId || !req.file) return res.status(400).json({ error: 'ownerId and file required' })
+      await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
+      const meta = await analyzeFile(req.file)
+      const repo = ds.getRepository(ContentAsset)
+      const a = repo.create({ name: req.file.originalname, tags: meta.tags, metadata: meta.metadata, ownerId })
+      await repo.save(a)
+      res.status(201).json(a)
+    } catch (e: any) {
+      req.log?.error({ err: e }, 'ingest-pdf-failed')
+      res.status(500).json({ error: 'pdf-ingestion-failed', detail: e?.message || 'unknown' })
+    }
   })
 
   // Start server AFTER all routes are registered
