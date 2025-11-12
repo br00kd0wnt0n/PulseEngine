@@ -3,6 +3,7 @@ import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
 import multer from 'multer'
+import crypto from 'crypto'
 // lazy import heavy parsers
 import dotenv from 'dotenv'
 import pino from 'pino'
@@ -38,18 +39,51 @@ async function main() {
     res.status(201).json(a)
   })
 
-  // Multi-format upload support (stored elsewhere; we persist metadata only)
+  // Secure in-memory processing + minimal encrypted metadata storage
   app.post('/ingest/upload', upload.array('files'), async (req, res) => {
     const ownerId = (req.body?.ownerId as string) || ''
     if (!ownerId) return res.status(400).json({ error: 'ownerId required' })
     await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
     const files = (req.files as Express.Multer.File[]) || []
     const repo = ds.getRepository(ContentAsset)
-    const saved = [] as ContentAsset[]
+    const saved = [] as any[]
     for (const f of files) {
-      const meta = await analyzeFile(f)
-      const a = repo.create({ name: f.originalname, url: null, tags: meta.tags, metadata: meta.metadata, ownerId })
+      // 1) In-memory analysis
+      const analysis = await analyzeFile(f)
+      const insights = deriveInsights(analysis)
+      const embeddings = embedMinimal(analysis)
+      // 2) Compose minimal metadata payload
+      const payload = {
+        schema: 'kb.v1',
+        ownerId,
+        name: f.originalname,
+        size: f.size,
+        mime: f.mimetype,
+        extracted: {
+          tags: analysis.tags,
+          snippet: (analysis.metadata?.text || '').slice(0, 500),
+          insights,
+          embeddings,
+        },
+        createdAt: new Date().toISOString(),
+      }
+      // 3) Encrypt and store to object storage
+      const keyId = process.env.DATA_KEY_ID || 'v1'
+      const enc = encryptPayload(payload, keyId)
+      try {
+        const store = await getObjectStore()
+        const objectKey = `kb/${ownerId}/${Date.now()}_${safeName(f.originalname)}.json`
+        await store.putObject(objectKey, enc.buffer, {
+          contentType: 'application/octet-stream',
+          metadata: { keyId, alg: 'AES-256-GCM', schema: 'kb.v1' },
+        })
+      } catch (e) {
+        req.log?.error({ err: e }, 'object-store-failure')
+      }
+      // 4) Persist only light reference row; do not store file
+      const a = repo.create({ name: f.originalname, url: null, tags: analysis.tags, metadata: { insights }, ownerId })
       saved.push(await repo.save(a))
+      // 5) Ephemeral buffer auto-dropped by garbage collector
     }
     res.status(201).json(saved)
   })
@@ -102,6 +136,64 @@ async function analyzeFile(f: Express.Multer.File) {
     // ignore parse errors in MVP
   }
   return { tags, metadata }
+}
+
+function deriveInsights(a: { tags: any; metadata: any }) {
+  const text: string = a.metadata?.text || ''
+  const keys = (text.toLowerCase().match(/ai|dance|remix|tutorial|gaming|retro/g) || [])
+  const uniq = Array.from(new Set(keys))
+  return { keyPhrases: uniq.slice(0, 8) }
+}
+
+function embedMinimal(a: { metadata: any }) {
+  // Deterministic tiny embedding (placeholder). Replace with model embeddings later.
+  const text: string = a.metadata?.text || ''
+  const hash = crypto.createHash('sha256').update(text).digest()
+  const vec = Array.from(hash.slice(0, 16)).map(b => (b / 255) * 2 - 1)
+  return { dim: 16, values: vec }
+}
+
+function safeName(n: string) { return n.replace(/[^a-zA-Z0-9._-]/g, '_') }
+
+function encryptPayload(data: any, keyId: string) {
+  const key = process.env[`DATA_KEY_${keyId.toUpperCase()}`] || process.env.DATA_KEY
+  if (!key) throw new Error('missing DATA_KEY')
+  const keyBuf = Buffer.from(key, key.length === 64 ? 'hex' : 'base64')
+  if (keyBuf.length !== 32) throw new Error('DATA_KEY must be 32 bytes (hex/base64)')
+  const iv = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv('aes-256-gcm', keyBuf, iv)
+  const plaintext = Buffer.from(JSON.stringify(data), 'utf-8')
+  const enc = Buffer.concat([cipher.update(plaintext), cipher.final()])
+  const tag = cipher.getAuthTag()
+  // format: [keyIdLen|keyId|iv|tag|ciphertext]
+  const kid = Buffer.from(keyId, 'utf-8')
+  const header = Buffer.alloc(1)
+  header.writeUInt8(kid.length)
+  const buffer = Buffer.concat([header, kid, iv, tag, enc])
+  return { buffer, iv: iv.toString('base64') }
+}
+
+// S3-compatible object store (Cloudflare R2, S3, GCS via S3 interface)
+async function getObjectStore() {
+  const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
+  const endpoint = process.env.OBJ_ENDPOINT // e.g., https://<accountid>.r2.cloudflarestorage.com
+  const region = process.env.OBJ_REGION || 'auto'
+  const bucket = process.env.OBJ_BUCKET || 'pulse-kb'
+  const accessKeyId = process.env.OBJ_ACCESS_KEY || process.env.AWS_ACCESS_KEY_ID
+  const secretAccessKey = process.env.OBJ_SECRET_KEY || process.env.AWS_SECRET_ACCESS_KEY
+  if (!bucket) throw new Error('OBJ_BUCKET required')
+  const client = new S3Client({
+    region,
+    endpoint,
+    forcePathStyle: true,
+    credentials: accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined,
+  })
+  return {
+    async putObject(key: string, body: Buffer, opts?: { contentType?: string; metadata?: Record<string, string> }) {
+      const cmd = new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: opts?.contentType, Metadata: opts?.metadata })
+      await client.send(cmd)
+    }
+  }
 }
 
 main().catch((e) => { logger.error(e, 'Fatal'); process.exit(1) })

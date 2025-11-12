@@ -20,6 +20,17 @@ RAG knowledge base (internal):
 - Admin dashboard exposes a drag‑and‑drop uploader with metadata to categorize briefs, proposals, case studies, industry data, and screengrabs.
 - MVP stores metadata client‑side; production will route to Ingestion → storage → vector index.
 
+Secure object storage (Cloudflare R2 / S3 compatible):
+- Configure in `backend/services/ingestion` via env:
+  - `OBJ_ENDPOINT` – S3 endpoint (e.g., https://<accountid>.r2.cloudflarestorage.com)
+  - `OBJ_REGION` – region (R2 uses `auto`)
+  - `OBJ_BUCKET` – bucket name
+  - `OBJ_ACCESS_KEY` / `OBJ_SECRET_KEY` – credentials
+  - `DATA_KEY` or `DATA_KEY_V1` – 32‑byte key (hex or base64) for AES‑256‑GCM
+  - `DATA_KEY_ID` – key id (e.g., `v1`) used for rotation
+- Uploads are processed in memory and only minimal encrypted metadata is persisted to object storage.
+- Generate keys with: `node backend/services/ingestion/scripts/generate-key.mjs`
+
 Quick start (local):
 - Prereqs: Node LTS, PostgreSQL, Railway CLI (optional)
 - Copy `.env.example` to `.env` in each service and fill values
