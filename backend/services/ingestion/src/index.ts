@@ -9,7 +9,7 @@ import dotenv from 'dotenv'
 import pino from 'pino'
 import pinoHttp from 'pino-http'
 import { DataSource } from 'typeorm'
-import { ContentAsset } from './entities/ContentAsset'
+import { ContentAsset } from './entities/ContentAsset.js'
 
 dotenv.config()
 const logger = pino({ level: process.env.NODE_ENV === 'production' ? 'info' : 'debug' })
