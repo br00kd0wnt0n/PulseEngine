@@ -89,9 +89,10 @@ export async function generateRecommendations(concept: string, graph: TrendGraph
       const client = new OpenAI({ apiKey })
       const model = process.env.MODEL_NAME || 'gpt-4o-mini'
       const prompt = `You are a storytelling strategist. Given this story concept: "${concept}"\n` +
-        `Provide 4 categories of recommendations with 3 concise bullets each:\n` +
+        `Provide 4 categories of recommendations with 3 concise, practical bullets each:\n` +
         `- Narrative Development\n- Content Strategy\n- Platform Coverage\n- Collaboration\n` +
-        `Return strictly as JSON with keys narrative, content, platform, collab and array of strings.`
+        `Also include a framework object with 3 dimensions (market, narrative, commercial), each with a numeric score (0-100) and a one-sentence why.\n` +
+        `Return strictly as JSON with keys narrative, content, platform, collab (arrays of strings), and framework { market: { score, why }, narrative: { score, why }, commercial: { score, why } }.`
       const resp = await client.chat.completions.create({
         model,
         messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
@@ -130,5 +131,11 @@ function buildHeuristicRecs(concept?: string) {
     'Line up 1 macro + 3 micro collaborators for coverage.',
     'Offer a shared asset (beat/overlay) to ease adoption.',
   ]
-  return { narrative, content, platform, collab }
+  // Simple framework scores + rationales
+  const framework = {
+    market: { score: clamp(50 + (platform.length + collab.length) * 8, 0, 100), why: 'Solid cross‑platform plan and collaboration hooks signal healthy market fit.' },
+    narrative: { score: clamp(50 + narrative.length * 10, 0, 100), why: 'Clear hook and cultural angle strengthen narrative potential.' },
+    commercial: { score: clamp(45 + (collab.length * 10), 0, 100), why: 'Collaboration and format planning open monetization and scalability pathways.' },
+  }
+  return { narrative, content, platform, collab, framework }
 }

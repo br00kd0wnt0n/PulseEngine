@@ -12,7 +12,7 @@ const examples = [
 ]
 
 export default function StoryPromptHero() {
-  const { concept, setConcept, activated, setActivated } = useDashboard()
+  const { concept, setConcept, activated, setActivated, frameworkScores } = useDashboard()
   const [projectId, setProjectId] = useState<string | null>(null)
   const [versions, setVersions] = useState<any[]>([])
   const [cursor, setCursor] = useState(0)
@@ -66,7 +66,7 @@ export default function StoryPromptHero() {
   }
 
   function saveVersionLocal() {
-    const v = { id: 'local-'+Date.now(), summary: concept, createdAt: new Date().toISOString() }
+    const v = { id: 'local-'+Date.now(), summary: concept, scores: frameworkScores ? { framework: frameworkScores } : {}, createdAt: new Date().toISOString() }
     setVersions((vs) => [v, ...vs])
     setCursor(0)
     const pid = projectId || 'local'

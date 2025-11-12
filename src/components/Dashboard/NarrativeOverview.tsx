@@ -55,7 +55,7 @@ export default function NarrativeOverview() {
         </div>
       </div>
       <div className="grid md:grid-cols-3 gap-4">
-        <div className="md:col-span-2 text-sm leading-relaxed min-h-[140px]">
+        <div className="md:col-span-2 text-sm leading-relaxed min-h-[140px] max-h-[240px] overflow-y-auto pr-2">
           {highlightNarrative(text) || 'Generating narrative...'}
         </div>
         <div className="space-y-2">
