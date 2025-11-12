@@ -55,8 +55,8 @@ export default function NarrativeOverview() {
         </div>
       </div>
       <div className="grid md:grid-cols-3 gap-4">
-        <div className="md:col-span-2 text-sm leading-relaxed whitespace-pre-wrap min-h-[140px]">
-          {text || 'Generating narrative...'}
+        <div className="md:col-span-2 text-sm leading-relaxed min-h-[140px]">
+          {highlightNarrative(text) || 'Generating narrative...'}
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -65,7 +65,7 @@ export default function NarrativeOverview() {
               <button className="text-[11px] px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={() => setExpanded(e => !e)}>{expanded ? 'Show less' : 'Show more'}</button>
             )}
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2">
           {visible.map((t: any) => {
             const details = getVectorDetails(t)
             const platformFit = 60 + (t.id.charCodeAt(0) % 35)
@@ -87,41 +87,7 @@ export default function NarrativeOverview() {
                   </div>
                   <div className="mt-1 text-[10px] text-white/40 text-right">{platformFit}%</div>
                 </div>
-                <Tooltip label={t.label}>
-                  <div className="space-y-2">
-                    <div className="font-semibold text-sm text-white border-b border-white/10 pb-2">
-                      {t.label}
-                    </div>
-                    <div className="space-y-1.5 text-xs">
-                      <div>
-                        <div className="text-white/50 mb-1">Platforms</div>
-                        <div className="flex flex-wrap gap-1">
-                          {details.platforms.map(p => (
-                            <span key={p} className="px-2 py-0.5 bg-white/10 rounded text-white/80">
-                              {p}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-white/50">Engagement</div>
-                        <div className="text-ralph-cyan">{details.engagement}</div>
-                      </div>
-                      <div>
-                        <div className="text-white/50">Velocity</div>
-                        <div className="text-ralph-pink">{details.velocity}</div>
-                      </div>
-                      <div>
-                        <div className="text-white/50">Primary Audience</div>
-                        <div className="text-white/80">{details.audience}</div>
-                      </div>
-                      <div>
-                        <div className="text-white/50">Best Posting Time</div>
-                        <div className="text-white/80">{details.bestTime}</div>
-                      </div>
-                    </div>
-                  </div>
-                </Tooltip>
+                {/* Simplified card; removed nested tooltip to avoid overlay issues */}
               </div>
             )
           })}
@@ -129,5 +95,22 @@ export default function NarrativeOverview() {
         </div>
       </div>
     </div>
+  )
+}
+
+function highlightNarrative(text: string) {
+  if (!text) return null
+  const keywords = ['AI','dance','challenge','loop','remix','retro','gaming','tutorial','collab','duet','Reels','Shorts','TikTok']
+  const parts = text.split(/(\b)/)
+  return (
+    <p className="whitespace-pre-wrap">
+      {parts.map((p, i) => {
+        const match = keywords.find(k => p.toLowerCase() === k.toLowerCase())
+        if (match) {
+          return <span key={i} className="inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded bg-white/10 border border-white/20 text-white/90" title={`Key factor: ${match}`}>{p}</span>
+        }
+        return <span key={i}>{p}</span>
+      })}
+    </p>
   )
 }

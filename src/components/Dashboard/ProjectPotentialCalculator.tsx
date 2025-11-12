@@ -47,24 +47,16 @@ export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: '
   return (
     <div className="panel module p-4 transform-gpu">
       <div className="flex items-center justify-between mb-3">
-        <div className="font-semibold">Project Potential</div>
-        {mode === 'full' && <div className="text-xs text-white/50">Drop a text brief</div>}
+        <div className="font-semibold">Story Breakdown</div>
+        {mode === 'viz' && (
+          <button
+            onClick={() => { window.dispatchEvent(new CustomEvent('open-chat')) }}
+            className="text-xs px-2 py-1 rounded-full border border-white/10 bg-white/5 hover:bg-white/10"
+          >+ Refine Story</button>
+        )}
       </div>
 
-      {mode === 'full' && (
-        <div
-          onDragEnter={() => setDrag(true)} onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
-          onDragLeave={() => setDrag(false)} onDrop={onDrop}
-          className={`rounded-md border ${drag ? 'border-ralph-pink bg-charcoal-700/30' : 'border-white/10 bg-charcoal-800/50'} p-3 mb-3`}
-        >
-          <textarea
-            className="w-full bg-transparent outline-none text-sm min-h-[80px]"
-            value={concept}
-            onChange={(e) => { setConcept(e.target.value); setSharedConcept(e.target.value) }}
-            placeholder="Describe your concept..."
-          />
-        </div>
-      )}
+      {mode === 'full' && null}
 
       <div className="grid grid-cols-2 gap-3 text-sm">
         <Score label="Audience Potential" value={analysis.scores.audiencePotential} />
@@ -87,23 +79,6 @@ export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: '
         </div>
       )}
 
-      {mode === 'viz' && (
-        <div className="mt-4">
-          <details className="panel p-3">
-            <summary className="text-xs text-white/70 cursor-pointer">Refine story idea</summary>
-            <div className="mt-2 text-xs text-white/60">Adjust your concept to see updated insights.</div>
-            <div className="mt-2 rounded-md border border-white/10 bg-charcoal-800/50 p-2">
-              <textarea
-                className="w-full bg-transparent outline-none text-sm min-h-[60px]"
-                value={concept}
-                onChange={(e) => { setConcept(e.target.value); setSharedConcept(e.target.value) }}
-                placeholder="Describe your concept..."
-              />
-            </div>
-          </details>
-        </div>
-      )}
-
       <div className="mt-4 grid md:grid-cols-2 gap-3">
         <div className="panel p-3">
           <div className="text-xs text-white/60 mb-2">Key Drivers</div>
@@ -111,14 +86,7 @@ export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: '
             {(analysis.keyDrivers || []).map((k: string) => <span key={k} className="px-2 py-1 rounded border border-white/10 text-xs bg-charcoal-700/40">{k}</span>)}
           </div>
         </div>
-        <div className="panel p-3">
-          <div className="text-xs text-white/60 mb-2">Recommended Collaborators</div>
-          <div className="flex flex-wrap gap-2">
-            {(analysis.recommendedCreators || []).map((c: any) => (
-              <span key={c.id} className="px-2 py-1 rounded border border-white/10 text-xs bg-ralph-purple/20">{c.name}</span>
-            ))}
-          </div>
-        </div>
+        {/* Recommended collaborators removed; covered by Creator Intelligence */}
       </div>
     </div>
   )

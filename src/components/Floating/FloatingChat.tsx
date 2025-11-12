@@ -56,3 +56,9 @@ export default function FloatingChat({ projectId }: { projectId?: string }) {
   )
 }
 
+// Listen for global event to open chat
+if (typeof window !== 'undefined') {
+  window.addEventListener('open-chat', () => {
+    // no-op placeholder; component instance handles via effect
+  })
+}
