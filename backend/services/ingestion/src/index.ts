@@ -104,6 +104,8 @@ async function main() {
   })
 
   const port = Number(process.env.PORT || 8081)
+  console.log('PORT env var:', process.env.PORT)
+  console.log('Using port:', port)
   app.listen(port, '0.0.0.0', () => {
     console.log(`Ingestion service listening on 0.0.0.0:${port}`)
     logger.info(`Ingestion listening on ${port}`)
