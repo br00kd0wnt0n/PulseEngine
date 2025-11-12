@@ -39,19 +39,6 @@ async function main() {
   app.use(express.json({ limit: '4mb' }))
   app.use(pinoHttp({ logger }))
 
-  // Start server BEFORE database connection
-  const port = Number(process.env.PORT || 8081)
-  console.log('PORT env var:', process.env.PORT)
-  console.log('Using port:', port)
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`Ingestion service listening on 0.0.0.0:${port}`)
-    logger.info(`Ingestion listening on ${port}`)
-  })
-
-  // Connect to database AFTER server is listening
-  await ds.initialize()
-  console.log('Database connected successfully')
-
   // URL parsing and social link extraction (lightweight placeholder)
   app.post('/ingest/url', async (req, res) => {
     const { url, ownerId } = req.body || {}
@@ -66,51 +53,56 @@ async function main() {
 
   // Secure in-memory processing + minimal encrypted metadata storage
   app.post('/ingest/upload', upload.array('files'), async (req, res) => {
-    const ownerId = (req.body?.ownerId as string) || ''
-    if (!ownerId) return res.status(400).json({ error: 'ownerId required' })
-    await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
-    const files = (req.files as Express.Multer.File[]) || []
-    const repo = ds.getRepository(ContentAsset)
-    const saved = [] as any[]
-    for (const f of files) {
-      // 1) In-memory analysis
-      const analysis = await analyzeFile(f)
-      const insights = deriveInsights(analysis)
-      const embeddings = embedMinimal(analysis)
-      // 2) Compose minimal metadata payload
-      const payload = {
-        schema: 'kb.v1',
-        ownerId,
-        name: f.originalname,
-        size: f.size,
-        mime: f.mimetype,
-        extracted: {
-          tags: analysis.tags,
-          snippet: (analysis.metadata?.text || '').slice(0, 500),
-          insights,
-          embeddings,
-        },
-        createdAt: new Date().toISOString(),
+    try {
+      const ownerId = (req.body?.ownerId as string) || ''
+      if (!ownerId) return res.status(400).json({ error: 'ownerId required' })
+      await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
+      const files = (req.files as Express.Multer.File[]) || []
+      const repo = ds.getRepository(ContentAsset)
+      const saved = [] as any[]
+      for (const f of files) {
+        // 1) In-memory analysis
+        const analysis = await analyzeFile(f)
+        const insights = deriveInsights(analysis)
+        const embeddings = embedMinimal(analysis)
+        // 2) Compose minimal metadata payload
+        const payload = {
+          schema: 'kb.v1',
+          ownerId,
+          name: f.originalname,
+          size: f.size,
+          mime: f.mimetype,
+          extracted: {
+            tags: analysis.tags,
+            snippet: (analysis.metadata?.text || '').slice(0, 500),
+            insights,
+            embeddings,
+          },
+          createdAt: new Date().toISOString(),
+        }
+        // 3) Encrypt and store to object storage (optional; do not fail ingestion if misconfigured)
+        try {
+          const keyId = process.env.DATA_KEY_ID || 'v1'
+          const enc = encryptPayload(payload, keyId)
+          const store = await getObjectStore()
+          const objectKey = `kb/${ownerId}/${Date.now()}_${safeName(f.originalname)}.json`
+          await store.putObject(objectKey, enc.buffer, {
+            contentType: 'application/octet-stream',
+            metadata: { keyId, alg: 'AES-256-GCM', schema: 'kb.v1' },
+          })
+        } catch (e) {
+          req.log?.error({ err: e }, 'object-store-failure-or-encryption-missing')
+        }
+        // 4) Persist only light reference row; do not store file
+        const a = repo.create({ name: f.originalname, url: null, tags: analysis.tags, metadata: { insights }, ownerId })
+        saved.push(await repo.save(a))
+        // 5) Ephemeral buffer auto-dropped by garbage collector
       }
-      // 3) Encrypt and store to object storage
-      const keyId = process.env.DATA_KEY_ID || 'v1'
-      const enc = encryptPayload(payload, keyId)
-      try {
-        const store = await getObjectStore()
-        const objectKey = `kb/${ownerId}/${Date.now()}_${safeName(f.originalname)}.json`
-        await store.putObject(objectKey, enc.buffer, {
-          contentType: 'application/octet-stream',
-          metadata: { keyId, alg: 'AES-256-GCM', schema: 'kb.v1' },
-        })
-      } catch (e) {
-        req.log?.error({ err: e }, 'object-store-failure')
-      }
-      // 4) Persist only light reference row; do not store file
-      const a = repo.create({ name: f.originalname, url: null, tags: analysis.tags, metadata: { insights }, ownerId })
-      saved.push(await repo.save(a))
-      // 5) Ephemeral buffer auto-dropped by garbage collector
+      res.status(201).json(saved)
+    } catch (e: any) {
+      req.log?.error({ err: e }, 'ingest-upload-failed')
+      res.status(500).json({ error: 'ingestion-failed', detail: e?.message || 'unknown' })
     }
-    res.status(201).json(saved)
   })
 
   // PDF/document analysis placeholder
@@ -124,6 +116,19 @@ async function main() {
     await repo.save(a)
     res.status(201).json(a)
   })
+
+  // Start server AFTER all routes are registered
+  const port = Number(process.env.PORT || 8081)
+  console.log('PORT env var:', process.env.PORT)
+  console.log('Using port:', port)
+  const server = app.listen(port, '0.0.0.0', () => {
+    console.log(`Ingestion service listening on 0.0.0.0:${port}`)
+    logger.info(`Ingestion listening on ${port}`)
+  })
+
+  // Connect to database AFTER server is listening
+  await ds.initialize()
+  console.log('Database connected successfully')
 }
 
 function parseUrl(url: string) {
