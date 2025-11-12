@@ -20,21 +20,37 @@ const ds = new DataSource({ type: 'postgres', url: process.env.DATABASE_URL, ent
 async function main() {
   console.log('Starting ingestion service...')
   console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'set' : 'NOT SET')
-  await ds.initialize()
-  console.log('Database connected successfully')
+
   const app = express()
 
-  // Health check BEFORE all middleware
+  // Health check BEFORE all middleware - always responds immediately
   app.get('/health', (_req, res) => {
     console.log('Health endpoint called')
     res.status(200).send('OK')
     console.log('Health response sent')
   })
 
+  app.get('/', (_req, res) => {
+    res.status(200).send('Ingestion Service OK')
+  })
+
   app.use(helmet())
   app.use(cors())
   app.use(express.json({ limit: '4mb' }))
   app.use(pinoHttp({ logger }))
+
+  // Start server BEFORE database connection
+  const port = Number(process.env.PORT || 8081)
+  console.log('PORT env var:', process.env.PORT)
+  console.log('Using port:', port)
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Ingestion service listening on 0.0.0.0:${port}`)
+    logger.info(`Ingestion listening on ${port}`)
+  })
+
+  // Connect to database AFTER server is listening
+  await ds.initialize()
+  console.log('Database connected successfully')
 
   // URL parsing and social link extraction (lightweight placeholder)
   app.post('/ingest/url', async (req, res) => {
