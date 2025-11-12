@@ -104,7 +104,10 @@ async function main() {
   })
 
   const port = Number(process.env.PORT || 8081)
-  app.listen(port, () => logger.info(`Ingestion listening on ${port}`))
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Ingestion service listening on 0.0.0.0:${port}`)
+    logger.info(`Ingestion listening on ${port}`)
+  })
 }
 
 function parseUrl(url: string) {
