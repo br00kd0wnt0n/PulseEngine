@@ -28,11 +28,18 @@ export default function FloatingChat({ projectId }: { projectId?: string }) {
     } catch {}
   }
 
+  // Open panel on global event
+  useEffect(() => {
+    function handler() { setOpen(true) }
+    window.addEventListener('open-chat', handler as any)
+    return () => window.removeEventListener('open-chat', handler as any)
+  }, [])
+
   return (
-    <div className="fixed bottom-4 left-4 z-40">
+    <div className="fixed bottom-4 right-36 z-40">
       {!open && (
         <button onClick={() => setOpen(true)} className="px-3 py-2 rounded-full text-xs bg-white/10 hover:bg-white/15 border border-white/20 shadow-md">
-          Ask Pulse
+          + Refine Story
         </button>
       )}
       {open && (

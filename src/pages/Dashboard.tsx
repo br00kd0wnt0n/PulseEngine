@@ -2,8 +2,8 @@ import NarrativeOverview from '../components/Dashboard/NarrativeOverview'
 // import GuidedCalculator from '../components/Dashboard/GuidedCalculator'
 import ProjectPotentialCalculator from '../components/Dashboard/ProjectPotentialCalculator'
 import CreatorPanel from '../components/Dashboard/CreatorPanel'
-import TrendEcosystem from '../components/Dashboard/TrendEcosystem'
-import ContentIngest from '../components/Dashboard/ContentIngest'
+import StoryRecommendations from '../components/Dashboard/StoryRecommendations'
+import UnderTheHood from '../components/Dashboard/UnderTheHood'
 import StoryPromptHero from '../components/Dashboard/StoryPromptHero'
 import AtAGlance from '../components/Dashboard/AtAGlance'
 import AtAGlanceV2 from '../components/Dashboard/AtAGlanceV2'
@@ -40,18 +40,18 @@ export default function Dashboard() {
           <ProjectPotentialCalculator mode="viz" />
         </div>
       </div>
-      {/* Creator Intelligence (left) and Trend Ecosystem (right) */}
+      {/* Creator Intelligence (left) and Story Recommendations (right) */}
       <div className="grid lg:grid-cols-2 gap-6 mt-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
         <div className="space-y-6">
           <CreatorPanel />
         </div>
         <div className="space-y-6">
-          <TrendEcosystem defaultOpen={true} />
+          <StoryRecommendations />
         </div>
       </div>
       {/* Content upload prompt as a compact panel below */}
       <div className="mt-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
-        <ContentIngest />
+        <UnderTheHood />
       </div>
       {/* Floating always-available helpers */}
       <FloatingUpload />
