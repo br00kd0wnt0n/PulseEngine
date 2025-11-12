@@ -4,6 +4,7 @@ import { useCreators } from '../../context/CreatorContext'
 import { scoreConcept, potentialColor } from '../../services/scoring'
 import { api } from '../../services/api'
 import { useDashboard } from '../../context/DashboardContext'
+import { logActivity } from '../../utils/activity'
 
 export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: 'full' | 'viz' }) {
   const { snapshot } = useTrends()
@@ -20,7 +21,7 @@ export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: '
     ;(async () => {
       try {
         const r = await api.score(concept, snapshot())
-        if (!cancel) setRemote(r)
+        if (!cancel) { setRemote(r); try { logActivity('Story Breakdown calculated') } catch {} }
       } catch { setRemote(null) }
     })()
     return () => { cancel = true }

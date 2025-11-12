@@ -5,7 +5,8 @@ import { useTrends } from '../../context/TrendContext'
 import Tooltip from '../shared/Tooltip'
 import { logActivity } from '../../utils/activity'
 
-const categories = [
+type RecKey = 'narrative' | 'content' | 'platform' | 'collab'
+const categories: { key: RecKey; title: string }[] = [
   { key: 'narrative', title: 'Narrative Development' },
   { key: 'content', title: 'Content Strategy' },
   { key: 'platform', title: 'Platform Coverage' },
@@ -82,7 +83,7 @@ export default function StoryRecommendations() {
           <div key={c.key} className="panel p-3">
             <div className="text-xs text-white/60 mb-2">{c.title}</div>
             <ul className="list-disc pl-4 space-y-1">
-              {(recs[c.key] || []).map((r, i) => <li key={i} className="text-white/80">{r}</li>)}
+              {((recs[c.key] as unknown as string[]) || []).map((r: string, i: number) => <li key={i} className="text-white/80">{r}</li>)}
             </ul>
           </div>
         ))}
