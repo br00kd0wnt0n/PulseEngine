@@ -42,5 +42,14 @@ router.get('/users', async (req, res) => {
   }
 })
 
+router.get('/assets', async (req, res) => {
+  try {
+    const assets = await AppDataSource.query('SELECT id, name, tags, metadata, "ownerId", "createdAt" FROM content_assets ORDER BY "createdAt" DESC LIMIT 10')
+    res.json({ ok: true, assets })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
 export default router
 
