@@ -18,7 +18,10 @@ const upload = multer({ storage: multer.memoryStorage() })
 const ds = new DataSource({ type: 'postgres', url: process.env.DATABASE_URL, entities: [ContentAsset] })
 
 async function main() {
+  console.log('Starting ingestion service...')
+  console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'set' : 'NOT SET')
   await ds.initialize()
+  console.log('Database connected successfully')
   const app = express()
   app.use(helmet())
   app.use(cors())
@@ -196,4 +199,8 @@ async function getObjectStore() {
   }
 }
 
-main().catch((e) => { logger.error(e, 'Fatal'); process.exit(1) })
+main().catch((e) => {
+  console.error('Fatal error:', e);
+  logger.error(e, 'Fatal');
+  process.exit(1)
+})
