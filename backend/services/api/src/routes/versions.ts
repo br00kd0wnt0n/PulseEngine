@@ -6,12 +6,12 @@ import { Project } from '../db/entities/Project.js'
 const router = Router({ mergeParams: true })
 
 router.get('/', async (req, res) => {
-  const list = await AppDataSource.getRepository(ProjectVersion).find({ where: { projectId: req.params.id }, order: { createdAt: 'DESC' } })
+  const list = await AppDataSource.getRepository(ProjectVersion).find({ where: { projectId: (req.params as any).id }, order: { createdAt: 'DESC' } })
   res.json(list)
 })
 
 router.post('/', async (req, res) => {
-  const projectId = req.params.id
+  const projectId = (req.params as any).id
   const { summary, narrative, scores, changeSummary } = req.body || {}
   if (!summary) return res.status(400).json({ error: 'summary required' })
   // validate project exists
