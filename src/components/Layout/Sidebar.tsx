@@ -11,6 +11,7 @@ const nav = [
   { to: '/insights', label: 'Insights' },
   { to: '/projects', label: 'Projects' },
   { to: '/admin', label: 'Backend' },
+  { to: '/rkb', label: 'RKB' },
 ]
 
 export default function Sidebar() {

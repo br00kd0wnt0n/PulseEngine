@@ -9,6 +9,7 @@ import Upload from './pages/Upload'
 import Creators from './pages/Creators'
 import Insights from './pages/Insights'
 import AdminDashboard from './pages/AdminDashboard'
+import RKB from './pages/RKB'
 import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
 import { ThemeProvider } from './context/ThemeContext'
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
       { path: 'projects', element: <Projects /> },
       { path: 'projects/:id', element: <ProjectDetail /> },
       { path: 'admin', element: <AdminDashboard /> },
+      { path: 'rkb', element: <RKB /> },
     ],
   },
 ])
