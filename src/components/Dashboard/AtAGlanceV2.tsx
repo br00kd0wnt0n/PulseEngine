@@ -16,20 +16,17 @@ export default function AtAGlanceV2() {
   useEffect(() => {
     const narrative = Math.round(analysis.scores.narrativeStrength)
     const peak = Math.max(1, Math.round(analysis.scores.timeToPeakWeeks))
-    // crude cross-platform readiness estimate from concept keywords
     const text = (concept || '').toLowerCase()
     const platforms = ['tiktok', 'shorts', 'reels']
     const hits = platforms.filter(p => text.includes(p)).length
     const cross = Math.min(100, hits * 30 + 40)
     setVals({ narrative, peak, cross })
-    // Simple one-liner (AI-friendly later):
-    const c = (concept || 'this story').replace(/\s+/g, ' ').trim()
-    setHowText(`Quick look at Narrative Potential, Time to Peak, and Cross‑platform fit for “${c}”.`)
   }, [analysis, concept])
 
-  // Optional AI one-liner (non-blocking): grab first sentence from narrative
+  // AI one-liner (non-blocking): grab first sentence from narrative; fallback if needed
   useEffect(() => {
     let cancel = false
+    setHowText('Analyzing story fit…')
     ;(async () => {
       try {
         const n = await api.narrative(snapshot(), null)
@@ -37,10 +34,17 @@ export default function AtAGlanceV2() {
         const text = (n as any).text || ''
         const first = (text.split(/\.[\s\n]/)[0] || '').trim()
         if (first) setHowText(first)
-      } catch {}
+        else {
+          const c = (concept || 'this story').replace(/\s+/g, ' ').trim()
+          setHowText(`Quick look at Narrative Potential, Time to Peak, and Cross‑platform fit for “${c}”.`)
+        }
+      } catch {
+        const c = (concept || 'this story').replace(/\s+/g, ' ').trim()
+        setHowText(`Quick look at Narrative Potential, Time to Peak, and Cross‑platform fit for “${c}”.`)
+      }
     })()
     return () => { cancel = true }
-  }, [snapshot])
+  }, [concept, snapshot])
 
   return (
     <div className="panel module p-4">

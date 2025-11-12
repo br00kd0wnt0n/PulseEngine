@@ -57,7 +57,7 @@ export default function StoryRecommendations() {
           </div>
         ))}
       </div>
-      <FrameworkViz />
+      <FrameworkViz values={deriveAxesFromRecs(recs)} />
     </div>
   )
 }
@@ -89,10 +89,24 @@ function buildHeuristicRecs(concept?: string, narrative?: string) {
   return { narrative: narrativeRecs, content: contentRecs, platform: platformRecs, collab: collabRecs }
 }
 
-function FrameworkViz() {
-  // Simple radar placeholder with 5 axes
+function deriveAxesFromRecs(recs: Record<string, string[]>) {
+  // Map recommendation density to axes (0–100)
+  const n = (recs.narrative || []).length
+  const c = (recs.content || []).length
+  const p = (recs.platform || []).length
+  const k = (recs.collab || []).length
+  // Simple weighting
+  const hook = Math.min(100, 50 + n * 10)
+  const clarity = Math.min(100, 50 + n * 8)
+  const arc = Math.min(100, 45 + c * 9)
+  const emotion = Math.min(100, 40 + (c + k) * 6)
+  const adaptability = Math.min(100, 50 + (p + k) * 8)
+  return [hook, clarity, arc, emotion, adaptability]
+}
+
+function FrameworkViz({ values }: { values: number[] }) {
+  // Radar with 5 axes
   const axes = ['Hook','Clarity','Arc','Emotion','Adaptability']
-  const values = [70, 60, 65, 55, 75]
   const cx = 120, cy = 120, r = 80
   const points = values.map((v, i) => {
     const angle = (Math.PI * 2 * i) / axes.length - Math.PI / 2

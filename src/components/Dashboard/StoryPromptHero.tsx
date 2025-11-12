@@ -13,6 +13,9 @@ const examples = [
 
 export default function StoryPromptHero() {
   const { concept, setConcept, activated, setActivated } = useDashboard()
+  const [projectId, setProjectId] = useState<string | null>(null)
+  const [versions, setVersions] = useState<any[]>([])
+  const [cursor, setCursor] = useState(0)
   const prefs = usePreferences()
   const { processed, addFiles, addUrl, removeContent } = useUpload()
   const [value, setValue] = useState(concept || '')
@@ -46,13 +49,43 @@ export default function StoryPromptHero() {
       const allowSave = ((import.meta as any).env?.VITE_PUBLIC_PROJECTS === '1')
       if (allowSave) {
         // create a project to persist and generate narrative/scores on backend
-        await api.createProject({ concept: text, graph: snapshot(), focusId: null })
+        const p = await api.createProject({ concept: text, graph: snapshot(), focusId: null })
+        if (p && p.id) {
+          setProjectId(p.id)
+          try { const list = await api.listVersions(p.id); setVersions(list || []); setCursor(0) } catch {}
+        }
       }
     } catch (_e) {
       // ignore on MVP if API not configured or protected
     }
     const el = document.getElementById('dashboard-main')
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  function saveVersionLocal() {
+    const v = { id: 'local-'+Date.now(), summary: concept, createdAt: new Date().toISOString() }
+    setVersions((vs) => [v, ...vs])
+    setCursor(0)
+    try { localStorage.setItem('story_versions', JSON.stringify([v, ...versions])) } catch {}
+  }
+
+  async function saveVersion() {
+    if (projectId) {
+      try { const v = await api.saveVersion(projectId, { summary: concept }); setVersions((vs) => [v, ...vs]); setCursor(0) } catch { saveVersionLocal() }
+    } else {
+      saveVersionLocal()
+    }
+  }
+
+  function older() {
+    setCursor((c) => Math.min(c + 1, Math.max(0, versions.length - 1)))
+    const v = versions[Math.min(cursor + 1, Math.max(0, versions.length - 1))]
+    if (v) setConcept(v.summary)
+  }
+  function newer() {
+    setCursor((c) => Math.max(0, c - 1))
+    const v = versions[Math.max(0, cursor - 1)]
+    if (v) setConcept(v.summary)
   }
 
   const handleDragEnter = (e: React.DragEvent) => {
@@ -128,13 +161,20 @@ export default function StoryPromptHero() {
 
   if (activated && concept) {
     return (
-      <div className="panel p-4 flex items-start justify-between">
-        <div>
-          <div className="text-xs text-white/60 mb-1">Current Story</div>
-          <div className="font-semibold">{concept}</div>
-          <div className="mt-2 text-xs text-white/60">Persona: {prefs.persona} • Focus: {prefs.platforms.join(', ')} • Areas: {prefs.areasOfInterest.join(', ')}</div>
+      <div className="panel p-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="text-xs text-white/60 mb-1">Current Story</div>
+            <div className="font-semibold">{concept}</div>
+            <div className="mt-2 text-xs text-white/60">Persona: {prefs.persona} • Focus: {prefs.platforms.join(', ')} • Areas: {prefs.areasOfInterest.join(', ')}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={older} className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10">‹ Older</button>
+            <button onClick={newer} className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10">Newer ›</button>
+            <button onClick={saveVersion} className="text-xs px-2 py-1 rounded border border-white/10 bg-ralph-cyan/70 hover:bg-ralph-cyan">Save Version</button>
+            <button onClick={() => setActivated(false)} className="px-3 py-1.5 rounded text-xs border border-white/10 bg-white/5 hover:bg-white/10">Edit</button>
+          </div>
         </div>
-        <button onClick={() => setActivated(false)} className="px-3 py-2 rounded-md text-sm border border-white/10 bg-white/5 hover:bg-white/10">Edit</button>
       </div>
     )
   }
