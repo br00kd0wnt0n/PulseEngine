@@ -76,7 +76,7 @@ export default function StoryRecommendations() {
   return (
     <div className="panel module p-4">
       <div className="flex items-center justify-between mb-2">
-        <div className="font-semibold">Story Recommendations</div>
+        <div className="font-semibold">Enhancements</div>
         <div className="text-xs text-white/60 flex items-center">
           How this works
           <Tooltip label="How this works"><span>Scores reflect density and type of recommendations; AI rationale summarizes why a dimension is strong or weak.</span></Tooltip>
@@ -147,7 +147,8 @@ function FrameworkViz({ recs }: { recs: RecResponse }) {
     'Mapped from narrative + content density.',
     'Mapped from collab + platform density.',
   ]
-  const axes = ['Market Resonance','Narrative Potential','Commercial Viability']
+  // Short labels to avoid clipping; full rationale in tooltip
+  const axes = ['Market','Narrative','Commercial']
   const [prev, setPrev] = useState<number[] | null>(null)
   useEffect(() => { setPrev(values) }, [values[0], values[1], values[2]])
   const deltas = prev ? values.map((v, i) => Math.round(v - prev[i])) : [0,0,0]
@@ -184,7 +185,7 @@ function FrameworkViz({ recs }: { recs: RecResponse }) {
   return (
     <div className="mt-4 panel p-3">
       <div className="text-xs text-white/60 mb-2">Storytelling Framework</div>
-      <svg width={240} height={240} className="block mx-auto">
+      <svg width={260} height={240} className="block mx-auto">
         {[20,40,60,80].map((rr, idx) => (
           <circle key={idx} cx={cx} cy={cy} r={(rr/100)*r} fill="none" stroke="rgba(255,255,255,0.1)" />
         ))}

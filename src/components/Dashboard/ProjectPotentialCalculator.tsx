@@ -86,7 +86,7 @@ export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: '
   return (
     <div className="panel module p-4 transform-gpu h-[460px] overflow-hidden">
       <div className="flex items-center justify-between mb-3">
-        <div className="font-semibold">Story Breakdown</div>
+        <div className="font-semibold">Strategic Breakdown</div>
         {mode === 'viz' && (
           <button
             onClick={() => { window.dispatchEvent(new CustomEvent('open-chat')) }}

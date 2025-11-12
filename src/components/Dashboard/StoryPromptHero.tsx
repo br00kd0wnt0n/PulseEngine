@@ -261,10 +261,10 @@ export default function StoryPromptHero() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={older} disabled={versions.length<=1} className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40">‹ Older</button>
-            <button onClick={newer} disabled={versions.length<=1} className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40">Newer ›</button>
-            <div className="text-[11px] px-2 py-1 rounded border border-white/10 bg-white/5 text-white/60">
-              {dirty ? 'Saving…' : (lastSavedAt ? `Auto-saved ${new Date(lastSavedAt).toLocaleTimeString()}` : 'Auto-saved')}
+            <button onClick={older} disabled={versions.length<=1} className="whitespace-nowrap text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40">‹ Older</button>
+            <button onClick={newer} disabled={versions.length<=1} className="whitespace-nowrap text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40">Newer ›</button>
+            <div className="text-[11px] px-2 py-1 rounded border border-white/10 bg-white/5 text-white/60 whitespace-nowrap">
+              {dirty ? 'Saving…' : 'Auto-saved'}
             </div>
             <button onClick={() => setActivated(false)} className="px-3 py-1.5 rounded text-xs border border-white/10 bg-white/5 hover:bg-white/10">Edit</button>
           </div>

@@ -25,9 +25,21 @@ router.get('/overview', async (_req, res) => {
     ORDER BY bytes DESC
   `)
 
+  const ai = {
+    ok: !!process.env.OPENAI_API_KEY,
+    model: process.env.MODEL_NAME || 'gpt-4o-mini',
+    provider: process.env.OPENAI_API_KEY ? 'OpenAI' : 'unset',
+  }
+  const ingestion = {
+    ok: !!process.env.INGESTION_URL,
+    status: process.env.INGESTION_URL ? 'configured' : 'not configured',
+  }
+
   res.json({
     services: {
       api: { ok: true, status: 'healthy' },
+      ingestion,
+      ai,
     },
     database: {
       sizeBytes: dbSize?.bytes ?? null,
