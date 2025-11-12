@@ -29,7 +29,7 @@ export default function StoryPromptHero() {
 
   const messages = [
     "Share your concept and I'll help you shape it into something extraordinary",
-    "Powered by community-built database of proven work",
+    "Powered by a community-built database of proven work",
     "Drop files, links, and screengrabs to add context"
   ]
 
