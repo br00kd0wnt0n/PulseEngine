@@ -294,6 +294,15 @@ export default function StoryPromptHero() {
 
       {/* Claude-like greeting */}
       <div className="mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        {/* Animated center logo */}
+        <video
+          className="mx-auto mb-4 w-28 md:w-36 h-auto rounded"
+          src="/pulse_logo_pinkbluegrad.mp4"
+          autoPlay
+          loop
+          muted
+          playsInline
+        />
         <h1 className="text-4xl md:text-5xl font-semibold mb-3 headline-gradient bg-clip-text text-transparent animated-gradient-text">
           What story do you want to tell?
         </h1>
