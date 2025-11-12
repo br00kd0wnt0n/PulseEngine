@@ -8,8 +8,8 @@ export default function Topbar() {
   const { toggleSidebar } = useLayout()
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
-      <div>
-        <div className="px-4 md:px-8 py-3 flex items-center gap-3 text-white bg-charcoal-900/80">
+      <div className="bg-gradient-to-r from-ralph-pink to-ralph-teal">
+        <div className="px-4 md:px-8 py-3 flex items-center gap-3 text-white">
           <button onClick={toggleSidebar} className="px-2 py-1 rounded-md border border-white/20 bg-white/10 hover:bg-white/15" aria-label="Navigation">
             ☰
           </button>

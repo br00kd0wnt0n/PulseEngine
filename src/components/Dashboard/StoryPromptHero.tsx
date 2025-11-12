@@ -294,7 +294,7 @@ export default function StoryPromptHero() {
 
       {/* Claude-like greeting */}
       <div className="mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-        <h1 className="text-4xl md:text-5xl font-semibold mb-3 bg-gradient-to-r from-ralph-pink to-ralph-teal bg-clip-text text-transparent animated-gradient-text">
+        <h1 className="text-4xl md:text-5xl font-semibold mb-3 headline-gradient bg-clip-text text-transparent animated-gradient-text">
           What story do you want to tell?
         </h1>
         {/* Rotating messages */}
