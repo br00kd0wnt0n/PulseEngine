@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { runSeed } from '../seed/runner.js'
+import { AppDataSource } from '../db/data-source.js'
 
 const router = Router()
 
@@ -18,6 +19,15 @@ router.post('/seed', async (req, res) => {
   try {
     const result = await runSeed({ dry, withAI })
     res.json({ ok: true, result })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
+router.post('/migrate', async (req, res) => {
+  try {
+    const migrations = await AppDataSource.runMigrations()
+    res.json({ ok: true, migrations: migrations.map(m => m.name) })
   } catch (e: any) {
     res.status(500).json({ ok: false, error: e?.message || String(e) })
   }
