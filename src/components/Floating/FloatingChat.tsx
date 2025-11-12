@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 // local storage MVP chat; API stubs are left for later integration
+import { logActivity } from '../../utils/activity'
 
 export default function FloatingChat({ projectId }: { projectId?: string }) {
   const [open, setOpen] = useState(false)
@@ -23,6 +24,7 @@ export default function FloatingChat({ projectId }: { projectId?: string }) {
       return next
     })
     try { window.dispatchEvent(new CustomEvent('conversation-updated')) } catch {}
+    try { logActivity('User message posted; updating recommendations') } catch {}
   }
 
   // Open panel on global event

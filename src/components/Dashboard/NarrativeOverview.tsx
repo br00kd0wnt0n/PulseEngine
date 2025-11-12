@@ -3,6 +3,7 @@ import { useTrends } from '../../context/TrendContext'
 import { generateNarrative } from '../../services/ai'
 import { api } from '../../services/api'
 import Tooltip from '../shared/Tooltip'
+import { logActivity } from '../../utils/activity'
 
 export default function NarrativeOverview() {
   const { snapshot, selectNode } = useTrends() as any
@@ -11,7 +12,7 @@ export default function NarrativeOverview() {
   useEffect(() => {
     // Try backend OpenAI narrative first; fallback to local mock
     api.narrative(snapshot(), null)
-      .then((r) => setText(r.text))
+      .then((r) => { setText(r.text); try { logActivity('Narrative generated') } catch {} })
       .catch(() => generateNarrative(snapshot(), null).then(setText))
   }, [snapshot])
 

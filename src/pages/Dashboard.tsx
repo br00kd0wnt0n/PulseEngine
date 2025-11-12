@@ -44,14 +44,12 @@ export default function Dashboard() {
       <div className="grid lg:grid-cols-2 gap-6 mt-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
         <div className="space-y-6">
           <CreatorPanel />
+          {/* Move Under the Hood under Creative Partner */}
+          <UnderTheHood />
         </div>
         <div className="space-y-6">
           <StoryRecommendations />
         </div>
-      </div>
-      {/* Content upload prompt as a compact panel below */}
-      <div className="mt-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
-        <UnderTheHood />
       </div>
       {/* Floating always-available helpers */}
       <FloatingUpload />

@@ -4,6 +4,7 @@ import { api } from '../../services/api'
 import { useTrends } from '../../context/TrendContext'
 import { usePreferences } from '../../context/PreferencesContext'
 import { useUpload } from '../../context/UploadContext'
+import { logActivity } from '../../utils/activity'
 
 const examples = [
   'Launch a dance challenge using AI music loops',
@@ -45,6 +46,7 @@ export default function StoryPromptHero() {
     if (!text) return
     setConcept(text)
     setActivated(true)
+    try { logActivity('Story assessed') } catch {}
     try {
       // Always try public project creation first for MVP
       const p = await api.createPublicProject({ concept: text, graph: snapshot(), focusId: null })
@@ -53,6 +55,7 @@ export default function StoryPromptHero() {
         try { localStorage.setItem('activeProjectId', p.id) } catch {}
         // load local versions if any
         try { const local = JSON.parse(localStorage.getItem(`versions:${p.id}`) || '[]'); setVersions(local); setCursor(0) } catch {}
+        try { logActivity('Project created; Quick analysis in progress') } catch {}
       }
     } catch (_e) {
       // fallback: create local project id
@@ -60,6 +63,7 @@ export default function StoryPromptHero() {
       setProjectId(localId)
       try { localStorage.setItem('activeProjectId', localId) } catch {}
       setVersions([]); setCursor(0)
+      try { logActivity('Local project initialized') } catch {}
     }
     const el = document.getElementById('dashboard-main')
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -82,6 +86,8 @@ export default function StoryPromptHero() {
     } else {
       saveVersionLocal()
     }
+    try { logActivity('Story Breakdown complete') } catch {}
+    try { logActivity('Version saved (snapshot of framework)') } catch {}
   }
 
   function older() {

@@ -4,6 +4,7 @@ import { useDashboard } from '../../context/DashboardContext'
 import { useTrends } from '../../context/TrendContext'
 import { api } from '../../services/api'
 import { scoreConcept } from '../../services/scoring'
+import { logActivity } from '../../utils/activity'
 
 export default function AtAGlanceV2() {
   const { concept } = useDashboard()
@@ -21,6 +22,10 @@ export default function AtAGlanceV2() {
     const hits = platforms.filter(p => text.includes(p)).length
     const cross = Math.min(100, hits * 30 + 40)
     setVals({ narrative, peak, cross })
+    try {
+      logActivity('Quick analysis created')
+      logActivity('Narrative potential calculated')
+    } catch {}
   }, [analysis, concept])
 
   // AI one-liner (non-blocking): grab first sentence from narrative; fallback if needed

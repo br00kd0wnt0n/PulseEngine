@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from 'react'
 import { ProcessedContent } from '../types'
+import { logActivity } from '../utils/activity'
 
 type Ctx = {
   processed: ProcessedContent[]
@@ -17,17 +18,20 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     const items = files.map((f, i) => mockProcess(f, processed.length + i))
     setProcessed((p) => [...items, ...p])
     try { window.dispatchEvent(new CustomEvent('context-updated')) } catch {}
+    try { logActivity(`${files.length} file(s) uploaded; document upload assessed and integrated into context`) } catch {}
   }
 
   const addUrl = (url: string) => {
     const item = mockProcessUrl(url, processed.length)
     setProcessed((p) => [item, ...p])
     try { window.dispatchEvent(new CustomEvent('context-updated')) } catch {}
+    try { logActivity('URL ingested; document upload assessed and integrated into context') } catch {}
   }
 
   const removeContent = (id: string) => {
     setProcessed((p) => p.filter((c) => c.id !== id))
     try { window.dispatchEvent(new CustomEvent('context-updated')) } catch {}
+    try { logActivity('Context item removed; context updated') } catch {}
   }
 
   return <UploadCtx.Provider value={{ processed, addFiles, addUrl, removeContent }}>{children}</UploadCtx.Provider>

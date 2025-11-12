@@ -3,6 +3,7 @@ import { useDashboard } from '../../context/DashboardContext'
 import { api } from '../../services/api'
 import { useTrends } from '../../context/TrendContext'
 import Tooltip from '../shared/Tooltip'
+import { logActivity } from '../../utils/activity'
 
 const categories = [
   { key: 'narrative', title: 'Narrative Development' },
@@ -24,7 +25,10 @@ export default function StoryRecommendations() {
     ;(async () => {
       try {
         const r = await api.recommendations(concept || '', snapshot())
-        if (!cancel && r && typeof r === 'object') setRecs(r)
+        if (!cancel && r && typeof r === 'object') {
+          setRecs(r)
+          try { logActivity('Recommendations created') } catch {}
+        }
       } catch {
         // fallback heuristic
         setRecs(buildHeuristicRecs(concept, ''))
@@ -35,16 +39,20 @@ export default function StoryRecommendations() {
 
   // Refresh on context or conversation updates
   useEffect(() => {
-    function refresh() {
+    function refresh(e?: Event) {
       (async () => {
-        try { const r = await api.recommendations(concept || '', snapshot()); if (r) setRecs(r) } catch {}
+        try {
+          const r = await api.recommendations(concept || '', snapshot()); if (r) setRecs(r)
+          const reason = (e && (e.type === 'conversation-updated' ? 'user input' : 'context')) || 'update'
+          try { logActivity(`Recommendations updated based on ${reason}`) } catch {}
+        } catch {}
       })()
     }
-    window.addEventListener('context-updated', refresh)
-    window.addEventListener('conversation-updated', refresh)
+    window.addEventListener('context-updated', refresh as any)
+    window.addEventListener('conversation-updated', refresh as any)
     return () => {
-      window.removeEventListener('context-updated', refresh)
-      window.removeEventListener('conversation-updated', refresh)
+      window.removeEventListener('context-updated', refresh as any)
+      window.removeEventListener('conversation-updated', refresh as any)
     }
   }, [concept, snapshot])
 
