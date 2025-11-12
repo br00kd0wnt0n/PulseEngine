@@ -87,6 +87,8 @@ export async function generateRecommendations(
   graph: TrendGraph,
   userId?: string | null
 ) {
+  console.log('[RAG] generateRecommendations called:', { concept, userId, hasGraph: !!graph })
+
   // Retrieve context from all knowledge sources
   const context = await retrieveContext(concept, userId || null, {
     maxResults: 5,
@@ -94,7 +96,17 @@ export async function generateRecommendations(
     includeLive: true
   })
 
+  console.log('[RAG] Context retrieved:', {
+    userContent: context.userContent.length,
+    coreKnowledge: context.coreKnowledge.length,
+    liveMetrics: context.liveMetrics.length,
+    predictiveTrends: context.predictiveTrends.length,
+    sources: context.sources
+  })
+
   const apiKey = process.env.OPENAI_API_KEY
+  console.log('[RAG] OpenAI key present:', !!apiKey)
+
   if (apiKey) {
     try {
       const { OpenAI } = await import('openai')
@@ -113,6 +125,9 @@ export async function generateRecommendations(
         `Also include a framework object with 3 dimensions (market, narrative, commercial), each with a numeric score (0-100) and a one-sentence why.\n` +
         `Return strictly as JSON with keys narrative, content, platform, collab (arrays of strings), and framework { market: { score, why }, narrative: { score, why }, commercial: { score, why } }.`
 
+      console.log('[RAG] Calling OpenAI with model:', model)
+      console.log('[RAG] Prompt length:', prompt.length, 'characters')
+
       const resp = await client.chat.completions.create({
         model,
         messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
@@ -120,17 +135,24 @@ export async function generateRecommendations(
         max_tokens: 500, // Increased for richer context
       })
       const raw = resp.choices?.[0]?.message?.content || '{}'
+      console.log('[RAG] OpenAI response length:', raw.length, 'characters')
+
       try {
         const result = JSON.parse(raw)
         // Attach sources for attribution
         result.sources = context.sources
+        console.log('[RAG] Successfully parsed OpenAI response, returning with sources')
         return result
-      } catch { /* fallthrough */ }
+      } catch (parseErr) {
+        console.error('[RAG] Failed to parse OpenAI JSON response:', parseErr)
+        /* fallthrough */
+      }
     } catch (e) {
-      console.error('generateRecommendations error:', e)
+      console.error('[RAG] OpenAI call failed:', e)
       /* fallthrough */
     }
   }
+  console.log('[RAG] Using heuristic fallback')
   const heuristic = buildHeuristicRecs(concept)
   // Attach empty sources for heuristic mode
   return { ...heuristic, sources: { user: [], core: [], live: [], predictive: [] } }
