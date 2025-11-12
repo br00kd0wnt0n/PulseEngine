@@ -296,13 +296,16 @@ export default function StoryPromptHero() {
       <div className="mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
         {/* Animated center logo */}
         <video
-          className="mx-auto mb-4 w-28 md:w-36 h-auto rounded"
-          src="/pulse_logo_pinkbluegrad.mp4"
+          className="mx-auto mb-4 w-28 md:w-36 h-auto rounded transform-gpu scale-75 mix-blend-screen"
           autoPlay
           loop
           muted
           playsInline
-        />
+          aria-label="Animated logo"
+        >
+          <source src="/pulse_logo_pinkbluegrad.webm" type="video/webm" />
+          <source src="/pulse_logo_pinkbluegrad.mp4" type="video/mp4" />
+        </video>
         <h1 className="text-4xl md:text-5xl font-semibold mb-3 headline-gradient bg-clip-text text-transparent animated-gradient-text">
           What story do you want to tell?
         </h1>
