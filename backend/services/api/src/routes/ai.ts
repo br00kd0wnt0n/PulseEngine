@@ -23,7 +23,9 @@ router.post('/recommendations', async (req, res) => {
   const { concept, graph } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
-    const data = await generateRecommendations(concept, graph || { nodes: [], links: [] })
+    // Extract userId from request if authenticated (added by authMiddleware)
+    const userId = (req as any).user?.sub || null
+    const data = await generateRecommendations(concept, graph || { nodes: [], links: [] }, userId)
     res.json(data)
   } catch (e: any) {
     res.status(500).json({ error: e?.message || 'failed' })

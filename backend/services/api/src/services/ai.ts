@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { AppDataSource } from '../db/data-source.js'
 import { AICache } from '../db/entities/AICache.js'
+import { retrieveContext, formatContextForPrompt, type RetrievalContext } from './retrieval.js'
 
 export type TrendGraph = { nodes: { id: string; label: string; kind: 'trend'|'creator'|'content' }[]; links: { source: string; target: string }[] }
 
@@ -80,30 +81,59 @@ export function scoreConceptMvp(concept: string, graph: TrendGraph) {
 
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
 
-// Generate recommendations by category; uses OpenAI if available, else heuristic
-export async function generateRecommendations(concept: string, graph: TrendGraph) {
+// Generate recommendations by category with RAG context from multiple sources
+export async function generateRecommendations(
+  concept: string,
+  graph: TrendGraph,
+  userId?: string | null
+) {
+  // Retrieve context from all knowledge sources
+  const context = await retrieveContext(concept, userId || null, {
+    maxResults: 5,
+    includeCore: true,
+    includeLive: true
+  })
+
   const apiKey = process.env.OPENAI_API_KEY
   if (apiKey) {
     try {
       const { OpenAI } = await import('openai')
       const client = new OpenAI({ apiKey })
       const model = process.env.MODEL_NAME || 'gpt-4o-mini'
-      const prompt = `You are a storytelling strategist. Given this story concept: "${concept}"\n` +
+
+      // Format context for prompt
+      const contextStr = formatContextForPrompt(context)
+
+      const prompt = `You are a storytelling strategist. Given this story concept: "${concept}"\n\n` +
+        (contextStr ? `# RELEVANT CONTEXT:\n${contextStr}\n\n` : '') +
+        `# TASK:\n` +
         `Provide 4 categories of recommendations with 3 concise, practical bullets each:\n` +
         `- Narrative Development\n- Content Strategy\n- Platform Coverage\n- Collaboration\n` +
+        `Base your recommendations on the context provided above, especially user-uploaded knowledge and live trends.\n` +
         `Also include a framework object with 3 dimensions (market, narrative, commercial), each with a numeric score (0-100) and a one-sentence why.\n` +
         `Return strictly as JSON with keys narrative, content, platform, collab (arrays of strings), and framework { market: { score, why }, narrative: { score, why }, commercial: { score, why } }.`
+
       const resp = await client.chat.completions.create({
         model,
         messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
         temperature: 0.7,
-        max_tokens: 350,
+        max_tokens: 500, // Increased for richer context
       })
       const raw = resp.choices?.[0]?.message?.content || '{}'
-      try { return JSON.parse(raw) } catch { /* fallthrough */ }
-    } catch { /* fallthrough */ }
+      try {
+        const result = JSON.parse(raw)
+        // Attach sources for attribution
+        result.sources = context.sources
+        return result
+      } catch { /* fallthrough */ }
+    } catch (e) {
+      console.error('generateRecommendations error:', e)
+      /* fallthrough */
+    }
   }
-  return buildHeuristicRecs(concept)
+  const heuristic = buildHeuristicRecs(concept)
+  // Attach empty sources for heuristic mode
+  return { ...heuristic, sources: { user: [], core: [], live: [], predictive: [] } }
 }
 
 function buildHeuristicRecs(concept?: string) {
