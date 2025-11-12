@@ -5,15 +5,11 @@ type Props = { size?: number; className?: string }
 export default function LogoMark({ size = 32, className = '' }: Props) {
   const [ok, setOk] = useState(true)
   return (
-    <div
-      className={`relative rounded-md accent-gradient ${className}`}
-      style={{ width: size, height: size }}
-      aria-label="Pulse icon"
-    >
+    <div className={`relative rounded-md ${className}`} style={{ width: size, height: size }} aria-label="Logo icon">
       {ok && (
         <img
           src="/pulseblackicon.png"
-          alt="Pulse Icon"
+          alt="Logo"
           width={size}
           height={size}
           className="absolute inset-0 w-full h-full object-contain"

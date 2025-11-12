@@ -8,14 +8,14 @@ export default function Topbar() {
   const { toggleSidebar } = useLayout()
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
-      <div className="bg-gradient-to-r from-ralph-pink to-ralph-teal">
-        <div className="px-4 md:px-8 py-3 flex items-center gap-3 text-white">
+      <div>
+        <div className="px-4 md:px-8 py-3 flex items-center gap-3 text-white bg-charcoal-900/80">
           <button onClick={toggleSidebar} className="px-2 py-1 rounded-md border border-white/20 bg-white/10 hover:bg-white/15" aria-label="Navigation">
             ☰
           </button>
           <Link to="/" className="flex items-center gap-3">
-            <LogoMark size={32} className="shadow-[var(--glow-pink)]" />
-            <div className="hidden sm:block font-semibold tracking-wide uppercase text-xs">Pulse · Storytelling Intelligence</div>
+            <LogoMark size={32} className="" />
+            <div className="hidden sm:block font-semibold tracking-wide uppercase text-xs">Storytelling Intelligence</div>
           </Link>
           <div className="relative flex-1 max-w-2xl ml-auto">
             <input

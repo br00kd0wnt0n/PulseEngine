@@ -13,7 +13,7 @@ export default function App() {
           <Outlet />
         </main>
         <footer className="px-6 md:px-8 py-4 text-xs text-white/40 border-t border-white/5">
-          Pulse · Storytelling Intelligence · Prototype
+          Storytelling Intelligence · Prototype
         </footer>
       </div>
     </div>

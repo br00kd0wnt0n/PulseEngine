@@ -34,7 +34,7 @@ export default function Sidebar() {
             <div className="flex items-center gap-3 p-2 rounded-lg bg-charcoal-700/40 border border-white/5">
               <LogoMark size={28} />
               <div className="leading-tight">
-                <div className="font-semibold">Pulse</div>
+                <div className="font-semibold">Storytelling Intelligence</div>
                 <div className="text-white/50 text-[10px]">Navigation</div>
               </div>
             </div>

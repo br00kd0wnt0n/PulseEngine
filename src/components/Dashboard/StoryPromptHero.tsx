@@ -28,7 +28,7 @@ export default function StoryPromptHero() {
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
 
   const messages = [
-    "Share your concept and I'll help you shape it into something extraordinary.",
+    "Share your concept and I'll help you shape it into something extraordinary",
     "Powered by community-built database of proven work",
     "Drop files, links, and screengrabs to add context"
   ]
@@ -294,7 +294,7 @@ export default function StoryPromptHero() {
 
       {/* Claude-like greeting */}
       <div className="mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-        <h1 className="text-4xl md:text-5xl font-semibold mb-3 bg-gradient-to-r from-ralph-pink to-ralph-teal bg-clip-text text-transparent">
+        <h1 className="text-4xl md:text-5xl font-semibold mb-3 bg-gradient-to-r from-ralph-pink to-ralph-teal bg-clip-text text-transparent animated-gradient-text">
           What story do you want to tell?
         </h1>
         {/* Rotating messages */}
