@@ -1,5 +1,5 @@
 import NarrativeOverview from '../components/Dashboard/NarrativeOverview'
-import GuidedCalculator from '../components/Dashboard/GuidedCalculator'
+// import GuidedCalculator from '../components/Dashboard/GuidedCalculator'
 import ProjectPotentialCalculator from '../components/Dashboard/ProjectPotentialCalculator'
 import CreatorPanel from '../components/Dashboard/CreatorPanel'
 import TrendEcosystem from '../components/Dashboard/TrendEcosystem'
@@ -8,6 +8,8 @@ import StoryPromptHero from '../components/Dashboard/StoryPromptHero'
 import AtAGlance from '../components/Dashboard/AtAGlance'
 import AtAGlanceV2 from '../components/Dashboard/AtAGlanceV2'
 import { useDashboard } from '../context/DashboardContext'
+import FloatingUpload from '../components/Floating/FloatingUpload'
+import FloatingChat from '../components/Floating/FloatingChat'
 
 export default function Dashboard() {
   const { activated } = useDashboard()
@@ -29,36 +31,31 @@ export default function Dashboard() {
       {/* Current Story then At‑a‑Glance strip */}
       <div className="mb-6"><StoryPromptHero /></div>
       <div className="space-y-6 mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150"><AtAGlanceV2 /></div>
-      {/* Narrative (left) and Trend Ecosystem (right, expanded) */}
+      {/* Narrative (left) and Project Potential (right) */}
       <div id="dashboard-main" className="grid lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
         <div className="space-y-6">
           <NarrativeOverview />
         </div>
-        <div className="space-y-6" id="calc">
-          <GuidedCalculator />
-          {/* Visualization-first view of project potential */}
-          <div className="mt-4">
-            <ProjectPotentialCalculator mode="viz" />
-          </div>
+        <div className="space-y-6" id="project-potential">
+          <ProjectPotentialCalculator mode="viz" />
         </div>
       </div>
-      {/* Guided calculator as a full-width section to anchor CTA */}
-      <div id="calc" className="mt-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-250">
-        <GuidedCalculator />
-      </div>
-      {/* Creator Intelligence (left) and Content Upload (right) */}
+      {/* Creator Intelligence (left) and Trend Ecosystem (right) */}
       <div className="grid lg:grid-cols-2 gap-6 mt-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
         <div className="space-y-6">
           <CreatorPanel />
         </div>
         <div className="space-y-6">
-          <ContentIngest />
+          <TrendEcosystem defaultOpen={true} />
         </div>
       </div>
-      {/* Keep Trend Ecosystem as a separate section for now */}
+      {/* Content upload prompt as a compact panel below */}
       <div className="mt-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
-        <TrendEcosystem defaultOpen={true} />
+        <ContentIngest />
       </div>
+      {/* Floating always-available helpers */}
+      <FloatingUpload />
+      <FloatingChat />
     </div>
   )
 }

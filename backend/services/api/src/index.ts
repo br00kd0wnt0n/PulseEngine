@@ -15,6 +15,8 @@ import statusRoutes from './routes/status.js'
 import publicRoutes from './routes/public.js'
 import adminRoutes from './routes/admin.js'
 import projectRoutes from './routes/projects.js'
+import versionsRoutes from './routes/versions.js'
+import conversationRoutes from './routes/conversation.js'
 import ingestionRoutes from './routes/ingestion.js'
 import { authMiddleware, attachRls } from './middleware/auth.js'
 
@@ -50,6 +52,8 @@ async function main() {
   app.use('/trends', trendRoutes)
   app.use('/assets', assetRoutes)
   app.use('/projects', projectRoutes)
+  app.use('/projects/:id/versions', versionsRoutes)
+  app.use('/projects/:id/conversation', conversationRoutes)
   app.use('/ingest', ingestionRoutes)
 
   // error handler

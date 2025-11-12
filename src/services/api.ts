@@ -42,4 +42,10 @@ export const api = {
   ),
   trends: () => request<any[]>('/public/trends'),
   creators: () => request<any[]>('/public/creators'),
+  listVersions: (projectId: string) => request<any[]>(`/projects/${projectId}/versions`),
+  saveVersion: (projectId: string, payload: { summary: string; narrative?: string; scores?: any; changeSummary?: string }) =>
+    request<any>(`/projects/${projectId}/versions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
+  getConversation: (projectId: string) => request<any[]>(`/projects/${projectId}/conversation`),
+  postConversation: (projectId: string, payload: { role: 'user'|'ai'; content: string }) =>
+    request<any>(`/projects/${projectId}/conversation`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
 }

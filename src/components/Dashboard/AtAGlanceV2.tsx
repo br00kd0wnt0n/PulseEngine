@@ -29,8 +29,8 @@ export default function AtAGlanceV2() {
         <div className="font-semibold">At‑a‑Glance</div>
         <div className="flex items-center gap-2">
           <button className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={() => {
-            const el = document.getElementById('calc'); if (el) el.scrollIntoView({ behavior: 'smooth' })
-          }}>Go to Calculator</button>
+            const el = document.getElementById('project-potential'); if (el) el.scrollIntoView({ behavior: 'smooth' })
+          }}>See Project Potential</button>
           <button className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={() => setHowOpen(o => !o)}>How it works</button>
         </div>
       </div>
