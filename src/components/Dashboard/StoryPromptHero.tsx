@@ -46,17 +46,20 @@ export default function StoryPromptHero() {
     setConcept(text)
     setActivated(true)
     try {
-      const allowSave = ((import.meta as any).env?.VITE_PUBLIC_PROJECTS === '1')
-      if (allowSave) {
-        // create a project to persist and generate narrative/scores on backend
-        const p = await api.createProject({ concept: text, graph: snapshot(), focusId: null })
-        if (p && p.id) {
-          setProjectId(p.id)
-          try { const list = await api.listVersions(p.id); setVersions(list || []); setCursor(0) } catch {}
-        }
+      // Always try public project creation first for MVP
+      const p = await api.createPublicProject({ concept: text, graph: snapshot(), focusId: null })
+      if (p && p.id) {
+        setProjectId(p.id)
+        try { localStorage.setItem('activeProjectId', p.id) } catch {}
+        // load local versions if any
+        try { const local = JSON.parse(localStorage.getItem(`versions:${p.id}`) || '[]'); setVersions(local); setCursor(0) } catch {}
       }
     } catch (_e) {
-      // ignore on MVP if API not configured or protected
+      // fallback: create local project id
+      const localId = `local-${Date.now()}`
+      setProjectId(localId)
+      try { localStorage.setItem('activeProjectId', localId) } catch {}
+      setVersions([]); setCursor(0)
     }
     const el = document.getElementById('dashboard-main')
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -66,12 +69,16 @@ export default function StoryPromptHero() {
     const v = { id: 'local-'+Date.now(), summary: concept, createdAt: new Date().toISOString() }
     setVersions((vs) => [v, ...vs])
     setCursor(0)
-    try { localStorage.setItem('story_versions', JSON.stringify([v, ...versions])) } catch {}
+    const pid = projectId || 'local'
+    try { localStorage.setItem(`versions:${pid}`, JSON.stringify([v, ...versions])) } catch {}
   }
 
   async function saveVersion() {
     if (projectId) {
-      try { const v = await api.saveVersion(projectId, { summary: concept }); setVersions((vs) => [v, ...vs]); setCursor(0) } catch { saveVersionLocal() }
+      try {
+        // Prefer local for MVP; persist locally
+        saveVersionLocal()
+      } catch { saveVersionLocal() }
     } else {
       saveVersionLocal()
     }

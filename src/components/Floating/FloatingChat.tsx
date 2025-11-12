@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api } from '../../services/api'
+// local storage MVP chat; API stubs are left for later integration
 
 export default function FloatingChat({ projectId }: { projectId?: string }) {
   const [open, setOpen] = useState(false)
@@ -7,26 +7,22 @@ export default function FloatingChat({ projectId }: { projectId?: string }) {
   const [text, setText] = useState('')
 
   useEffect(() => {
-    if (!open || !projectId) return
-    let cancel = false
-    ;(async () => {
-      try {
-        const list = await api.getConversation(projectId)
-        if (!cancel) setItems(list)
-      } catch {}
-    })()
-    return () => { cancel = true }
+    if (!open) return
+    const key = `conv:${projectId || 'local'}`
+    try { const arr = JSON.parse(localStorage.getItem(key) || '[]'); setItems(arr) } catch {}
   }, [open, projectId])
 
   async function send() {
     if (!text.trim()) return
     setText('')
-    if (!projectId) return
-    try {
-      const msg = await api.postConversation(projectId, { role: 'user', content: text.trim() })
-      setItems((it) => [...it, msg])
-      try { window.dispatchEvent(new CustomEvent('conversation-updated')) } catch {}
-    } catch {}
+    const key = `conv:${projectId || 'local'}`
+    const msg = { id: 'local-'+Date.now(), role: 'user', content: text.trim(), createdAt: new Date().toISOString() }
+    setItems((it) => {
+      const next = [...it, msg]
+      try { localStorage.setItem(key, JSON.stringify(next)) } catch {}
+      return next
+    })
+    try { window.dispatchEvent(new CustomEvent('conversation-updated')) } catch {}
   }
 
   // Open panel on global event
