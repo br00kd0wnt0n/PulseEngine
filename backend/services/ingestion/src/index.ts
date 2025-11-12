@@ -28,7 +28,18 @@ async function main() {
   app.use(express.json({ limit: '4mb' }))
   app.use(pinoHttp({ logger }))
 
-  app.get('/health', (_req, res) => res.json({ ok: true }))
+  app.get('/health', (_req, res) => {
+    console.log('Health endpoint called')
+    try {
+      const response = { ok: true }
+      console.log('Sending health response:', response)
+      res.json(response)
+      console.log('Health response sent')
+    } catch (e) {
+      console.error('Health endpoint error:', e)
+      res.status(500).json({ error: String(e) })
+    }
+  })
 
   // URL parsing and social link extraction (lightweight placeholder)
   app.post('/ingest/url', async (req, res) => {
