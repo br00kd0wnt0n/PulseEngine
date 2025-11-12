@@ -17,7 +17,7 @@ type Framework = { market: { score: number; why: string }; narrative: { score: n
 type RecResponse = { narrative: string[]; content: string[]; platform: string[]; collab: string[]; framework?: Framework }
 
 export default function StoryRecommendations() {
-  const { concept, setFrameworkScores } = useDashboard()
+  const { concept, setFrameworkScores, setRecsDensity } = useDashboard()
   const { snapshot } = useTrends()
   const [recs, setRecs] = useState<RecResponse>({ narrative: [], content: [], platform: [], collab: [] })
 
@@ -28,11 +28,14 @@ export default function StoryRecommendations() {
         const r = await api.recommendations(concept || '', snapshot())
         if (!cancel && r && typeof r === 'object') {
           setRecs(r)
+          try { setRecsDensity({ narrative: (r.narrative||[]).length, content: (r.content||[]).length, platform: (r.platform||[]).length, collab: (r.collab||[]).length }) } catch {}
           try { logActivity('Recommendations created') } catch {}
         }
       } catch {
         // fallback heuristic
-        setRecs(buildHeuristicRecs(concept, ''))
+        const b = buildHeuristicRecs(concept, '')
+        setRecs(b)
+        try { setRecsDensity({ narrative: b.narrative.length, content: b.content.length, platform: b.platform.length, collab: b.collab.length }) } catch {}
       }
     })()
     return () => { cancel = true }
@@ -43,7 +46,7 @@ export default function StoryRecommendations() {
     function refresh(e?: Event) {
       (async () => {
         try {
-          const r = await api.recommendations(concept || '', snapshot()); if (r) setRecs(r)
+          const r = await api.recommendations(concept || '', snapshot()); if (r) { setRecs(r); try { setRecsDensity({ narrative: (r.narrative||[]).length, content: (r.content||[]).length, platform: (r.platform||[]).length, collab: (r.collab||[]).length }) } catch {} }
           const reason = (e && (e.type === 'conversation-updated' ? 'user input' : 'context')) || 'update'
           try { logActivity(`Recommendations updated based on ${reason}`) } catch {}
         } catch {}
@@ -57,7 +60,7 @@ export default function StoryRecommendations() {
     }
   }, [concept, snapshot])
 
-  // Update global framework scores for Save Version snapshots
+  // Update global framework + density for Save Version snapshots
   useEffect(() => {
     const f = (recs as any)?.framework as Framework | undefined
     if (f && typeof f.market?.score === 'number' && typeof f.narrative?.score === 'number' && typeof f.commercial?.score === 'number') {
@@ -67,6 +70,7 @@ export default function StoryRecommendations() {
       const [m, n, c] = deriveFrameworkFromRecs(recs)
       setFrameworkScores({ market: m, narrative: n, commercial: c })
     }
+    try { setRecsDensity({ narrative: (recs.narrative||[]).length, content: (recs.content||[]).length, platform: (recs.platform||[]).length, collab: (recs.collab||[]).length }) } catch {}
   }, [recs, setFrameworkScores])
 
   return (
@@ -144,6 +148,32 @@ function FrameworkViz({ recs }: { recs: RecResponse }) {
     'Mapped from collab + platform density.',
   ]
   const axes = ['Market Resonance','Narrative Potential','Commercial Viability']
+  const [prev, setPrev] = useState<number[] | null>(null)
+  useEffect(() => { setPrev(values) }, [values[0], values[1], values[2]])
+  const deltas = prev ? values.map((v, i) => Math.round(v - prev[i])) : [0,0,0]
+
+  const [sinceSave, setSinceSave] = useState<number[] | null>(null)
+  useEffect(() => {
+    try {
+      const pid = localStorage.getItem('activeProjectId') || 'local'
+      const raw = localStorage.getItem(`versions:${pid}`)
+      if (!raw) { setSinceSave([0,0,0]); return }
+      const arr = JSON.parse(raw)
+      const last = arr && arr[0]
+      const sv = last?.scores?.framework
+      if (sv && typeof sv.market === 'number' && typeof sv.narrative === 'number' && typeof sv.commercial === 'number') {
+        setSinceSave([Math.round(values[0] - sv.market), Math.round(values[1] - sv.narrative), Math.round(values[2] - sv.commercial)])
+      } else {
+        setSinceSave([0,0,0])
+      }
+    } catch { setSinceSave([0,0,0]) }
+  }, [values[0], values[1], values[2]])
+
+  function Delta({ d }: { d: number }) {
+    if (!d) return null
+    const cls = d > 0 ? 'border-ralph-pink/40 bg-ralph-pink/10 text-ralph-pink' : 'border-ralph-cyan/40 bg-ralph-cyan/10 text-ralph-cyan'
+    return <span className={`text-[9px] px-1 py-0.5 rounded-full border ${cls}`}>{d > 0 ? `+${d}` : d}</span>
+  }
   const cx = 120, cy = 120, r = 80
   const points = values.map((v, i) => {
     const angle = (Math.PI * 2 * i) / axes.length - Math.PI / 2
@@ -171,9 +201,10 @@ function FrameworkViz({ recs }: { recs: RecResponse }) {
           const y = cy + Math.sin(angle) * (r + 18)
           return (
             <g key={i} transform={`translate(${x},${y})`}>
-              <foreignObject x={-60} y={-10} width={120} height={20}>
+              <foreignObject x={-70} y={-12} width={140} height={24}>
                 <div className="flex items-center justify-center gap-1 text-[10px] text-[#9aa]">
                   <span>{a}</span>
+                  <Delta d={deltas[i]} />
                   <Tooltip label={a}><span>{whys[i]}</span></Tooltip>
                 </div>
               </foreignObject>
@@ -181,6 +212,14 @@ function FrameworkViz({ recs }: { recs: RecResponse }) {
           )
         })}
       </svg>
+      {sinceSave && (
+        <div className="mt-2 text-[11px] text-white/60 text-center">
+          Change since last save:
+          <span className="ml-1">M <Delta d={sinceSave[0]} /></span>
+          <span className="ml-2">N <Delta d={sinceSave[1]} /></span>
+          <span className="ml-2">C <Delta d={sinceSave[2]} /></span>
+        </div>
+      )}
     </div>
   )
 }

@@ -11,9 +11,22 @@ export default function NarrativeOverview() {
 
   useEffect(() => {
     // Try backend OpenAI narrative first; fallback to local mock
-    api.narrative(snapshot(), null)
+    const run = () => api.narrative(snapshot(), null)
       .then((r) => { setText(r.text); try { logActivity('Narrative generated') } catch {} })
       .catch(() => generateNarrative(snapshot(), null).then(setText))
+    run()
+    function refresh(e?: Event) {
+      run().then(() => {
+        const reason = e?.type === 'conversation-updated' ? 'user input' : 'context'
+        try { logActivity(`Narrative updated based on ${reason}`) } catch {}
+      })
+    }
+    window.addEventListener('context-updated', refresh as any)
+    window.addEventListener('conversation-updated', refresh as any)
+    return () => {
+      window.removeEventListener('context-updated', refresh as any)
+      window.removeEventListener('conversation-updated', refresh as any)
+    }
   }, [snapshot])
 
   const [expanded, setExpanded] = useState(false)

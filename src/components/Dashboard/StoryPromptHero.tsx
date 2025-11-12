@@ -13,7 +13,7 @@ const examples = [
 ]
 
 export default function StoryPromptHero() {
-  const { concept, setConcept, activated, setActivated, frameworkScores } = useDashboard()
+  const { concept, setConcept, activated, setActivated, frameworkScores, keyDrivers, recsDensity } = useDashboard()
   const [projectId, setProjectId] = useState<string | null>(null)
   const [versions, setVersions] = useState<any[]>([])
   const [cursor, setCursor] = useState(0)
@@ -24,6 +24,8 @@ export default function StoryPromptHero() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragCounterRef = useRef(0)
   const [currentMessage, setCurrentMessage] = useState(0)
+  const [dirty, setDirty] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
 
   const messages = [
     "Share your concept and I'll help you shape it into something extraordinary.",
@@ -69,12 +71,36 @@ export default function StoryPromptHero() {
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  // Mark unsaved when inputs change
+  useEffect(() => { if (activated) setDirty(true) }, [concept])
+  useEffect(() => { if (activated) setDirty(true) }, [frameworkScores])
+  useEffect(() => {
+    function mark() { setDirty(true) }
+    window.addEventListener('context-updated', mark as any)
+    window.addEventListener('conversation-updated', mark as any)
+    return () => {
+      window.removeEventListener('context-updated', mark as any)
+      window.removeEventListener('conversation-updated', mark as any)
+    }
+  }, [activated])
+
   function saveVersionLocal() {
-    const v = { id: 'local-'+Date.now(), summary: concept, scores: frameworkScores ? { framework: frameworkScores } : {}, createdAt: new Date().toISOString() }
+    const v = {
+      id: 'local-'+Date.now(),
+      summary: concept,
+      scores: {
+        ...(frameworkScores ? { framework: frameworkScores } : {}),
+        ...(keyDrivers ? { keyDrivers } : {}),
+        ...(recsDensity ? { recsDensity } : {}),
+      },
+      createdAt: new Date().toISOString()
+    }
     setVersions((vs) => [v, ...vs])
     setCursor(0)
     const pid = projectId || 'local'
     try { localStorage.setItem(`versions:${pid}`, JSON.stringify([v, ...versions])) } catch {}
+    setDirty(false)
+    setLastSavedAt(v.createdAt)
   }
 
   async function saveVersion() {
@@ -90,12 +116,49 @@ export default function StoryPromptHero() {
     try { logActivity('Version saved (snapshot of framework)') } catch {}
   }
 
+  // Auto-save when dirty changes settle
+  useEffect(() => {
+    if (!activated || !concept) return
+    if (!dirty) return
+    const DEBOUNCE = Number((import.meta as any).env?.VITE_AUTO_SAVE_DEBOUNCE_MS) || 1200
+    const t = setTimeout(() => {
+      // basic dedupe: avoid saving identical consecutive version
+      const latest = versions[0]
+      const sameSummary = latest && latest.summary === concept
+      const latestFramework = latest?.scores?.framework
+      const sameFramework = latestFramework && frameworkScores &&
+        latestFramework.market === frameworkScores.market &&
+        latestFramework.narrative === frameworkScores.narrative &&
+        latestFramework.commercial === frameworkScores.commercial
+      const latestKD: string[] | undefined = latest?.scores?.keyDrivers
+      const sameKeyDrivers = !!(latestKD && keyDrivers) && arraysEqual(latestKD, keyDrivers)
+      const latestRD: any = latest?.scores?.recsDensity
+      const sameRecs = !!(latestRD && recsDensity) && latestRD.narrative === recsDensity.narrative && latestRD.content === recsDensity.content && latestRD.platform === recsDensity.platform && latestRD.collab === recsDensity.collab
+      if (sameSummary && (frameworkScores ? sameFramework : true) && (keyDrivers ? sameKeyDrivers : true) && (recsDensity ? sameRecs : true)) {
+        setDirty(false)
+        setLastSavedAt(new Date().toISOString())
+        return
+      }
+      saveVersion()
+    }, DEBOUNCE)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, concept, frameworkScores, keyDrivers, recsDensity, activated])
+
+  function arraysEqual(a: string[], b: string[]) {
+    if (a.length !== b.length) return false
+    for (let i=0;i<a.length;i++) if (a[i] !== b[i]) return false
+    return true
+  }
+
   function older() {
+    if (versions.length === 0) return
     setCursor((c) => Math.min(c + 1, Math.max(0, versions.length - 1)))
     const v = versions[Math.min(cursor + 1, Math.max(0, versions.length - 1))]
     if (v) setConcept(v.summary)
   }
   function newer() {
+    if (versions.length === 0) return
     setCursor((c) => Math.max(0, c - 1))
     const v = versions[Math.max(0, cursor - 1)]
     if (v) setConcept(v.summary)
@@ -179,12 +242,30 @@ export default function StoryPromptHero() {
           <div>
             <div className="text-xs text-white/60 mb-1">Current Story</div>
             <div className="font-semibold">{concept}</div>
-            <div className="mt-2 text-xs text-white/60">Persona: {prefs.persona} • Focus: {prefs.platforms.join(', ')} • Areas: {prefs.areasOfInterest.join(', ')}</div>
+            <div className="mt-2 text-xs text-white/60 flex items-center gap-2">
+              <span>Persona: {prefs.persona} • Focus: {prefs.platforms.join(', ')} • Areas: {prefs.areasOfInterest.join(', ')}</span>
+              {dirty && <span className="px-2 py-0.5 rounded-full border border-ralph-pink/30 bg-ralph-pink/10 text-ralph-pink">Unsaved changes</span>}
+            </div>
+            {versions.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {versions.slice(0,6).map((v, idx) => (
+                  <button key={v.id}
+                    onClick={() => { setConcept(v.summary); setCursor(idx) }}
+                    className={`text-[11px] px-2 py-1 rounded border ${idx===cursor?'border-ralph-cyan/50 bg-ralph-cyan/10':'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                    title={new Date(v.createdAt).toLocaleString()}
+                  >
+                    v{versions.length - idx}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={older} className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10">‹ Older</button>
-            <button onClick={newer} className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10">Newer ›</button>
-            <button onClick={saveVersion} className="text-xs px-2 py-1 rounded border border-white/10 bg-ralph-cyan/70 hover:bg-ralph-cyan">Save Version</button>
+            <button onClick={older} disabled={versions.length<=1} className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40">‹ Older</button>
+            <button onClick={newer} disabled={versions.length<=1} className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40">Newer ›</button>
+            <div className="text-[11px] px-2 py-1 rounded border border-white/10 bg-white/5 text-white/60">
+              {dirty ? 'Saving…' : (lastSavedAt ? `Auto-saved ${new Date(lastSavedAt).toLocaleTimeString()}` : 'Auto-saved')}
+            </div>
             <button onClick={() => setActivated(false)} className="px-3 py-1.5 rounded text-xs border border-white/10 bg-white/5 hover:bg-white/10">Edit</button>
           </div>
         </div>

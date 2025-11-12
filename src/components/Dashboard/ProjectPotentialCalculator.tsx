@@ -9,7 +9,7 @@ import { logActivity } from '../../utils/activity'
 export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: 'full' | 'viz' }) {
   const { snapshot } = useTrends()
   const { creators } = useCreators()
-  const { concept: sharedConcept, setConcept: setSharedConcept } = useDashboard()
+  const { concept: sharedConcept, setConcept: setSharedConcept, setKeyDrivers } = useDashboard()
   const [concept, setConcept] = useState(sharedConcept || 'AI music loop for dance challenge with retro gaming remix')
   useEffect(() => { if (sharedConcept) setConcept(sharedConcept) }, [sharedConcept])
   const [drag, setDrag] = useState(false)
@@ -26,6 +26,25 @@ export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: '
     })()
     return () => { cancel = true }
   }, [concept, snapshot])
+
+  useEffect(() => {
+    function refresh(e?: Event) {
+      (async () => {
+        try {
+          const r = await api.score(concept, snapshot())
+          setRemote(r)
+          const reason = e?.type === 'conversation-updated' ? 'user input' : 'context'
+          try { logActivity(`Story Breakdown recalculated based on ${reason}`) } catch {}
+        } catch {}
+      })()
+    }
+    window.addEventListener('context-updated', refresh as any)
+    window.addEventListener('conversation-updated', refresh as any)
+    return () => {
+      window.removeEventListener('context-updated', refresh as any)
+      window.removeEventListener('conversation-updated', refresh as any)
+    }
+  }, [concept, snapshot])
   const analysis = useMemo(() => {
     if (!remote) return localAnalysis
     const merged = {
@@ -37,6 +56,25 @@ export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: '
     } as any
     return merged
   }, [remote, localAnalysis])
+
+  // Expose key drivers to context for dedupe
+  useEffect(() => {
+    try { setKeyDrivers((analysis as any).keyDrivers || null) } catch {}
+  }, [analysis, setKeyDrivers])
+
+  const [prevScores, setPrevScores] = useState<{[k:string]: number}>({})
+  useEffect(() => {
+    setPrevScores(ps => ({
+      audience: analysis.scores.audiencePotential,
+      narrative: analysis.scores.narrativeStrength,
+      collab: analysis.scores.collaborationOpportunity,
+      ttp: analysis.scores.timeToPeakWeeks,
+      adapt: (analysis as any).ralph?.narrativeAdaptability ?? ps.adapt,
+      cross: (analysis as any).ralph?.crossPlatformPotential ?? ps.cross,
+      culture: (analysis as any).ralph?.culturalRelevance ?? ps.culture,
+    }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysis])
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault(); e.stopPropagation(); setDrag(false)
@@ -60,12 +98,15 @@ export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: '
       {mode === 'full' && null}
 
       <div className="grid grid-cols-2 gap-3 text-sm">
-        <Score label="Audience Potential" value={analysis.scores.audiencePotential} />
-        <Score label="Narrative Strength" value={analysis.scores.narrativeStrength} />
-        <Score label="Collaboration Opportunity" value={analysis.scores.collaborationOpportunity} />
+        <Score label="Audience Potential" value={analysis.scores.audiencePotential} prev={prevScores.audience} />
+        <Score label="Narrative Strength" value={analysis.scores.narrativeStrength} prev={prevScores.narrative} />
+        <Score label="Collaboration Opportunity" value={analysis.scores.collaborationOpportunity} prev={prevScores.collab} />
         <div className="panel p-3">
           <div className="text-white/60 text-xs">Time to Peak</div>
-          <div className="text-lg font-semibold">{analysis.scores.timeToPeakWeeks} weeks</div>
+          <div className="text-lg font-semibold flex items-center gap-2">
+            {analysis.scores.timeToPeakWeeks} weeks
+            <DeltaBadge delta={delta(analysis.scores.timeToPeakWeeks, prevScores.ttp)} />
+          </div>
         </div>
       </div>
 
@@ -73,9 +114,9 @@ export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: '
         <div className="mt-4 panel p-3">
           <div className="text-xs text-white/60 mb-2">Ralph Scoring</div>
           <div className="grid grid-cols-3 gap-3 text-sm">
-            <Score label="Adaptability" value={analysis.ralph.narrativeAdaptability} />
-            <Score label="Cross-Platform" value={analysis.ralph.crossPlatformPotential} />
-            <Score label="Cultural Relevance" value={analysis.ralph.culturalRelevance} />
+            <Score label="Adaptability" value={analysis.ralph.narrativeAdaptability} prev={prevScores.adapt} />
+            <Score label="Cross-Platform" value={analysis.ralph.crossPlatformPotential} prev={prevScores.cross} />
+            <Score label="Cultural Relevance" value={analysis.ralph.culturalRelevance} prev={prevScores.culture} />
           </div>
         </div>
       )}
@@ -93,11 +134,21 @@ export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: '
   )
 }
 
-function Score({ label, value }: { label: string; value: number }) {
+function delta(curr?: number, prev?: number) { if (typeof curr !== 'number' || typeof prev !== 'number') return 0; return Math.round(curr - prev) }
+
+function DeltaBadge({ delta }: { delta?: number }) {
+  if (delta === undefined || delta === 0) return null
+  const pos = delta > 0
+  const txt = (pos ? '+' : '') + delta
+  const cls = pos ? 'border-ralph-pink/40 bg-ralph-pink/10 text-ralph-pink' : 'border-ralph-cyan/40 bg-ralph-cyan/10 text-ralph-cyan'
+  return <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${cls}`}>{txt}</span>
+}
+
+function Score({ label, value, prev }: { label: string; value: number; prev?: number }) {
   const color = potentialColor(value)
   return (
     <div className="panel p-3">
-      <div className="text-white/60 text-xs">{label}</div>
+      <div className="text-white/60 text-xs flex items-center gap-2">{label} <DeltaBadge delta={delta(value, prev)} /></div>
       <div className="flex items-center gap-3 mt-1">
         <div className="text-lg font-semibold w-12">{Math.round(value)}</div>
         <div className="flex-1 h-2 rounded bg-charcoal-700/50">
