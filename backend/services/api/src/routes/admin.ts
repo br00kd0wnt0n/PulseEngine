@@ -33,5 +33,14 @@ router.post('/migrate', async (req, res) => {
   }
 })
 
+router.get('/users', async (req, res) => {
+  try {
+    const users = await AppDataSource.query('SELECT id, email, role, "createdAt" FROM users LIMIT 10')
+    res.json({ ok: true, users })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
 export default router
 
