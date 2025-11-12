@@ -23,23 +23,18 @@ async function main() {
   await ds.initialize()
   console.log('Database connected successfully')
   const app = express()
+
+  // Health check BEFORE all middleware
+  app.get('/health', (_req, res) => {
+    console.log('Health endpoint called')
+    res.status(200).send('OK')
+    console.log('Health response sent')
+  })
+
   app.use(helmet())
   app.use(cors())
   app.use(express.json({ limit: '4mb' }))
   app.use(pinoHttp({ logger }))
-
-  app.get('/health', (_req, res) => {
-    console.log('Health endpoint called')
-    try {
-      const response = { ok: true }
-      console.log('Sending health response:', response)
-      res.json(response)
-      console.log('Health response sent')
-    } catch (e) {
-      console.error('Health endpoint error:', e)
-      res.status(500).json({ error: String(e) })
-    }
-  })
 
   // URL parsing and social link extraction (lightweight placeholder)
   app.post('/ingest/url', async (req, res) => {
