@@ -16,15 +16,18 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
   const addFiles = (files: File[]) => {
     const items = files.map((f, i) => mockProcess(f, processed.length + i))
     setProcessed((p) => [...items, ...p])
+    try { window.dispatchEvent(new CustomEvent('context-updated')) } catch {}
   }
 
   const addUrl = (url: string) => {
     const item = mockProcessUrl(url, processed.length)
     setProcessed((p) => [item, ...p])
+    try { window.dispatchEvent(new CustomEvent('context-updated')) } catch {}
   }
 
   const removeContent = (id: string) => {
     setProcessed((p) => p.filter((c) => c.id !== id))
+    try { window.dispatchEvent(new CustomEvent('context-updated')) } catch {}
   }
 
   return <UploadCtx.Provider value={{ processed, addFiles, addUrl, removeContent }}>{children}</UploadCtx.Provider>
@@ -87,4 +90,3 @@ function mockProcessUrl(url: string, idx: number): ProcessedContent {
     summary: `Fetching content from ${domain}...`
   }
 }
-

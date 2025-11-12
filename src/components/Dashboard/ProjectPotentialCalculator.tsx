@@ -45,13 +45,13 @@ export default function ProjectPotentialCalculator({ mode = 'full' }: { mode?: '
   }
 
   return (
-    <div className="panel module p-4 transform-gpu">
+    <div className="panel module p-4 transform-gpu h-[460px] overflow-hidden">
       <div className="flex items-center justify-between mb-3">
         <div className="font-semibold">Story Breakdown</div>
         {mode === 'viz' && (
           <button
             onClick={() => { window.dispatchEvent(new CustomEvent('open-chat')) }}
-            className="text-xs px-2 py-1 rounded-full border border-white/10 bg-white/5 hover:bg-white/10"
+            className="text-xs px-2 py-1 rounded-full border border-white/10 bg-ralph-cyan/70 hover:bg-ralph-cyan"
           >+ Refine Story</button>
         )}
       </div>

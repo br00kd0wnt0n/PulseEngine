@@ -24,6 +24,10 @@ export const api = {
     '/ai/score',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph }) }
   ),
+  recommendations: (concept: string, graph: any) => request<any>(
+    '/ai/recommendations',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph }) }
+  ),
   createProject: (payload: { concept: string; persona?: string; platforms?: string[]; areasOfInterest?: string[]; graph?: any; focusId?: string | null }) =>
     request<any>('/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
   createPublicProject: (payload: any) =>

@@ -19,17 +19,29 @@ export default function StoryRecommendations() {
     let cancel = false
     ;(async () => {
       try {
-        // Use narrative to steer simple recommendations (MVP: heuristic)
-        const n = await api.narrative(snapshot(), null).catch(() => ({ text: '' }))
-        const text = typeof n === 'object' ? (n as any).text || '' : ''
-        if (cancel) return
-        const base = buildHeuristicRecs(concept, text)
-        setRecs(base)
+        const r = await api.recommendations(concept || '', snapshot())
+        if (!cancel && r && typeof r === 'object') setRecs(r)
       } catch {
+        // fallback heuristic
         setRecs(buildHeuristicRecs(concept, ''))
       }
     })()
     return () => { cancel = true }
+  }, [concept, snapshot])
+
+  // Refresh on context or conversation updates
+  useEffect(() => {
+    function refresh() {
+      (async () => {
+        try { const r = await api.recommendations(concept || '', snapshot()); if (r) setRecs(r) } catch {}
+      })()
+    }
+    window.addEventListener('context-updated', refresh)
+    window.addEventListener('conversation-updated', refresh)
+    return () => {
+      window.removeEventListener('context-updated', refresh)
+      window.removeEventListener('conversation-updated', refresh)
+    }
   }, [concept, snapshot])
 
   return (
@@ -45,6 +57,7 @@ export default function StoryRecommendations() {
           </div>
         ))}
       </div>
+      <FrameworkViz />
     </div>
   )
 }
@@ -76,3 +89,41 @@ function buildHeuristicRecs(concept?: string, narrative?: string) {
   return { narrative: narrativeRecs, content: contentRecs, platform: platformRecs, collab: collabRecs }
 }
 
+function FrameworkViz() {
+  // Simple radar placeholder with 5 axes
+  const axes = ['Hook','Clarity','Arc','Emotion','Adaptability']
+  const values = [70, 60, 65, 55, 75]
+  const cx = 120, cy = 120, r = 80
+  const points = values.map((v, i) => {
+    const angle = (Math.PI * 2 * i) / axes.length - Math.PI / 2
+    const rr = (v / 100) * r
+    return [cx + Math.cos(angle) * rr, cy + Math.sin(angle) * rr]
+  })
+  const path = points.map(p => p.join(',')).join(' ')
+  return (
+    <div className="mt-4 panel p-3">
+      <div className="text-xs text-white/60 mb-2">Storytelling Framework (placeholder)</div>
+      <svg width={240} height={240} className="block mx-auto">
+        {/* grid */}
+        {[20,40,60,80].map((rr, idx) => (
+          <circle key={idx} cx={cx} cy={cy} r={(rr/100)*r} fill="none" stroke="rgba(255,255,255,0.1)" />
+        ))}
+        {axes.map((_, i) => {
+          const angle = (Math.PI * 2 * i) / axes.length - Math.PI / 2
+          const x = cx + Math.cos(angle) * r
+          const y = cy + Math.sin(angle) * r
+          return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(255,255,255,0.1)" />
+        })}
+        {/* polygon */}
+        <polygon points={path} fill="rgba(59,232,255,0.25)" stroke="#3be8ff" />
+        {/* axis labels */}
+        {axes.map((a, i) => {
+          const angle = (Math.PI * 2 * i) / axes.length - Math.PI / 2
+          const x = cx + Math.cos(angle) * (r + 14)
+          const y = cy + Math.sin(angle) * (r + 14)
+          return <text key={i} x={x} y={y} fill="#9aa" fontSize={10} textAnchor="middle" dominantBaseline="middle">{a}</text>
+        })}
+      </svg>
+    </div>
+  )
+}

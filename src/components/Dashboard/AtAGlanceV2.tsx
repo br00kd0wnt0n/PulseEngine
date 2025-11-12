@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Tooltip from '../shared/Tooltip'
 import { useDashboard } from '../../context/DashboardContext'
 import { useTrends } from '../../context/TrendContext'
+import { api } from '../../services/api'
 import { scoreConcept } from '../../services/scoring'
 
 export default function AtAGlanceV2() {
@@ -23,8 +24,23 @@ export default function AtAGlanceV2() {
     setVals({ narrative, peak, cross })
     // Simple one-liner (AI-friendly later):
     const c = (concept || 'this story').replace(/\s+/g, ' ').trim()
-    setHowText(`Quick look at reach, timing, and cross‑platform fit for “${c}”.`)
+    setHowText(`Quick look at Narrative Potential, Time to Peak, and Cross‑platform fit for “${c}”.`)
   }, [analysis, concept])
+
+  // Optional AI one-liner (non-blocking): grab first sentence from narrative
+  useEffect(() => {
+    let cancel = false
+    ;(async () => {
+      try {
+        const n = await api.narrative(snapshot(), null)
+        if (cancel) return
+        const text = (n as any).text || ''
+        const first = (text.split(/\.[\s\n]/)[0] || '').trim()
+        if (first) setHowText(first)
+      } catch {}
+    })()
+    return () => { cancel = true }
+  }, [snapshot])
 
   return (
     <div className="panel module p-4">

@@ -40,9 +40,9 @@ export default function NarrativeOverview() {
   }
 
   return (
-    <div className="panel module p-4 transform-gpu">
+    <div className="panel module p-4 transform-gpu h-[460px] overflow-hidden">
       <div className="flex items-center justify-between mb-3">
-        <div className="font-semibold">Narrative Potential Overview</div>
+        <div className="font-semibold">Narrative Potential</div>
         <div className="flex items-center gap-2">
           {/* Snapshot date pill */}
           <div className="px-3 py-1 bg-ralph-purple/20 border border-ralph-purple/30 rounded-full text-xs text-ralph-purple font-medium">

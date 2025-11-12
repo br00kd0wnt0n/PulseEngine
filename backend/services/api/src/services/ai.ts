@@ -79,3 +79,56 @@ export function scoreConceptMvp(concept: string, graph: TrendGraph) {
 }
 
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
+
+// Generate recommendations by category; uses OpenAI if available, else heuristic
+export async function generateRecommendations(concept: string, graph: TrendGraph) {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (apiKey) {
+    try {
+      const { OpenAI } = await import('openai')
+      const client = new OpenAI({ apiKey })
+      const model = process.env.MODEL_NAME || 'gpt-4o-mini'
+      const prompt = `You are a storytelling strategist. Given this story concept: "${concept}"\n` +
+        `Provide 4 categories of recommendations with 3 concise bullets each:\n` +
+        `- Narrative Development\n- Content Strategy\n- Platform Coverage\n- Collaboration\n` +
+        `Return strictly as JSON with keys narrative, content, platform, collab and array of strings.`
+      const resp = await client.chat.completions.create({
+        model,
+        messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
+        temperature: 0.7,
+        max_tokens: 350,
+      })
+      const raw = resp.choices?.[0]?.message?.content || '{}'
+      try { return JSON.parse(raw) } catch { /* fallthrough */ }
+    } catch { /* fallthrough */ }
+  }
+  return buildHeuristicRecs(concept)
+}
+
+function buildHeuristicRecs(concept?: string) {
+  const lc = (concept || '').toLowerCase()
+  const flags = {
+    dance: lc.includes('dance'), ai: lc.includes('ai'), retro: lc.includes('retro'), tutorial: lc.includes('tutorial')
+  }
+  const narrative = [
+    flags.ai ? 'Lean into AI hook; make the benefit explicit in sentence one.' : 'Clarify the core hook in sentence one.',
+    flags.retro ? 'Tie nostalgia to a modern pattern with a named device.' : 'Add a cultural beat that resonates with target audience.',
+    'Close with a prompt that invites creator response (duet/stitch).',
+  ]
+  const content = [
+    flags.tutorial ? 'Produce a 20–30s how‑to variant to boost saves.' : 'Plan a tutorial cut to improve saves and replays.',
+    flags.dance ? 'Design a loop‑friendly beat for the dance moment (7–10s).' : 'Identify a loopable moment to support replays.',
+    'Prepare 3–5 caption variants to test hook clarity.',
+  ]
+  const platform = [
+    'Ship trims for TikTok/Shorts/Reels; tailor the first 2s to each.',
+    flags.retro ? 'Use overlays to connect nostalgia with present relevance.' : 'Use overlays to state the promise in frame 1.',
+    'Schedule posts to match your audience’s peak windows.',
+  ]
+  const collab = [
+    flags.dance ? 'Target dance creators with a duet prompt and a clear beat.' : 'Invite creator remixes with a simple prompt and stitch cue.',
+    'Line up 1 macro + 3 micro collaborators for coverage.',
+    'Offer a shared asset (beat/overlay) to ease adoption.',
+  ]
+  return { narrative, content, platform, collab }
+}

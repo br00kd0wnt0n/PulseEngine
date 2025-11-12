@@ -23,10 +23,10 @@ html, body, #root {
 /* Tactile modules */
 .module {
   position: relative;
-  transition: transform 180ms ease, box-shadow 200ms ease, border-color 200ms ease;
+  transition: box-shadow 200ms ease, border-color 200ms ease;
   box-shadow: var(--shadow-md, 0 2px 8px rgba(0,0,0,0.35));
 }
-.module:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg, 0 6px 24px rgba(0,0,0,0.45)); }
+.module:hover { transform: none; box-shadow: var(--shadow-md, 0 2px 8px rgba(0,0,0,0.35)); }
 .module::before {
   content: '';
   position: absolute; left: 0; right: 0; top: 0; height: 2px;

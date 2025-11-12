@@ -25,6 +25,7 @@ export default function FloatingChat({ projectId }: { projectId?: string }) {
     try {
       const msg = await api.postConversation(projectId, { role: 'user', content: text.trim() })
       setItems((it) => [...it, msg])
+      try { window.dispatchEvent(new CustomEvent('conversation-updated')) } catch {}
     } catch {}
   }
 
