@@ -35,6 +35,7 @@ export async function retrieveContext(
   userId: string | null,
   options: { maxResults?: number; includeCore?: boolean; includeLive?: boolean } = {}
 ): Promise<RetrievalContext> {
+  console.log('[RETRIEVAL] retrieveContext called:', { concept, userId, options })
   const { maxResults = 10, includeCore = true, includeLive = true } = options
 
   const context: RetrievalContext = {
@@ -47,31 +48,48 @@ export async function retrieveContext(
 
   // 1. Query user's personal KB (if logged in)
   if (userId) {
+    console.log('[RETRIEVAL] Querying user content for userId:', userId)
     const userAssets = await retrieveUserContent(userId, concept, maxResults)
+    console.log('[RETRIEVAL] User content found:', userAssets.content.length, 'items')
     context.userContent = userAssets.content
     context.sources.user = userAssets.sources
+  } else {
+    console.log('[RETRIEVAL] Skipping user content (no userId)')
   }
 
   // 2. Query core RKB (platform knowledge)
   if (includeCore) {
+    console.log('[RETRIEVAL] Querying core knowledge...')
     const coreData = await retrieveCoreKnowledge(concept, maxResults)
+    console.log('[RETRIEVAL] Core knowledge found:', coreData.content.length, 'items')
     context.coreKnowledge = coreData.content
     context.sources.core = coreData.sources
   }
 
   // 3. Query live social metrics (if enabled)
   if (includeLive) {
+    console.log('[RETRIEVAL] Querying live metrics...')
     const liveData = await retrieveLiveMetrics(concept, maxResults)
+    console.log('[RETRIEVAL] Live metrics found:', liveData.content.length, 'items')
     context.liveMetrics = liveData.content
     context.sources.live = liveData.sources
   }
 
   // 4. Query predictive trends
   if (includeLive) {
+    console.log('[RETRIEVAL] Querying predictive trends...')
     const predictive = await retrievePredictiveTrends(concept, maxResults)
+    console.log('[RETRIEVAL] Predictive trends found:', predictive.content.length, 'items')
     context.predictiveTrends = predictive.content
     context.sources.predictive = predictive.sources
   }
+
+  console.log('[RETRIEVAL] Final context:', {
+    userContent: context.userContent.length,
+    coreKnowledge: context.coreKnowledge.length,
+    liveMetrics: context.liveMetrics.length,
+    predictiveTrends: context.predictiveTrends.length
+  })
 
   return context
 }
@@ -116,11 +134,13 @@ async function retrieveCoreKnowledge(
   concept: string,
   limit: number
 ): Promise<{ content: string[]; sources: string[] }> {
+  console.log('[CORE] retrieveCoreKnowledge called:', { concept, limit })
   const content: string[] = []
   const sources: string[] = []
 
   // Query trends table
   const trendRepo = AppDataSource.getRepository(Trend)
+  console.log('[CORE] Querying trends table with search:', `%${concept}%`)
   const trends = await trendRepo
     .createQueryBuilder('trend')
     .where(
@@ -130,6 +150,7 @@ async function retrieveCoreKnowledge(
     .orderBy('trend.createdAt', 'DESC')
     .limit(Math.floor(limit / 2))
     .getMany()
+  console.log('[CORE] Trends found:', trends.length)
 
   for (const trend of trends) {
     const platformHint = trend.signals?.platform || 'multi-platform'
@@ -139,6 +160,7 @@ async function retrieveCoreKnowledge(
 
   // Query creators table
   const creatorRepo = AppDataSource.getRepository(Creator)
+  console.log('[CORE] Querying creators table with search:', `%${concept}%`)
   const creators = await creatorRepo
     .createQueryBuilder('creator')
     .where(
@@ -148,12 +170,14 @@ async function retrieveCoreKnowledge(
     .orderBy('creator.createdAt', 'DESC')
     .limit(Math.floor(limit / 2))
     .getMany()
+  console.log('[CORE] Creators found:', creators.length)
 
   for (const creator of creators) {
     content.push(`Creator: ${creator.name} (${creator.platform})`)
     sources.push(`creator:${creator.name}`)
   }
 
+  console.log('[CORE] Total core knowledge items:', content.length)
   return { content, sources }
 }
 
