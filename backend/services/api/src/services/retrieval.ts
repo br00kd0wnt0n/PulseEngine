@@ -175,6 +175,41 @@ async function retrieveUserContent(
 
   console.log('[USER CONTENT] Found', assets.length, 'similar assets')
 
+  if (assets.length === 0) {
+    console.log('[USER CONTENT] Semantic search returned no results, falling back to keyword search')
+    const keywords = extractKeywords(concept)
+    console.log('[USER CONTENT] Extracted keywords for fallback:', keywords)
+
+    if (keywords.length > 0) {
+      const repo = AppDataSource.getRepository(ContentAsset)
+      const conditions = keywords
+        .map((_, i) => `(asset.name ILIKE :keyword${i} OR asset.metadata::text ILIKE :keyword${i} OR asset.tags::text ILIKE :keyword${i})`)
+        .join(' OR ')
+      const params: any = { userId }
+      keywords.forEach((kw, i) => {
+        params[`keyword${i}`] = `%${kw}%`
+      })
+
+      const fallbackAssets = await repo
+        .createQueryBuilder('asset')
+        .where('asset.ownerId = :userId', { userId })
+        .andWhere(`(${conditions})`, params)
+        .orderBy('asset.createdAt', 'DESC')
+        .limit(limit)
+        .getMany()
+
+      console.log('[USER CONTENT] Fallback found', fallbackAssets.length, 'assets')
+
+      const content = fallbackAssets.map(a => {
+        const snippet = a.metadata?.insights?.snippet || a.metadata?.text || ''
+        return `[${a.name}]: ${snippet}`
+      })
+      return { content, sources: fallbackAssets.map(a => a.name) }
+    }
+
+    return { content: [], sources: [] }
+  }
+
   const content = assets.map(a => {
     const snippet = a.metadata?.insights?.snippet || a.metadata?.text || ''
     const similarity = ((a.similarity || 0) * 100).toFixed(1)
@@ -289,6 +324,62 @@ async function retrieveCoreKnowledge(
     const similarity = ((creator.similarity || 0) * 100).toFixed(1)
     content.push(`Creator: ${creator.name} (${creator.platform}, ${similarity}% match)`)
     sources.push(`creator:${creator.name}`)
+  }
+
+  // If semantic search returned no results, fall back to keyword search
+  if (content.length === 0) {
+    console.log('[CORE] Semantic search returned no results, falling back to keyword search')
+    const keywords = extractKeywords(concept)
+    console.log('[CORE] Extracted keywords for fallback:', keywords)
+
+    if (keywords.length > 0) {
+      const trendRepo = AppDataSource.getRepository(Trend)
+      const trendConditions = keywords
+        .map((_, i) => `(trend.label ILIKE :keyword${i} OR trend.signals::text ILIKE :keyword${i} OR trend.metrics::text ILIKE :keyword${i})`)
+        .join(' OR ')
+      const trendParams: any = {}
+      keywords.forEach((kw, i) => {
+        trendParams[`keyword${i}`] = `%${kw}%`
+      })
+
+      const fallbackTrends = await trendRepo
+        .createQueryBuilder('trend')
+        .where(trendConditions, trendParams)
+        .orderBy('trend.createdAt', 'DESC')
+        .limit(Math.floor(limit / 2))
+        .getMany()
+
+      console.log('[CORE] Fallback found', fallbackTrends.length, 'trends')
+
+      for (const trend of fallbackTrends) {
+        const platformHint = trend.signals?.platform || 'multi-platform'
+        content.push(`Trend: ${trend.label} (${platformHint})`)
+        sources.push(`trend:${trend.label}`)
+      }
+
+      const creatorRepo = AppDataSource.getRepository(Creator)
+      const creatorConditions = keywords
+        .map((_, i) => `(creator.name ILIKE :keyword${i} OR creator.platform ILIKE :keyword${i} OR creator.category ILIKE :keyword${i} OR creator.metadata::text ILIKE :keyword${i})`)
+        .join(' OR ')
+      const creatorParams: any = {}
+      keywords.forEach((kw, i) => {
+        creatorParams[`keyword${i}`] = `%${kw}%`
+      })
+
+      const fallbackCreators = await creatorRepo
+        .createQueryBuilder('creator')
+        .where(creatorConditions, creatorParams)
+        .orderBy('creator.createdAt', 'DESC')
+        .limit(Math.floor(limit / 2))
+        .getMany()
+
+      console.log('[CORE] Fallback found', fallbackCreators.length, 'creators')
+
+      for (const creator of fallbackCreators) {
+        content.push(`Creator: ${creator.name} (${creator.platform})`)
+        sources.push(`creator:${creator.name}`)
+      }
+    }
   }
 
   console.log('[CORE] Total core knowledge items:', content.length)
