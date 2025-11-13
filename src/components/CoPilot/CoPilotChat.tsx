@@ -76,6 +76,19 @@ export default function CoPilotChat() {
     return () => { try { ws?.close() } catch {} }
   }, [])
 
+  // Accept insert events from NarrativeFramework and others
+  useEffect(() => {
+    function onInsert(e: any) {
+      const txt = e?.detail?.text
+      if (typeof txt === 'string' && txt.trim()) {
+        setText((t) => (t ? `${t}\n${txt}` : txt))
+        inputRef.current?.focus()
+      }
+    }
+    window.addEventListener('copilot-insert' as any, onInsert as any)
+    return () => window.removeEventListener('copilot-insert' as any, onInsert as any)
+  }, [])
+
   return (
     <div className="panel module p-4" onDrop={onDrop} onDragOver={(e)=>e.preventDefault()}>
       <div className="flex items-center justify-between mb-2">

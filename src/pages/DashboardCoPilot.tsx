@@ -1,5 +1,6 @@
 import AtAGlanceV2 from '../components/Dashboard/AtAGlanceV2'
 import CoPilotChat from '../components/CoPilot/CoPilotChat'
+import NarrativeFramework from '../components/CoPilot/NarrativeFramework'
 import NarrativeOverview from '../components/Dashboard/NarrativeOverview'
 import CreatorPanel from '../components/Dashboard/CreatorPanel'
 import StoryRecommendations from '../components/Dashboard/StoryRecommendations'
@@ -31,6 +32,9 @@ export default function DashboardCoPilot() {
         </div>
       </div>
 
+      {/* Versatile Narrative Deconstruction Framework */}
+      <NarrativeFramework />
+
       {/* Central Co‑Pilot */}
       <CoPilotChat />
 
@@ -60,4 +64,3 @@ function CondensedCard({ title, children }: { title: string; children: React.Rea
     </div>
   )
 }
-
