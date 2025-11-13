@@ -13,6 +13,7 @@ import { ContentAsset } from '../db/entities/ContentAsset.js'
 import { Trend } from '../db/entities/Trend.js'
 import { Creator } from '../db/entities/Creator.js'
 import { PlatformMetric } from '../db/entities/PlatformMetric.js'
+import { generateEmbedding, searchSimilar } from './embeddings.js'
 
 export interface RetrievalContext {
   userContent: string[]      // User's uploaded files
@@ -102,24 +103,42 @@ async function retrieveUserContent(
   concept: string,
   limit: number
 ): Promise<{ content: string[]; sources: string[] }> {
-  const repo = AppDataSource.getRepository(ContentAsset)
+  console.log('[USER CONTENT] Retrieving content for user:', userId, 'concept:', concept)
 
-  // For now: simple text search in metadata
-  // TODO: Replace with semantic vector search
-  const assets = await repo
-    .createQueryBuilder('asset')
-    .where('asset.ownerId = :userId', { userId })
-    .andWhere(
-      `(asset.name ILIKE :search OR asset.metadata::text ILIKE :search OR asset.tags::text ILIKE :search)`,
-      { search: `%${concept}%` }
-    )
-    .orderBy('asset.createdAt', 'DESC')
-    .limit(limit)
-    .getMany()
+  // Generate embedding for the concept
+  const conceptEmbedding = await generateEmbedding(concept)
+
+  if (!conceptEmbedding) {
+    // Fallback to text search if embedding generation fails
+    console.log('[USER CONTENT] No embedding, using text search fallback')
+    const repo = AppDataSource.getRepository(ContentAsset)
+    const assets = await repo
+      .createQueryBuilder('asset')
+      .where('asset.ownerId = :userId', { userId })
+      .andWhere(
+        `(asset.name ILIKE :search OR asset.metadata::text ILIKE :search OR asset.tags::text ILIKE :search)`,
+        { search: `%${concept}%` }
+      )
+      .orderBy('asset.createdAt', 'DESC')
+      .limit(limit)
+      .getMany()
+
+    const content = assets.map(a => {
+      const snippet = a.metadata?.insights?.snippet || a.metadata?.text || ''
+      return `[${a.name}]: ${snippet}`
+    })
+    return { content, sources: assets.map(a => a.name) }
+  }
+
+  // Use semantic search
+  const assets = await searchSimilar('content_assets', conceptEmbedding, limit, { ownerId: userId })
+
+  console.log('[USER CONTENT] Found', assets.length, 'similar assets')
 
   const content = assets.map(a => {
     const snippet = a.metadata?.insights?.snippet || a.metadata?.text || ''
-    return `[${a.name}]: ${snippet}`
+    const similarity = ((a.similarity || 0) * 100).toFixed(1)
+    return `[${a.name}] (${similarity}% match): ${snippet}`
   })
 
   const sources = assets.map(a => a.name)
@@ -138,42 +157,69 @@ async function retrieveCoreKnowledge(
   const content: string[] = []
   const sources: string[] = []
 
-  // Query trends table
-  const trendRepo = AppDataSource.getRepository(Trend)
-  console.log('[CORE] Querying trends table with search:', `%${concept}%`)
-  const trends = await trendRepo
-    .createQueryBuilder('trend')
-    .where(
-      `(trend.label ILIKE :search OR trend.signals::text ILIKE :search OR trend.metrics::text ILIKE :search)`,
-      { search: `%${concept}%` }
-    )
-    .orderBy('trend.createdAt', 'DESC')
-    .limit(Math.floor(limit / 2))
-    .getMany()
-  console.log('[CORE] Trends found:', trends.length)
+  // Generate embedding for the concept
+  const conceptEmbedding = await generateEmbedding(concept)
+
+  if (!conceptEmbedding) {
+    // Fallback to text search
+    console.log('[CORE] No embedding, using text search fallback')
+
+    const trendRepo = AppDataSource.getRepository(Trend)
+    const trends = await trendRepo
+      .createQueryBuilder('trend')
+      .where(
+        `(trend.label ILIKE :search OR trend.signals::text ILIKE :search OR trend.metrics::text ILIKE :search)`,
+        { search: `%${concept}%` }
+      )
+      .orderBy('trend.createdAt', 'DESC')
+      .limit(Math.floor(limit / 2))
+      .getMany()
+
+    for (const trend of trends) {
+      const platformHint = trend.signals?.platform || 'multi-platform'
+      content.push(`Trend: ${trend.label} (${platformHint})`)
+      sources.push(`trend:${trend.label}`)
+    }
+
+    const creatorRepo = AppDataSource.getRepository(Creator)
+    const creators = await creatorRepo
+      .createQueryBuilder('creator')
+      .where(
+        `(creator.name ILIKE :search OR creator.platform ILIKE :search OR creator.category ILIKE :search OR creator.metadata::text ILIKE :search)`,
+        { search: `%${concept}%` }
+      )
+      .orderBy('creator.createdAt', 'DESC')
+      .limit(Math.floor(limit / 2))
+      .getMany()
+
+    for (const creator of creators) {
+      content.push(`Creator: ${creator.name} (${creator.platform})`)
+      sources.push(`creator:${creator.name}`)
+    }
+
+    return { content, sources }
+  }
+
+  // Use semantic search for trends
+  console.log('[CORE] Using semantic search for trends')
+  const trends = await searchSimilar('trends', conceptEmbedding, Math.floor(limit / 2))
+  console.log('[CORE] Found', trends.length, 'similar trends')
 
   for (const trend of trends) {
     const platformHint = trend.signals?.platform || 'multi-platform'
-    content.push(`Trend: ${trend.label} (${platformHint})`)
+    const similarity = ((trend.similarity || 0) * 100).toFixed(1)
+    content.push(`Trend: ${trend.label} (${platformHint}, ${similarity}% match)`)
     sources.push(`trend:${trend.label}`)
   }
 
-  // Query creators table
-  const creatorRepo = AppDataSource.getRepository(Creator)
-  console.log('[CORE] Querying creators table with search:', `%${concept}%`)
-  const creators = await creatorRepo
-    .createQueryBuilder('creator')
-    .where(
-      `(creator.name ILIKE :search OR creator.platform ILIKE :search OR creator.category ILIKE :search OR creator.metadata::text ILIKE :search)`,
-      { search: `%${concept}%` }
-    )
-    .orderBy('creator.createdAt', 'DESC')
-    .limit(Math.floor(limit / 2))
-    .getMany()
-  console.log('[CORE] Creators found:', creators.length)
+  // Use semantic search for creators
+  console.log('[CORE] Using semantic search for creators')
+  const creators = await searchSimilar('creators', conceptEmbedding, Math.floor(limit / 2))
+  console.log('[CORE] Found', creators.length, 'similar creators')
 
   for (const creator of creators) {
-    content.push(`Creator: ${creator.name} (${creator.platform})`)
+    const similarity = ((creator.similarity || 0) * 100).toFixed(1)
+    content.push(`Creator: ${creator.name} (${creator.platform}, ${similarity}% match)`)
     sources.push(`creator:${creator.name}`)
   }
 

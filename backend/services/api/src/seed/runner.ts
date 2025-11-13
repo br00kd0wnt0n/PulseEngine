@@ -8,6 +8,7 @@ import { Trend } from '../db/entities/Trend.js'
 import { Creator } from '../db/entities/Creator.js'
 import { ContentAsset } from '../db/entities/ContentAsset.js'
 import { narrativeFromTrends } from '../services/ai.js'
+import { generateEmbedding, formatTrendForEmbedding, formatCreatorForEmbedding, formatAssetForEmbedding } from '../services/embeddings.js'
 
 type TrendSeed = { label: string; tags: string[] }
 type CreatorSeed = { name: string; platform: string; category: string; tags: string[] }
@@ -43,6 +44,7 @@ export async function runSeed({ dry = false, withAI = true }: { dry?: boolean; w
   const r = rng('pulse-seed')
 
   const trendRows: Trend[] = []
+  console.log(`📊 Seeding ${trends.length} trends with embeddings...`)
   for (const t of trends) {
     const signals = {
       tiktok: { engagement: Math.floor(500 + r() * 2000), velocity: +(0.5 + r()).toFixed(2) },
@@ -55,23 +57,49 @@ export async function runSeed({ dry = false, withAI = true }: { dry?: boolean; w
     const velocity = Math.min(100, Math.round((signals.tiktok.velocity + signals.shorts.velocity + signals.reels.velocity) * 20))
     const metrics = { potential, longevity, resonance, velocity, tags: t.tags }
     const row = trendRepo.create({ label: t.label, signals, metrics, ownerId: user.id })
+
+    // Generate embedding for the trend
+    const trendText = formatTrendForEmbedding({ label: t.label, signals, metrics })
+    const embedding = await generateEmbedding(trendText)
+    if (embedding) {
+      (row as any).embedding = `[${embedding.join(',')}]`
+    }
+
     if (!dry) await trendRepo.save(row)
     trendRows.push(row)
   }
 
   const creatorRows: Creator[] = []
+  console.log(`👥 Seeding ${creators.length} creators with embeddings...`)
   for (const c of creators) {
     const resonance = Math.min(100, 60 + Math.floor(r() * 40))
     const collaboration = Math.min(100, 55 + Math.floor(r() * 45))
     const metadata = { tags: c.tags, resonance, collaboration }
     const row = creatorRepo.create({ name: c.name, platform: c.platform, category: c.category, metadata, ownerId: user.id })
+
+    // Generate embedding for the creator
+    const creatorText = formatCreatorForEmbedding({ name: c.name, platform: c.platform, category: c.category })
+    const embedding = await generateEmbedding(creatorText)
+    if (embedding) {
+      (row as any).embedding = `[${embedding.join(',')}]`
+    }
+
     if (!dry) await creatorRepo.save(row)
     creatorRows.push(row)
   }
 
+  console.log(`📁 Seeding ${assets.length} assets with embeddings...`)
   for (const a of assets) {
     const metadata = { ...(a.metadata || {}), tags: a.tags }
     const row = assetRepo.create({ name: a.name, url: a.url, tags: { list: a.tags }, metadata, ownerId: user.id })
+
+    // Generate embedding for the asset
+    const assetText = formatAssetForEmbedding({ name: a.name, metadata, tags: { list: a.tags } })
+    const embedding = await generateEmbedding(assetText)
+    if (embedding) {
+      (row as any).embedding = `[${embedding.join(',')}]`
+    }
+
     if (!dry) await assetRepo.save(row)
   }
 
