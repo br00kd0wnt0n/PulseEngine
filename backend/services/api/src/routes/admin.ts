@@ -33,6 +33,39 @@ router.post('/migrate', async (req, res) => {
   }
 })
 
+router.post('/setup-pgvector', async (req, res) => {
+  try {
+    // Enable pgvector extension
+    await AppDataSource.query('CREATE EXTENSION IF NOT EXISTS vector')
+
+    // Add embedding columns
+    await AppDataSource.query('ALTER TABLE trends ADD COLUMN IF NOT EXISTS embedding vector(1536)')
+    await AppDataSource.query('ALTER TABLE creators ADD COLUMN IF NOT EXISTS embedding vector(1536)')
+    await AppDataSource.query('ALTER TABLE content_assets ADD COLUMN IF NOT EXISTS embedding vector(1536)')
+
+    // Create indexes
+    await AppDataSource.query(`
+      CREATE INDEX IF NOT EXISTS trends_embedding_idx
+      ON trends USING ivfflat (embedding vector_cosine_ops)
+      WITH (lists = 100)
+    `)
+    await AppDataSource.query(`
+      CREATE INDEX IF NOT EXISTS creators_embedding_idx
+      ON creators USING ivfflat (embedding vector_cosine_ops)
+      WITH (lists = 100)
+    `)
+    await AppDataSource.query(`
+      CREATE INDEX IF NOT EXISTS content_assets_embedding_idx
+      ON content_assets USING ivfflat (embedding vector_cosine_ops)
+      WITH (lists = 100)
+    `)
+
+    res.json({ ok: true, message: 'pgvector setup complete' })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
 router.get('/users', async (req, res) => {
   try {
     const users = await AppDataSource.query('SELECT id, email, role, "createdAt" FROM users LIMIT 10')
