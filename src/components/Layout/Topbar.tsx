@@ -1,11 +1,17 @@
 import { useTheme } from '../../context/ThemeContext'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useLayout } from '../../context/LayoutContext'
 import LogoMark from '../LogoMark'
 
 export default function Topbar() {
   const { dark, toggle } = useTheme()
   const { toggleSidebar } = useLayout()
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const onToggleView = () => {
+    if (pathname === '/classic') navigate('/')
+    else navigate('/classic')
+  }
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
       <div className="bg-gradient-to-r from-ralph-pink to-ralph-teal">
@@ -29,6 +35,13 @@ export default function Topbar() {
             className="ml-2 px-3 py-2 rounded-md text-sm border border-white/20 bg-white/10 hover:bg-white/15"
           >
             {dark ? 'Light' : 'Dark'}
+          </button>
+          <button
+            onClick={onToggleView}
+            className="ml-2 px-3 py-2 rounded-md text-sm border border-white/20 bg-white/10 hover:bg-white/15"
+            title="Toggle dashboard view"
+          >
+            {pathname === '/classic' ? 'Co‑Pilot View' : 'Classic View'}
           </button>
         </div>
       </div>

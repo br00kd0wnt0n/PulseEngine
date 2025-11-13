@@ -27,7 +27,8 @@ const router = createBrowserRouter([
     path: '/',
     element: <App />,
     children: [
-      { index: true, element: <Dashboard /> },
+      { index: true, element: <DashboardCoPilot /> },
+      { path: 'classic', element: <Dashboard /> },
       { path: 'trends', element: <Trends /> },
       { path: 'upload', element: <Upload /> },
       { path: 'creators', element: <Creators /> },

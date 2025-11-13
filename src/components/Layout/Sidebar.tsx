@@ -12,7 +12,7 @@ const nav = [
   { to: '/projects', label: 'Projects' },
   { to: '/admin', label: 'Backend' },
   { to: '/rkb', label: 'RKB' },
-  { to: '/copilot', label: 'Co‑Pilot View' },
+  { to: '/classic', label: 'Classic Dashboard' },
 ]
 
 export default function Sidebar() {

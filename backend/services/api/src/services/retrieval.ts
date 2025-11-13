@@ -15,6 +15,27 @@ import { Creator } from '../db/entities/Creator.js'
 import { PlatformMetric } from '../db/entities/PlatformMetric.js'
 import { generateEmbedding, searchSimilar } from './embeddings.js'
 
+/**
+ * Extract keywords from a concept for keyword-based search
+ * Removes common words and extracts meaningful terms
+ */
+function extractKeywords(concept: string): string[] {
+  const stopWords = new Set([
+    'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he',
+    'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'will', 'with',
+    'create', 'make', 'using', 'use', 'help', 'need', 'want', 'how', 'what', 'when', 'where'
+  ])
+
+  const words = concept
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ') // Remove punctuation
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !stopWords.has(word))
+
+  // Return unique keywords
+  return [...new Set(words)]
+}
+
 export interface RetrievalContext {
   userContent: string[]      // User's uploaded files
   coreKnowledge: string[]    // Platform trends, creators, patterns
@@ -109,19 +130,38 @@ async function retrieveUserContent(
   const conceptEmbedding = await generateEmbedding(concept)
 
   if (!conceptEmbedding) {
-    // Fallback to text search if embedding generation fails
-    console.log('[USER CONTENT] No embedding, using text search fallback')
+    // Fallback to keyword-based text search
+    console.log('[USER CONTENT] No embedding, using keyword-based text search fallback')
+
+    const keywords = extractKeywords(concept)
+    console.log('[USER CONTENT] Extracted keywords:', keywords)
+
+    if (keywords.length === 0) {
+      console.log('[USER CONTENT] No keywords extracted, returning empty results')
+      return { content: [], sources: [] }
+    }
+
     const repo = AppDataSource.getRepository(ContentAsset)
+
+    // Build OR conditions for each keyword
+    const conditions = keywords
+      .map((_, i) => `(asset.name ILIKE :keyword${i} OR asset.metadata::text ILIKE :keyword${i} OR asset.tags::text ILIKE :keyword${i})`)
+      .join(' OR ')
+
+    const params: any = { userId }
+    keywords.forEach((kw, i) => {
+      params[`keyword${i}`] = `%${kw}%`
+    })
+
     const assets = await repo
       .createQueryBuilder('asset')
       .where('asset.ownerId = :userId', { userId })
-      .andWhere(
-        `(asset.name ILIKE :search OR asset.metadata::text ILIKE :search OR asset.tags::text ILIKE :search)`,
-        { search: `%${concept}%` }
-      )
+      .andWhere(`(${conditions})`, params)
       .orderBy('asset.createdAt', 'DESC')
       .limit(limit)
       .getMany()
+
+    console.log('[USER CONTENT] Found', assets.length, 'assets matching keywords')
 
     const content = assets.map(a => {
       const snippet = a.metadata?.insights?.snippet || a.metadata?.text || ''
@@ -161,19 +201,37 @@ async function retrieveCoreKnowledge(
   const conceptEmbedding = await generateEmbedding(concept)
 
   if (!conceptEmbedding) {
-    // Fallback to text search
-    console.log('[CORE] No embedding, using text search fallback')
+    // Fallback to keyword-based text search
+    console.log('[CORE] No embedding, using keyword-based text search fallback')
+
+    const keywords = extractKeywords(concept)
+    console.log('[CORE] Extracted keywords:', keywords)
+
+    if (keywords.length === 0) {
+      console.log('[CORE] No keywords extracted, returning empty results')
+      return { content, sources }
+    }
 
     const trendRepo = AppDataSource.getRepository(Trend)
+
+    // Build OR conditions for each keyword
+    const trendConditions = keywords
+      .map((_, i) => `(trend.label ILIKE :keyword${i} OR trend.signals::text ILIKE :keyword${i} OR trend.metrics::text ILIKE :keyword${i})`)
+      .join(' OR ')
+
+    const trendParams: any = {}
+    keywords.forEach((kw, i) => {
+      trendParams[`keyword${i}`] = `%${kw}%`
+    })
+
     const trends = await trendRepo
       .createQueryBuilder('trend')
-      .where(
-        `(trend.label ILIKE :search OR trend.signals::text ILIKE :search OR trend.metrics::text ILIKE :search)`,
-        { search: `%${concept}%` }
-      )
+      .where(trendConditions, trendParams)
       .orderBy('trend.createdAt', 'DESC')
       .limit(Math.floor(limit / 2))
       .getMany()
+
+    console.log('[CORE] Found', trends.length, 'trends matching keywords')
 
     for (const trend of trends) {
       const platformHint = trend.signals?.platform || 'multi-platform'
@@ -182,15 +240,25 @@ async function retrieveCoreKnowledge(
     }
 
     const creatorRepo = AppDataSource.getRepository(Creator)
+
+    // Build OR conditions for each keyword
+    const creatorConditions = keywords
+      .map((_, i) => `(creator.name ILIKE :keyword${i} OR creator.platform ILIKE :keyword${i} OR creator.category ILIKE :keyword${i} OR creator.metadata::text ILIKE :keyword${i})`)
+      .join(' OR ')
+
+    const creatorParams: any = {}
+    keywords.forEach((kw, i) => {
+      creatorParams[`keyword${i}`] = `%${kw}%`
+    })
+
     const creators = await creatorRepo
       .createQueryBuilder('creator')
-      .where(
-        `(creator.name ILIKE :search OR creator.platform ILIKE :search OR creator.category ILIKE :search OR creator.metadata::text ILIKE :search)`,
-        { search: `%${concept}%` }
-      )
+      .where(creatorConditions, creatorParams)
       .orderBy('creator.createdAt', 'DESC')
       .limit(Math.floor(limit / 2))
       .getMany()
+
+    console.log('[CORE] Found', creators.length, 'creators matching keywords')
 
     for (const creator of creators) {
       content.push(`Creator: ${creator.name} (${creator.platform})`)
