@@ -11,6 +11,7 @@ import Insights from './pages/Insights'
 import AdminDashboard from './pages/AdminDashboard'
 import RKB from './pages/RKB'
 import DashboardCoPilot from './pages/DashboardCoPilot'
+import DashboardCoPilotPlus from './pages/DashboardCoPilotPlus'
 import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
 import { ThemeProvider } from './context/ThemeContext'
@@ -38,6 +39,7 @@ const router = createBrowserRouter([
       { path: 'admin', element: <AdminDashboard /> },
       { path: 'rkb', element: <RKB /> },
       { path: 'copilot', element: <DashboardCoPilot /> },
+      { path: 'copilot2', element: <DashboardCoPilotPlus /> },
     ],
   },
 ])

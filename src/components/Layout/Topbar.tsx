@@ -10,6 +10,7 @@ export default function Topbar() {
   const { pathname } = useLocation()
   const onToggleView = () => {
     if (pathname === '/classic') navigate('/')
+    else if (pathname === '/') navigate('/copilot2')
     else navigate('/classic')
   }
   return (
@@ -41,7 +42,7 @@ export default function Topbar() {
             className="ml-2 px-3 py-2 rounded-md text-sm border border-white/20 bg-white/10 hover:bg-white/15"
             title="Toggle dashboard view"
           >
-            {pathname === '/classic' ? 'Co‑Pilot View' : 'Classic View'}
+            {pathname === '/classic' ? 'Co‑Pilot View' : pathname === '/' ? 'Co‑Pilot+ View' : 'Classic View'}
           </button>
         </div>
       </div>

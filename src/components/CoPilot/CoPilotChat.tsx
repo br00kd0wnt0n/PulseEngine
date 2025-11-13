@@ -90,7 +90,7 @@ export default function CoPilotChat() {
   }, [])
 
   return (
-    <div className="panel module p-4" onDrop={onDrop} onDragOver={(e)=>e.preventDefault()}>
+    <div className="panel module p-4 bg-ralph-teal/10 animated-gradient-border" onDrop={onDrop} onDragOver={(e)=>e.preventDefault()}>
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold">AI Co‑Pilot</div>
         <div className="text-[11px] text-white/60">Drag files/URLs into this window to add context</div>
