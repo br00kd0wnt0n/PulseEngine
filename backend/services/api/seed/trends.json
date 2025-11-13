@@ -1,11 +1,17 @@
 [
-  { "label": "AI Music", "tags": ["ai","music","loops"] },
-  { "label": "Dance Challenge", "tags": ["dance","challenge","short-form"] },
-  { "label": "Retro Gaming", "tags": ["gaming","retro","edits"] },
-  { "label": "Tutorial Hacks", "tags": ["how-to","tips","shorts"] },
-  { "label": "Streetwear Aesthetic", "tags": ["fashion","streetwear","reels"] },
-  { "label": "Nostalgia Remixes", "tags": ["remix","nostalgia","audio"] },
-  { "label": "Creator Collabs", "tags": ["collab","duet","remix"] },
-  { "label": "Loop-Friendly Beats", "tags": ["beats","audio","loops"] }
+  { "label": "AI Music Loop Generation", "tags": ["ai", "music", "loops", "tiktok", "generation"] },
+  { "label": "AI-Powered Remix Challenges", "tags": ["ai", "music", "remix", "challenge", "instagram"] },
+  { "label": "Text-to-Music Experiments", "tags": ["ai", "music", "text-to-music", "tools", "youtube"] },
+  { "label": "7-Second Dance Loops", "tags": ["dance", "loops", "short-form", "tiktok", "viral"] },
+  { "label": "Tutorial-Style Dance Challenges", "tags": ["dance", "tutorial", "challenge", "instagram", "educational"] },
+  { "label": "Duo Sync Dance Collabs", "tags": ["dance", "collaboration", "sync", "duet", "tiktok"] },
+  { "label": "Retro Gaming Nostalgia Edits", "tags": ["gaming", "retro", "nostalgia", "edits", "youtube"] },
+  { "label": "8-Bit Music Mashups", "tags": ["gaming", "music", "8-bit", "mashup", "tiktok"] },
+  { "label": "Speedrun Commentary Clips", "tags": ["gaming", "speedrun", "commentary", "shorts", "youtube"] },
+  { "label": "Beat-Synced Montages", "tags": ["editing", "beats", "sync", "montage", "tiktok"] },
+  { "label": "Tutorial-in-Under-30s", "tags": ["tutorial", "short-form", "educational", "reels", "instagram"] },
+  { "label": "Stitch-First Content Design", "tags": ["collaboration", "stitch", "duet", "remix", "tiktok"] },
+  { "label": "Streetwear Thrift Flips", "tags": ["fashion", "streetwear", "thrift", "transformation", "instagram"] },
+  { "label": "Y2K Aesthetic Revival", "tags": ["fashion", "y2k", "nostalgia", "aesthetic", "tiktok"] },
+  { "label": "Outfit Transition Reels", "tags": ["fashion", "transition", "reels", "editing", "instagram"] }
 ]
-

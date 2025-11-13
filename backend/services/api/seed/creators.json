@@ -1,9 +1,14 @@
 [
-  { "name": "Nova Quinn", "platform": "TikTok", "category": "Comedy", "tags": ["comedy","sketch","viral"] },
-  { "name": "Echo Vale", "platform": "YouTube", "category": "Tech", "tags": ["ai","gadgets","review"] },
-  { "name": "Rae Lyric", "platform": "Instagram", "category": "Fashion", "tags": ["streetwear","aesthetic","editorial"] },
-  { "name": "Kai Drift", "platform": "Twitch", "category": "Gaming", "tags": ["gaming","esports","retro"] },
-  { "name": "Luna Voss", "platform": "TikTok", "category": "Dance", "tags": ["dance","challenge","loop"] },
-  { "name": "Milo Crest", "platform": "YouTube", "category": "DIY", "tags": ["maker","build","how-to"] }
+  { "name": "LoopMaster AI", "platform": "TikTok", "category": "music", "tags": ["ai", "music", "loops", "tutorial", "beats"] },
+  { "name": "SynthWave Sarah", "platform": "YouTube", "category": "music", "tags": ["synthwave", "retro", "music", "production", "ai"] },
+  { "name": "AI Music Daily", "platform": "Instagram", "category": "ai-tools", "tags": ["ai", "music", "tools", "educational", "demo"] },
+  { "name": "QuickStep Tutorials", "platform": "TikTok", "category": "dance", "tags": ["dance", "tutorial", "challenge", "choreography", "educational"] },
+  { "name": "Sync Sisters", "platform": "Instagram", "category": "dance", "tags": ["dance", "duo", "sync", "choreography", "collab"] },
+  { "name": "7SecondDance", "platform": "TikTok", "category": "dance", "tags": ["dance", "short-form", "loops", "viral", "challenge"] },
+  { "name": "RetroGameClips", "platform": "YouTube", "category": "gaming", "tags": ["gaming", "retro", "nostalgia", "clips", "commentary"] },
+  { "name": "8BitRemixer", "platform": "TikTok", "category": "gaming-music", "tags": ["gaming", "music", "8-bit", "remix", "chiptune"] },
+  { "name": "Speedrun Shorts", "platform": "YouTube Shorts", "category": "gaming", "tags": ["gaming", "speedrun", "shorts", "commentary", "competitive"] },
+  { "name": "EditInSeconds", "platform": "Instagram", "category": "editing", "tags": ["editing", "tutorial", "transitions", "quick", "educational"] },
+  { "name": "TransitionKing", "platform": "TikTok", "category": "editing", "tags": ["editing", "transitions", "effects", "tutorial", "viral"] },
+  { "name": "FastTutorials", "platform": "Instagram Reels", "category": "educational", "tags": ["tutorial", "educational", "quick", "how-to", "tips"] }
 ]
-
