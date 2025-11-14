@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import { ProcessedContent } from '../types'
 import { logActivity } from '../utils/activity'
 
@@ -12,10 +12,39 @@ type Ctx = {
 const UploadCtx = createContext<Ctx | null>(null)
 
 const INGESTION_URL = ((import.meta as any).env?.VITE_INGESTION_URL as string | undefined) || 'https://ingestion-production-c716.up.railway.app'
+const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string | undefined) || 'https://api-production-768d.up.railway.app'
 const USER_ID = '087d78e9-4bbe-49f6-8981-1588ce4934a2' // TODO: Get from auth context
 
 export function UploadProvider({ children }: { children: React.ReactNode }) {
   const [processed, setProcessed] = useState<ProcessedContent[]>([])
+
+  // Load existing assets from database on mount
+  useEffect(() => {
+    async function loadExisting() {
+      try {
+        const response = await fetch(`${API_BASE}/admin/assets`)
+        if (!response.ok) return
+
+        const data = await response.json()
+        const assets = data.assets || []
+
+        const processedItems = assets.map((asset: any) => ({
+          id: asset.id,
+          name: asset.name,
+          tags: Object.values(asset.tags || {}).filter(Boolean) as string[],
+          category: inferCategory(asset),
+          type: inferType(asset),
+          summary: generateSummary(asset),
+          url: asset.url,
+        }))
+
+        setProcessed(processedItems)
+      } catch (error) {
+        console.error('Failed to load existing assets:', error)
+      }
+    }
+    loadExisting()
+  }, [])
 
   const addFiles = async (files: File[]) => {
     // Add placeholder items immediately for UI feedback
