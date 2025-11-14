@@ -421,7 +421,7 @@ export default function StoryPromptHero() {
             disabled={!value.trim()}
             className="px-6 py-3 rounded-lg text-sm font-medium bg-gradient-to-r from-ralph-pink to-ralph-teal hover:shadow-glow disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           >
-            Start Exploring →
+            Submit + Begin
           </button>
         </div>
       </div>

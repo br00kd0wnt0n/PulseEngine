@@ -28,6 +28,7 @@ export default function NarrativeFramework() {
   const [blocks, setBlocks] = useState<Block[]>([])
   const [dragId, setDragId] = useState<string | null>(null)
   const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const [editing, setEditing] = useState<Record<string, boolean>>({})
 
   const projectId = useMemo(() => { try { return localStorage.getItem('activeProjectId') || 'local' } catch { return 'local' } }, [])
   const storageKey = `nf:${projectId}`
@@ -145,14 +146,34 @@ export default function NarrativeFramework() {
             >
               <div className="text-xs text-white/60 mb-1 flex items-center justify-between">
                 <span>{b.title}</span>
-                <button className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={() => insertIntoChat(`${b.title}: ${b.content || suggestFromDrivers(b, keyDrivers, concept)}`)}>Insert</button>
+                {!editing[b.id] && (
+                  <button className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={() => setEditing(ed => ({ ...ed, [b.id]: true }))}>Edit</button>
+                )}
+                {editing[b.id] && (
+                  <button
+                    className="text-[10px] px-1.5 py-0.5 rounded border border-ralph-teal/40 bg-ralph-teal/10 hover:bg-ralph-teal/20"
+                    onClick={() => {
+                      setEditing(ed => ({ ...ed, [b.id]: false }))
+                      setTouched(t => ({ ...t, [b.id]: true }))
+                      try { window.dispatchEvent(new CustomEvent('conversation-updated')) } catch {}
+                      try { logActivity(`Saved ${b.title}; reassessing narrative`) } catch {}
+                    }}
+                  >Save</button>
+                )}
               </div>
-              <textarea
-                className="w-full h-24 bg-charcoal-800/70 border border-white/10 rounded p-2 text-xs"
-                placeholder={b.hints.join(' • ')}
-                value={b.content}
-                onChange={(e) => onEdit(idx, e.target.value)}
-              />
+              {!editing[b.id] && (
+                <div className="w-full min-h-[96px] bg-charcoal-800/50 border border-white/10 rounded p-2 text-xs text-white/80 whitespace-pre-wrap">
+                  {b.content || b.hints.join(' • ')}
+                </div>
+              )}
+              {editing[b.id] && (
+                <textarea
+                  className="w-full h-24 bg-charcoal-800/70 border border-white/10 rounded p-2 text-xs"
+                  placeholder={b.hints.join(' • ')}
+                  value={b.content}
+                  onChange={(e) => onEdit(idx, e.target.value)}
+                />
+              )}
               {/* Connector line */}
               {idx < blocks.length - 1 && (
                 <div className="hidden md:block absolute top-1/2 -right-3 w-6 h-0.5 bg-white/10" />

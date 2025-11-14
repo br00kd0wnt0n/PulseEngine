@@ -20,7 +20,22 @@ export default function ScoringEnhancements() {
     ;(async () => {
       try {
         const [s, e] = await Promise.all([api.score(concept, graph), api.enhancements(concept, graph)])
-        if (!cancel) { setScore(s); setEnh(e) }
+        if (!cancel) {
+          setScore(s); setEnh(e)
+          // persist compact score snapshot for co‑pilot guidance
+          try {
+            const pid = localStorage.getItem('activeProjectId') || 'local'
+            const ext = s?.extended || {}
+            const snap = {
+              narrative: s?.scores?.narrativeStrength,
+              ttpWeeks: s?.scores?.timeToPeakWeeks,
+              cross: ext?.crossPlatformPotential ?? s?.ralph?.crossPlatformPotential,
+              commercial: ext?.commercialPotential,
+              overall: ext?.overall,
+            }
+            localStorage.setItem(`score:${pid}`, JSON.stringify(snap))
+          } catch {}
+        }
       } catch {}
     })()
     return () => { cancel = true }
@@ -36,7 +51,22 @@ export default function ScoringEnhancements() {
       logActivity(`Applied enhancement: ${text}`)
       // re-score after a short delay
       setTimeout(async () => {
-        try { const s = await api.score(concept, graph); setScore(s) } catch {}
+        try {
+          const s = await api.score(concept, graph)
+          setScore(s)
+          try {
+            const pid = localStorage.getItem('activeProjectId') || 'local'
+            const ext = s?.extended || {}
+            const snap = {
+              narrative: s?.scores?.narrativeStrength,
+              ttpWeeks: s?.scores?.timeToPeakWeeks,
+              cross: ext?.crossPlatformPotential ?? s?.ralph?.crossPlatformPotential,
+              commercial: ext?.commercialPotential,
+              overall: ext?.overall,
+            }
+            localStorage.setItem(`score:${pid}`, JSON.stringify(snap))
+          } catch {}
+        } catch {}
       }, 800)
     } catch {}
   }

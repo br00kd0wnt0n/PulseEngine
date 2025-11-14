@@ -23,7 +23,7 @@ export default function ConceptCreators() {
     <div className="panel module p-4">
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold">CONCEPT + CREATORS</div>
-        <div className="text-xs text-white/60">Shareable brief draft</div>
+        <div className="text-xs text-white/60">Shareable concept proposal</div>
       </div>
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
@@ -31,6 +31,9 @@ export default function ConceptCreators() {
           <ul className="mt-2 list-disc pl-5 space-y-1 text-sm">
             {refined.bullets.map((b, i) => <li key={i} className="text-white/80">{b}</li>)}
           </ul>
+          {refined.proposal && (
+            <div className="mt-3 text-sm text-white/80 leading-relaxed whitespace-pre-wrap">{refined.proposal}</div>
+          )}
         </div>
         <div>
           <div className="text-xs text-white/60 mb-1">Top Creators</div>
@@ -72,7 +75,14 @@ function synthesizeRefined(concept: string, blocks: Block[]) {
   const extra = deb?.summary ? [`Summary: ${deb.summary}`] : []
   const trendLine = trends.length ? [`Top vectors: ${trends.join(', ')}`] : []
   const bullets = [...extra, ...trendLine, pivot, evidence, resolution].filter(Boolean).slice(0,3)
-  return { oneLiner, bullets }
+  const proposalParts = [
+    hook || `Premise: ${premise}`,
+    pivot ? `Pivotal moment: ${pivot}` : '',
+    evidence ? `Evidence: ${evidence}` : '',
+    resolution ? `Outcome: ${resolution}` : '',
+  ].filter(Boolean)
+  const proposal = proposalParts.join('\n')
+  return { oneLiner, bullets, proposal }
 }
 
 function explainWhy(tags: string[]) {

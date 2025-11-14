@@ -57,11 +57,61 @@ export default function DashboardProgressive() {
     return () => clearTimeout(t)
   }, [stage])
 
+  // Co‑Pilot guidance prompts per stage + idle follow-ups
+  useEffect(() => {
+    let idleTimer: any = null
+    function say(text: string) {
+      try { window.dispatchEvent(new CustomEvent('copilot-say', { detail: { text } })) } catch {}
+    }
+    function getPid() { try { return localStorage.getItem('activeProjectId') || 'local' } catch { return 'local' } }
+    function readJSON(key: string) { try { return JSON.parse(localStorage.getItem(key) || 'null') } catch { return null } }
+    const pid = getPid()
+    const deb = readJSON(`debrief:${pid}`)
+    const opps = readJSON(`opps:${pid}`)
+    const nf = readJSON(`nf:${pid}`) as any[] | null
+    const score = readJSON(`score:${pid}`) as { narrative?: number; ttpWeeks?: number; cross?: number; commercial?: number; overall?: number } | null
+    const topOpps = ((opps?.opportunities || []) as any[]).slice(0,2).map(o => o.title).filter(Boolean)
+    const did = (deb?.didYouKnow || []) as string[]
+    const emptyNodes = (Array.isArray(nf) ? nf : []).filter(b => !String(b?.content || '').trim()).map(b => b?.title).filter(Boolean)
+    // Stage-specific primary prompt
+    if (stage === 'foundation') {
+      const oppHint = topOpps.length ? ` For example: ${topOpps.join(', ')}.` : ''
+      say(`Read the DEBRIEF + OPPORTUNITIES I put together.${oppHint} Decide if you want to integrate any of the ideas — I can update the narrative for you.`)
+      const didHint = did[0] ? ` “${did[0]}” might spark something.` : ' there might be something that sparks an idea.'
+      idleTimer = setTimeout(() => say(`Check out the DID YOU KNOWs —${didHint}`), 20000)
+    } else if (stage === 'depth') {
+      const missing = emptyNodes.slice(0,2)
+      const missingHint = missing.length ? ` I still need: ${missing.join(', ')}.` : ''
+      // Score-aware hinting
+      let scoreHint = ''
+      if (score) {
+        const tips: string[] = []
+        if (typeof score.narrative === 'number' && score.narrative < 60) tips.push('narrative is a bit low — we can tighten the hook')
+        if (typeof score.cross === 'number' && score.cross < 60) tips.push('cross‑platform fit is moderate — we can add native cues')
+        if (typeof score.commercial === 'number' && score.commercial < 60) tips.push('commercial potential could improve — stronger collab prompts may help')
+        if (typeof score.ttpWeeks === 'number' && score.ttpWeeks > 6) tips.push('time‑to‑peak looks longer — a loopable beat could speed it up')
+        if (tips.length) scoreHint = ` Also, ${tips[0]}.`
+      }
+      say(`Now review the Narrative Deconstruction.${missingHint}${scoreHint} If you agree, continue; if not, click Edit on any node to refine and Save — I will reassess scores and suggestions.`)
+      idleTimer = setTimeout(() => say(`Want me to propose a tighter hook or a clearer pivot? Tell me, and I’ll integrate it into the framework.`), 20000)
+    } else if (stage === 'full') {
+      say(`Here’s a synthesized concept proposal with top creators attached. Feel free to adjust any narrative nodes and I’ll keep this updated.`)
+    }
+    function resetIdle() { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null } }
+    window.addEventListener('conversation-updated', resetIdle as any)
+    window.addEventListener('context-updated', resetIdle as any)
+    return () => {
+      if (idleTimer) clearTimeout(idleTimer)
+      window.removeEventListener('conversation-updated', resetIdle as any)
+      window.removeEventListener('context-updated', resetIdle as any)
+    }
+  }, [stage])
+
   const tags = Array.from(new Set(processed.flatMap(p => p.tags))).slice(0, 16)
 
   return (
     <div className="space-y-6">
-      <Stepper stage={stage} onNext={() => setStage(next(stage))} onBack={() => setStage(prev(stage))} />
+      {stage !== 'initial' && <Stepper stage={stage} onNext={() => setStage(next(stage))} onBack={() => setStage(prev(stage))} />}
 
       {stage === 'initial' && (
         <div className="w-full max-w-3xl mx-auto px-4">
@@ -116,10 +166,10 @@ export default function DashboardProgressive() {
 
 function Stepper({ stage, onNext, onBack }: { stage: Stage; onNext: () => void; onBack: () => void }) {
   const steps: { key: Stage; label: string }[] = [
-    { key: 'initial', label: 'Initial' },
+    { key: 'initial', label: 'Brief' },
     { key: 'foundation', label: 'Narrative Foundation' },
-    { key: 'depth', label: 'Depth Exploration' },
-    { key: 'full', label: 'Comprehensive' },
+    { key: 'depth', label: 'Strategic Refinement' },
+    { key: 'full', label: 'Full Proposal' },
   ]
   const idx = steps.findIndex(s => s.key === stage)
   return (

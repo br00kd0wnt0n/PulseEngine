@@ -70,7 +70,7 @@ export default function DebriefOpportunities() {
               </div>
               <div className="text-white/70 text-xs mt-1">{o.why}</div>
               <div className="mt-2 flex items-center gap-2">
-                <button onClick={() => insertOpportunity(o)} className="text-[11px] px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10">Insert</button>
+                <button onClick={() => integrateOpportunity(o)} className="text-[11px] px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10">Integrate</button>
               </div>
             </div>
           ))}
@@ -98,12 +98,14 @@ function Attribution({ sources }: { sources?: any }) {
   )
 }
 
-function insertOpportunity(o: { title: string; why: string; impact: number }) {
-  const text = `${o.title} — ${o.why}`
+function integrateOpportunity(o: { title: string; why: string; impact: number }) {
+  const text = `Proposed component: ${o.title} — ${o.why}`
   try {
+    window.dispatchEvent(new CustomEvent('open-chat'))
     window.dispatchEvent(new CustomEvent('copilot-insert', { detail: { text } }))
     const target = guessTarget(o.title)
     if (target) window.dispatchEvent(new CustomEvent('nf-apply', { detail: { target, text: o.title } }))
+    window.dispatchEvent(new CustomEvent('conversation-updated'))
   } catch {}
 }
 

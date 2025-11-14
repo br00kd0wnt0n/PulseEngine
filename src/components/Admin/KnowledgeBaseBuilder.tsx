@@ -11,6 +11,29 @@ export default function KnowledgeBaseBuilder() {
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<any[]>([])
 
+  // Helper function to clean up redundant tags
+  function cleanTags(tags: any[]): string[] {
+    const rawTags = Object.values(tags || {}).filter(Boolean) as string[]
+    const cleaned = new Set<string>()
+
+    // Build set of simplified tags
+    rawTags.forEach(tag => {
+      const lower = String(tag).toLowerCase()
+      // Convert MIME types to simple extensions
+      if (lower === 'application/pdf') {
+        cleaned.add('pdf')
+      } else if (lower.startsWith('application/') || lower.startsWith('image/') || lower.startsWith('text/')) {
+        // Skip other MIME types if we already have a simple version
+        const ext = lower.split('/')[1]
+        if (ext) cleaned.add(ext)
+      } else {
+        cleaned.add(tag)
+      }
+    })
+
+    return Array.from(cleaned)
+  }
+
   // Load existing items from database
   useEffect(() => {
     async function loadAssets() {
@@ -29,7 +52,7 @@ export default function KnowledgeBaseBuilder() {
           source: 'Uploaded',
           conf: 'Public',
           quality: 'Good',
-          tags: Object.values(asset.tags || {}).filter(Boolean),
+          tags: cleanTags(asset.tags || {}),
           notes: '',
           files: [{ name: asset.name, size: 0, type: 'application/pdf' }],
           createdAt: asset.createdAt,
@@ -193,6 +216,7 @@ function PieChart({ stats }: { stats: Record<string, number> }) {
             <option>Industry Data</option>
             <option>Case Study</option>
             <option>Screengrab</option>
+            <option>Ralph Doc</option>
           </select>
           <input value={source} onChange={(e)=>setSource(e.target.value)} placeholder="Source / URL" className="w-full bg-charcoal-800/70 border border-white/10 rounded px-2 py-1" />
           <select value={conf} onChange={(e)=>setConf(e.target.value)} className="w-full bg-charcoal-800/70 border border-white/10 rounded px-2 py-1">
