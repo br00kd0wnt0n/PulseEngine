@@ -29,7 +29,7 @@ const router = createBrowserRouter([
     path: '/',
     element: <App />,
     children: [
-      { index: true, element: <DashboardCoPilot /> },
+      { index: true, element: <DashboardProgressive /> },
       { path: 'classic', element: <Dashboard /> },
       { path: 'trends', element: <Trends /> },
       { path: 'upload', element: <Upload /> },

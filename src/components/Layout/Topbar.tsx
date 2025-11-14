@@ -12,7 +12,8 @@ export default function Topbar() {
     if (pathname === '/classic') navigate('/')
     else if (pathname === '/') navigate('/copilot2')
     else if (pathname === '/copilot2') navigate('/progressive')
-    else navigate('/classic')
+    else if (pathname === '/progressive') navigate('/classic')
+    else navigate('/')
   }
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
@@ -43,7 +44,7 @@ export default function Topbar() {
             className="ml-2 px-3 py-2 rounded-md text-sm border border-white/20 bg-white/10 hover:bg-white/15"
             title="Toggle dashboard view"
           >
-            {pathname === '/classic' ? 'Co‑Pilot View' : pathname === '/' ? 'Co‑Pilot+ View' : pathname === '/copilot2' ? 'Progressive View' : 'Classic View'}
+            {pathname === '/classic' ? 'Co‑Pilot View' : pathname === '/' ? 'Co‑Pilot+ View' : pathname === '/copilot2' ? 'Progressive View' : pathname === '/progressive' ? 'Classic View' : 'Co‑Pilot View'}
           </button>
         </div>
       </div>
