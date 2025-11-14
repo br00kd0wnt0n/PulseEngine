@@ -18,34 +18,6 @@ const USER_ID = '087d78e9-4bbe-49f6-8981-1588ce4934a2' // TODO: Get from auth co
 export function UploadProvider({ children }: { children: React.ReactNode }) {
   const [processed, setProcessed] = useState<ProcessedContent[]>([])
 
-  // Load existing assets from database on mount
-  useEffect(() => {
-    async function loadExisting() {
-      try {
-        const response = await fetch(`${API_BASE}/admin/assets`)
-        if (!response.ok) return
-
-        const data = await response.json()
-        const assets = data.assets || []
-
-        const processedItems = assets.map((asset: any) => ({
-          id: asset.id,
-          name: asset.name,
-          tags: Object.values(asset.tags || {}).filter(Boolean) as string[],
-          category: inferCategory(asset),
-          type: inferType(asset),
-          summary: generateSummary(asset),
-          url: asset.url,
-        }))
-
-        setProcessed(processedItems)
-      } catch (error) {
-        console.error('Failed to load existing assets:', error)
-      }
-    }
-    loadExisting()
-  }, [])
-
   const addFiles = async (files: File[]) => {
     // Add placeholder items immediately for UI feedback
     const placeholders = files.map((f, i) => createPlaceholder(f, processed.length + i))

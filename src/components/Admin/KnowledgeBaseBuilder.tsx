@@ -11,16 +11,42 @@ export default function KnowledgeBaseBuilder() {
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<any[]>([])
 
-  // Load existing items
+  // Load existing items from database
   useEffect(() => {
-    try { setItems(JSON.parse(localStorage.getItem('rag:items') || '[]')) } catch { setItems([]) }
-    function onStorage(e: StorageEvent) {
-      if (e.key === 'rag:items') {
-        try { setItems(JSON.parse(e.newValue || '[]')) } catch {}
+    async function loadAssets() {
+      try {
+        const response = await fetch('https://api-production-768d.up.railway.app/admin/assets')
+        if (!response.ok) return
+
+        const data = await response.json()
+        const assets = data.assets || []
+
+        // Convert database assets to items format
+        const dbItems = assets.map((asset: any) => ({
+          id: asset.id,
+          title: asset.name,
+          type: 'Industry Data',
+          source: 'Uploaded',
+          conf: 'Public',
+          quality: 'Good',
+          tags: Object.values(asset.tags || {}).filter(Boolean),
+          notes: '',
+          files: [{ name: asset.name, size: 0, type: 'application/pdf' }],
+          createdAt: asset.createdAt,
+        }))
+
+        setItems(dbItems)
+      } catch (error) {
+        console.error('Failed to load assets:', error)
+        setItems([])
       }
     }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    loadAssets()
+
+    // Refresh when uploads happen
+    const handleContextUpdate = () => loadAssets()
+    window.addEventListener('context-updated', handleContextUpdate)
+    return () => window.removeEventListener('context-updated', handleContextUpdate)
   }, [])
 
   function onDrop(e: React.DragEvent) {
