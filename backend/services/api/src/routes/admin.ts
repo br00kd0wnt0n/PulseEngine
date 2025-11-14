@@ -33,6 +33,27 @@ router.post('/migrate', async (req, res) => {
   }
 })
 
+router.post('/add-project-id-column', async (req, res) => {
+  try {
+    // Manually add projectId column if it doesn't exist
+    await AppDataSource.query(`
+      ALTER TABLE content_assets
+      ADD COLUMN IF NOT EXISTS "projectId" uuid REFERENCES projects(id) ON DELETE CASCADE
+    `)
+    await AppDataSource.query(`
+      CREATE INDEX IF NOT EXISTS idx_content_assets_project
+      ON content_assets("projectId")
+    `)
+    await AppDataSource.query(`
+      CREATE INDEX IF NOT EXISTS idx_content_assets_rkb
+      ON content_assets("projectId") WHERE "projectId" IS NULL
+    `)
+    res.json({ ok: true, message: 'projectId column added successfully' })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
 router.post('/setup-pgvector', async (req, res) => {
   try {
     // Enable pgvector extension
