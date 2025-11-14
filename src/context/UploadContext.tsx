@@ -11,7 +11,7 @@ type Ctx = {
 
 const UploadCtx = createContext<Ctx | null>(null)
 
-const INGESTION_URL = (import.meta as any).env?.VITE_INGESTION_URL || 'https://ingestion-production-c716.up.railway.app'
+const INGESTION_URL = import.meta.env?.VITE_INGESTION_URL || 'https://ingestion-production-c716.up.railway.app'
 const USER_ID = '087d78e9-4bbe-49f6-8981-1588ce4934a2' // TODO: Get from auth context
 
 export function UploadProvider({ children }: { children: React.ReactNode }) {
