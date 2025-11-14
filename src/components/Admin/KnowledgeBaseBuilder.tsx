@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 
+const INGESTION_URL = ((import.meta as any).env?.VITE_INGESTION_URL as string | undefined) || 'https://ingestion-production-c716.up.railway.app'
+const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string | undefined) || 'https://api-production-768d.up.railway.app'
+const USER_ID = '087d78e9-4bbe-49f6-8981-1588ce4934a2'
+
 export default function KnowledgeBaseBuilder() {
   const [files, setFiles] = useState<File[]>([])
   const [title, setTitle] = useState('')
@@ -10,6 +14,7 @@ export default function KnowledgeBaseBuilder() {
   const [tags, setTags] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<any[]>([])
+  const [uploading, setUploading] = useState(false)
 
   // Helper function to clean up redundant tags
   function cleanTags(tags: any[]): string[] {
@@ -35,35 +40,36 @@ export default function KnowledgeBaseBuilder() {
   }
 
   // Load existing items from database
-  useEffect(() => {
-    async function loadAssets() {
-      try {
-        const response = await fetch('https://api-production-768d.up.railway.app/admin/assets')
-        if (!response.ok) return
+  async function loadAssets() {
+    try {
+      const response = await fetch(`${API_BASE}/admin/assets`)
+      if (!response.ok) return
 
-        const data = await response.json()
-        const assets = data.assets || []
+      const data = await response.json()
+      const assets = data.assets || []
 
-        // Convert database assets to items format
-        const dbItems = assets.map((asset: any) => ({
-          id: asset.id,
-          title: asset.name,
-          type: 'Industry Data',
-          source: 'Uploaded',
-          conf: 'Public',
-          quality: 'Good',
-          tags: cleanTags(asset.tags || {}),
-          notes: '',
-          files: [{ name: asset.name, size: 0, type: 'application/pdf' }],
-          createdAt: asset.createdAt,
-        }))
+      // Convert database assets to items format
+      const dbItems = assets.map((asset: any) => ({
+        id: asset.id,
+        title: asset.name,
+        type: 'Industry Data',
+        source: 'Uploaded',
+        conf: 'Public',
+        quality: 'Good',
+        tags: cleanTags(asset.tags || {}),
+        notes: '',
+        files: [{ name: asset.name, size: 0, type: 'application/pdf' }],
+        createdAt: asset.createdAt,
+      }))
 
-        setItems(dbItems)
-      } catch (error) {
-        console.error('Failed to load assets:', error)
-        setItems([])
-      }
+      setItems(dbItems)
+    } catch (error) {
+      console.error('Failed to load assets:', error)
+      setItems([])
     }
+  }
+
+  useEffect(() => {
     loadAssets()
 
     // Refresh when uploads happen
@@ -80,22 +86,48 @@ export default function KnowledgeBaseBuilder() {
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.files && e.target.files.length) setFiles(prev => [...prev, ...Array.from(e.target.files!)])
   }
-  function save() {
-    const key = 'rag:items'
-    const item = {
-      id: 'rag-'+Date.now(), title: title.trim() || (files[0]?.name || 'Untitled'),
-      type, source, conf, quality, tags: tags.split(',').map(x => x.trim()).filter(Boolean), notes,
-      files: files.map(f => ({ name: f.name, size: f.size, type: f.type })),
-      createdAt: new Date().toISOString(),
-    }
+
+  async function save() {
+    if (files.length === 0) return
+
+    setUploading(true)
     try {
-      const arr = JSON.parse(localStorage.getItem(key) || '[]')
-      const next = [item, ...arr]
-      localStorage.setItem(key, JSON.stringify(next))
-      setItems(next)
-    } catch {}
-    setFiles([]); setTitle(''); setSource(''); setTags(''); setNotes('')
-}
+      // Upload files to ingestion service
+      const formData = new FormData()
+      files.forEach(file => formData.append('files', file))
+      formData.append('ownerId', USER_ID)
+
+      const response = await fetch(`${INGESTION_URL}/ingest/upload`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`)
+      }
+
+      // Wait a moment for database to persist
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // Reload assets from database
+      await loadAssets()
+
+      // Dispatch context-updated event
+      window.dispatchEvent(new CustomEvent('context-updated'))
+
+      // Clear form
+      setFiles([])
+      setTitle('')
+      setSource('')
+      setTags('')
+      setNotes('')
+    } catch (error) {
+      console.error('Upload failed:', error)
+      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setUploading(false)
+    }
+  }
 
 function pieColor(i: number) {
   const colors = ['#EB008B', '#8a63ff', '#3be8ff', '#f59e0b', '#10b981', '#f87171']
@@ -231,7 +263,9 @@ function PieChart({ stats }: { stats: Record<string, number> }) {
           </select>
           <input value={tags} onChange={(e)=>setTags(e.target.value)} placeholder="Tags (comma separated)" className="w-full bg-charcoal-800/70 border border-white/10 rounded px-2 py-1" />
           <textarea value={notes} onChange={(e)=>setNotes(e.target.value)} placeholder="Notes / why this is good" className="w-full bg-charcoal-800/70 border border-white/10 rounded px-2 py-1" rows={3} />
-          <button onClick={save} className="w-full text-xs px-2 py-1 rounded border border-white/10 bg-ralph-cyan/70 hover:bg-ralph-cyan">Add to Knowledge Base</button>
+          <button onClick={save} disabled={uploading || files.length === 0} className="w-full text-xs px-2 py-1 rounded border border-white/10 bg-ralph-cyan/70 hover:bg-ralph-cyan disabled:opacity-50 disabled:cursor-not-allowed">
+            {uploading ? 'Uploading...' : 'Add to Knowledge Base'}
+          </button>
         </div>
       </div>
       <div className="mt-4">
