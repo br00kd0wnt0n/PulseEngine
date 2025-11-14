@@ -42,7 +42,7 @@ export default function KnowledgeBaseBuilder() {
   // Load existing items from database
   async function loadAssets() {
     try {
-      const response = await fetch(`${API_BASE}/admin/assets`)
+      const response = await fetch(`${API_BASE}/admin/assets?limit=1000`)
       if (!response.ok) return
 
       const data = await response.json()

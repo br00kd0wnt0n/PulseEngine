@@ -121,5 +121,19 @@ router.post('/assets/bulk-tag', async (req, res) => {
   }
 })
 
+router.delete('/assets/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    if (!id) {
+      return res.status(400).json({ ok: false, error: 'Asset ID is required' })
+    }
+
+    await AppDataSource.query('DELETE FROM content_assets WHERE id = $1', [id])
+    res.json({ ok: true, message: 'Asset deleted', id })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
 export default router
 
