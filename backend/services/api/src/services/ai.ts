@@ -81,7 +81,12 @@ export async function generateDebrief(concept: string, userId?: string | null) {
         max_tokens: 350,
       })
       const raw = resp.choices?.[0]?.message?.content || '{}'
-      try { const parsed = JSON.parse(raw); await cacheSet(cacheKey, parsed); return parsed } catch {}
+      try {
+        const parsed = JSON.parse(raw)
+        const withSources = { ...parsed, sources: ctx.sources }
+        await cacheSet(cacheKey, withSources)
+        return withSources
+      } catch {}
     } catch {}
   }
   const heuristic = {
@@ -89,6 +94,7 @@ export async function generateDebrief(concept: string, userId?: string | null) {
     summary: 'Opportunity in native hooks + remixable beats.',
     keyPoints: [ 'Clarify the promise in line one', 'Define a loopable moment', 'Map platform trims', 'Plan 1 macro + 3 micro collabs' ],
     didYouKnow: [ 'Loops increase completion by 18–35%', 'Remix prompts lift creator adoption', 'Native captions boost recall' ],
+    sources: ctx.sources,
   }
   await cacheSet(cacheKey, heuristic)
   return heuristic
@@ -117,7 +123,12 @@ export async function generateOpportunities(concept: string, userId?: string | n
         max_tokens: 380,
       })
       const raw = resp.choices?.[0]?.message?.content || '{}'
-      try { const parsed = JSON.parse(raw); await cacheSet(cacheKey, parsed); return parsed } catch {}
+      try {
+        const parsed = JSON.parse(raw)
+        const withSources = { ...parsed, sources: ctx.sources }
+        await cacheSet(cacheKey, withSources)
+        return withSources
+      } catch {}
     } catch {}
   }
   const opportunities = [
@@ -127,7 +138,7 @@ export async function generateOpportunities(concept: string, userId?: string | n
     { title: 'Remixable beat (7–10s)', why: 'Encourages replays and loops', impact: 70 },
     { title: 'Macro + micro collab mix', why: 'Combines reach with authenticity', impact: 68 },
   ]
-  const heuristic = { opportunities, rationale: 'Based on common uplift levers across short‑form and collab patterns.' }
+  const heuristic = { opportunities, rationale: 'Based on common uplift levers across short‑form and collab patterns.', sources: ctx.sources }
   await cacheSet(cacheKey, heuristic)
   return heuristic
 }

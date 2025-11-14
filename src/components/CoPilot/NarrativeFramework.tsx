@@ -101,11 +101,15 @@ export default function NarrativeFramework() {
     async function run() {
       if (!concept) return
       try {
-        const recs = await api.recommendations(concept, snapshot())
+        const [recs, deb, opp] = await Promise.all([
+          api.recommendations(concept, snapshot()),
+          api.debrief(concept).catch(()=>null),
+          api.opportunities(concept).catch(()=>null)
+        ])
         if (cancel || !recs) return
         setBlocks(bs => bs.map((b) => {
           if (touched[b.id]) return b
-          const filled = autofillBlock(b, concept, keyDrivers as string[] | undefined, recs)
+          const filled = autofillBlock(b, concept, keyDrivers as string[] | undefined, recs, deb, opp)
           return { ...b, content: filled }
         }))
         try { logActivity('Narrative deconstruction auto‑filled from AI') } catch {}
@@ -174,18 +178,21 @@ function countIntersections(text: string, drivers: string[]) {
   return drivers.reduce((acc, d) => acc + (words.includes(String(d).toLowerCase()) ? 1 : 0), 0)
 }
 
-function autofillBlock(b: Omit<Block, 'id'>, concept?: string, keyDrivers?: string[], recs?: any): string {
+function autofillBlock(b: Omit<Block, 'id'>, concept?: string, keyDrivers?: string[], recs?: any, deb?: any, opp?: any): string {
   const kd = keyDrivers || []
   const first = (arr?: string[]) => (Array.isArray(arr) && arr[0]) || ''
   const join2 = (arr?: string[]) => (Array.isArray(arr) ? arr.slice(0,2).join(' • ') : '')
   switch (b.key) {
-    case 'origin': return concept ? `Premise: ${concept}` : ''
-    case 'hook': return first(recs?.narrative) || suggestFromDrivers(b, kd, concept)
+    case 'origin': return deb?.summary ? `Premise: ${deb.summary}` : (concept ? `Premise: ${concept}` : '')
+    case 'hook': return first(recs?.narrative) || deb?.keyPoints?.[0] || suggestFromDrivers(b, kd, concept)
     case 'arc': return `Arc: ${join2(recs?.narrative)}`
     case 'perspective': return kd.length ? `Perspectives: ${kd.slice(0,2).join(', ')}` : 'Perspectives: audience • creator'
-    case 'pivots': return first(recs?.content) ? `Pivot: ${first(recs?.content)}` : ''
-    case 'evidence': return first(recs?.platform) ? `Evidence: ${first(recs?.platform)}` : ''
-    case 'resolution': return first(recs?.collab) ? `Outcome: ${first(recs?.collab)}` : 'Outcome: clear payoff + CTA'
+    case 'pivots': {
+      const fromOpp = (opp?.opportunities?.find((x:any)=>/pivot|moment|turn|beat/i.test(x.title))?.title) || first(recs?.content)
+      return fromOpp ? `Pivot: ${fromOpp}` : ''
+    }
+    case 'evidence': return deb?.didYouKnow?.[0] ? `Evidence: ${deb.didYouKnow[0]}` : (first(recs?.platform) ? `Evidence: ${first(recs?.platform)}` : '')
+    case 'resolution': return deb?.keyPoints?.[1] ? `Outcome: ${deb.keyPoints[1]}` : (first(recs?.collab) ? `Outcome: ${first(recs?.collab)}` : 'Outcome: clear payoff + CTA')
     default: return ''
   }
 }

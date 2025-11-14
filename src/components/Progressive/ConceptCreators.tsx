@@ -60,7 +60,18 @@ function synthesizeRefined(concept: string, blocks: Block[]) {
   const evidence = byKey('evidence')
   const resolution = byKey('resolution')
   const oneLiner = hook || `Premise: ${premise}`
-  const bullets = [pivot, evidence, resolution].filter(Boolean).slice(0,3)
+  const pid = localStorage.getItem('activeProjectId') || 'local'
+  let deb: any = null
+  let trends: string[] = []
+  try { deb = JSON.parse(localStorage.getItem(`debrief:${pid}`) || 'null') } catch {}
+  try {
+    const sources = deb?.sources || {}
+    const core = (sources.core || []) as string[]
+    trends = core.filter((s: string) => s.startsWith('trend:')).map((s: string) => s.replace('trend:', '')).slice(0,2)
+  } catch {}
+  const extra = deb?.summary ? [`Summary: ${deb.summary}`] : []
+  const trendLine = trends.length ? [`Top vectors: ${trends.join(', ')}`] : []
+  const bullets = [...extra, ...trendLine, pivot, evidence, resolution].filter(Boolean).slice(0,3)
   return { oneLiner, bullets }
 }
 
@@ -68,4 +79,3 @@ function explainWhy(tags: string[]) {
   const top = (tags || []).slice(0,2).join(' / ')
   return top || 'Strong creative fit'
 }
-

@@ -12,6 +12,7 @@ export default function AtAGlanceV2() {
   const [vals, setVals] = useState<{ narrative: number; peak: number; cross: number }>({ narrative: 0, peak: 0, cross: 0 })
   const [prev, setPrev] = useState<{ narrative?: number; peak?: number; cross?: number }>({})
   const [howText, setHowText] = useState('')
+  const [asOf, setAsOf] = useState<string>('')
 
   const [refreshKey, setRefreshKey] = useState(0)
   const analysis = useMemo(() => scoreConcept(concept || 'AI loop dance challenge', snapshot(), []), [concept, snapshot, refreshKey])
@@ -31,47 +32,52 @@ export default function AtAGlanceV2() {
   }, [])
 
   useEffect(() => {
-    const narrative = Math.round(analysis.scores.narrativeStrength)
-    const peak = Math.max(1, Math.round(analysis.scores.timeToPeakWeeks))
-    const text = (concept || '').toLowerCase()
-    const platforms = ['tiktok', 'shorts', 'reels']
-    const hits = platforms.filter(p => text.includes(p)).length
-    const cross = Math.min(100, hits * 30 + 40)
-    setPrev((p) => ({ narrative: vals.narrative, peak: vals.peak, cross: vals.cross }))
-    setVals({ narrative, peak, cross })
-    try {
-      logActivity('Quick analysis created')
-      logActivity('Narrative potential calculated')
-    } catch {}
-  }, [analysis, concept])
-
-  // AI one-liner (non-blocking): grab first sentence from narrative; fallback if needed
-  useEffect(() => {
     let cancel = false
-    setHowText('Analyzing story fit…')
+    setHowText('Analyzing story fit with trends…')
     ;(async () => {
       try {
-        const n = await api.narrative(snapshot(), null)
+        const [s, r] = await Promise.all([
+          api.score(concept || '', snapshot()),
+          api.recommendations(concept || '', snapshot()),
+        ])
         if (cancel) return
-        const text = (n as any).text || ''
-        const first = (text.split(/\.[\s\n]/)[0] || '').trim()
-        if (first) setHowText(first)
-        else {
-          const c = (concept || 'this story').replace(/\s+/g, ' ').trim()
-          setHowText(`Quick look at Narrative Potential, Time to Peak, and Cross‑platform fit for “${c}”.`)
-        }
-      } catch {
+        const narrative = Math.round((s?.scores?.narrativeStrength ?? analysis.scores.narrativeStrength) || 0)
+        const peak = Math.max(1, Math.round((s?.scores?.timeToPeakWeeks ?? analysis.scores.timeToPeakWeeks) || 1))
+        const cross = Math.round((s?.extended?.crossPlatformPotential ?? s?.ralph?.crossPlatformPotential ?? 0))
+        setPrev((p) => ({ narrative: vals.narrative, peak: vals.peak, cross: vals.cross }))
+        setVals({ narrative, peak, cross })
+        const coreSources = (r?.sources?.core || []) as string[]
+        const trendNames = coreSources.filter(x => x.startsWith('trend:')).map(x => x.replace('trend:', ''))
+        const topTrends = trendNames.slice(0, 2)
         const c = (concept || 'this story').replace(/\s+/g, ' ').trim()
-        setHowText(`Quick look at Narrative Potential, Time to Peak, and Cross‑platform fit for “${c}”.`)
+        if (topTrends.length) setHowText(`Quick look at fit for “${c}” — top vectors: ${topTrends.join(', ')}.`)
+        else setHowText(`Quick look at fit for “${c}”.`)
+        setAsOf(new Date().toLocaleString())
+        try {
+          logActivity('Quick analysis created')
+          logActivity('Narrative potential calculated')
+        } catch {}
+      } catch {
+        const narrative = Math.round(analysis.scores.narrativeStrength)
+        const peak = Math.max(1, Math.round(analysis.scores.timeToPeakWeeks))
+        const cross = 40
+        setPrev((p) => ({ narrative: vals.narrative, peak: vals.peak, cross: vals.cross }))
+        setVals({ narrative, peak, cross })
+        const c = (concept || 'this story').replace(/\s+/g, ' ').trim()
+        setHowText(`Quick look at fit for “${c}”.`)
+        setAsOf(new Date().toLocaleString())
       }
     })()
     return () => { cancel = true }
-  }, [concept, snapshot])
+  }, [analysis, concept, snapshot])
+
+  // bump on events already handled by refreshKey
 
   return (
     <div className="panel module p-4">
       <div className="flex items-center justify-between mb-1">
         <div className="font-semibold">Quick Analysis</div>
+        {asOf && <div className="text-[11px] text-white/50">As of {asOf}</div>}
       </div>
       <div className="mb-3 text-[12px] text-white/70">{howText}</div>
       <div className="grid sm:grid-cols-3 gap-3">

@@ -9,12 +9,14 @@ export default function ScoringEnhancements() {
   const { snapshot } = useTrends() as any
   const [score, setScore] = useState<any | null>(null)
   const [lastExt, setLastExt] = useState<any | null>(null)
+  const [updatedAfterApply, setUpdatedAfterApply] = useState<boolean>(false)
   const [enh, setEnh] = useState<{ suggestions: { text: string; target: string; impact: number }[] } | null>(null)
   const graph = useMemo(() => snapshot(), [snapshot])
 
   useEffect(() => {
     let cancel = false
     if (!concept) return
+    setScore(null); setEnh(null)
     ;(async () => {
       try {
         const [s, e] = await Promise.all([api.score(concept, graph), api.enhancements(concept, graph)])
@@ -28,6 +30,7 @@ export default function ScoringEnhancements() {
     try {
       // capture current ext for delta display
       if (score?.extended) setLastExt(score.extended)
+      setUpdatedAfterApply(true)
       window.dispatchEvent(new CustomEvent('copilot-insert', { detail: { text } }))
       window.dispatchEvent(new CustomEvent('conversation-updated'))
       logActivity(`Applied enhancement: ${text}`)
@@ -43,8 +46,16 @@ export default function ScoringEnhancements() {
     <div className="panel module p-4">
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold">SCORING + ENHANCEMENTS</div>
-        {typeof ext.overall === 'number' && <div className="text-xs text-white/60">Overall {ext.overall}</div>}
+        <div className="flex items-center gap-2">
+          {updatedAfterApply && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-white/60">Updated after apply</span>
+          )}
+          {typeof ext.overall === 'number' && <div className="text-xs text-white/60">Overall {ext.overall}</div>}
+        </div>
       </div>
+      {!score && (
+        <div className="text-xs text-white/60 mb-2">Scoring concept and computing targeted enhancements…</div>
+      )}
       <div className="grid md:grid-cols-2 gap-3">
         <div className="space-y-2">
           <Metric label="Narrative Potential" value={score?.scores?.narrativeStrength} delta={diff(score?.scores?.narrativeStrength, lastExt?.narrative)} />
