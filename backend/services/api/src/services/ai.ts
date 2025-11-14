@@ -58,6 +58,127 @@ export async function narrativeFromTrends(graph: TrendGraph, focusId?: string | 
   }
 }
 
+// Debrief: recap + key points + did-you-know insights
+export async function generateDebrief(concept: string, userId?: string | null) {
+  const ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
+  const cacheKey = sha({ t: 'debrief', concept, s: summarySig(ctx) })
+  const cached = await cacheGet<any>(cacheKey)
+  if (cached) return cached
+  const apiKey = process.env.OPENAI_API_KEY
+  if (apiKey) {
+    try {
+      const { OpenAI } = await import('openai')
+      const client = new OpenAI({ apiKey })
+      const model = process.env.MODEL_NAME || 'gpt-4o-mini'
+      const contextStr = formatContextForPrompt(ctx)
+      const prompt = `Concept: "${concept}"\n\n`+
+        (contextStr?`Context (concise):\n${contextStr}\n\n`:'')+
+        `Return JSON with brief (2–3 sentences), summary (1 sentence), keyPoints (4 bullets), didYouKnow (3 items).`
+      const resp = await client.chat.completions.create({
+        model,
+        messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
+        temperature: 0.5,
+        max_tokens: 350,
+      })
+      const raw = resp.choices?.[0]?.message?.content || '{}'
+      try { const parsed = JSON.parse(raw); await cacheSet(cacheKey, parsed); return parsed } catch {}
+    } catch {}
+  }
+  const heuristic = {
+    brief: `Recap for "${concept}": short‑form concept with collaborative hooks and platform‑native framing.`,
+    summary: 'Opportunity in native hooks + remixable beats.',
+    keyPoints: [ 'Clarify the promise in line one', 'Define a loopable moment', 'Map platform trims', 'Plan 1 macro + 3 micro collabs' ],
+    didYouKnow: [ 'Loops increase completion by 18–35%', 'Remix prompts lift creator adoption', 'Native captions boost recall' ],
+  }
+  await cacheSet(cacheKey, heuristic)
+  return heuristic
+}
+
+// Opportunities: ranked with impact
+export async function generateOpportunities(concept: string, userId?: string | null) {
+  const ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
+  const cacheKey = sha({ t: 'opps', concept, s: summarySig(ctx) })
+  const cached = await cacheGet<any>(cacheKey)
+  if (cached) return cached
+  const apiKey = process.env.OPENAI_API_KEY
+  if (apiKey) {
+    try {
+      const { OpenAI } = await import('openai')
+      const client = new OpenAI({ apiKey })
+      const model = process.env.MODEL_NAME || 'gpt-4o-mini'
+      const contextStr = formatContextForPrompt(ctx)
+      const prompt = `Concept: "${concept}"\n\n`+
+        (contextStr?`Context (concise):\n${contextStr}\n\n`:'')+
+        `Identify 5 opportunities with title, why, and impact (0-100). Return JSON { opportunities: [{ title, why, impact }], rationale }.`
+      const resp = await client.chat.completions.create({
+        model,
+        messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
+        temperature: 0.6,
+        max_tokens: 380,
+      })
+      const raw = resp.choices?.[0]?.message?.content || '{}'
+      try { const parsed = JSON.parse(raw); await cacheSet(cacheKey, parsed); return parsed } catch {}
+    } catch {}
+  }
+  const opportunities = [
+    { title: 'Sharpen the opening hook', why: 'Improves comprehension and retention', impact: 78 },
+    { title: 'Add duet/stitch prompt', why: 'Boosts creator participation', impact: 72 },
+    { title: 'Platform-native captions', why: 'Increases message recall', impact: 64 },
+    { title: 'Remixable beat (7–10s)', why: 'Encourages replays and loops', impact: 70 },
+    { title: 'Macro + micro collab mix', why: 'Combines reach with authenticity', impact: 68 },
+  ]
+  const heuristic = { opportunities, rationale: 'Based on common uplift levers across short‑form and collab patterns.' }
+  await cacheSet(cacheKey, heuristic)
+  return heuristic
+}
+
+function summarySig(ctx: RetrievalContext) {
+  const m = [ctx.userContent.length, ctx.coreKnowledge.length, ctx.liveMetrics.length, ctx.predictiveTrends.length]
+  return m.join('-')
+}
+
+// Enhancements with estimated impact and targets
+export async function generateEnhancements(concept: string, graph: TrendGraph, userId?: string | null) {
+  // Baseline scores for impact estimation
+  const base = scoreConceptMvp(concept, graph)
+  const narrative = base.scores.narrativeStrength
+  const ttp = Math.max(0, Math.min(100, 100 - (base.scores.timeToPeakWeeks - 1) * 12))
+  const cross = (base as any).ralph?.crossPlatformPotential ?? 0
+  const commercial = Math.round(0.6 * base.scores.collaborationOpportunity + 0.4 * ((base as any).ralph?.culturalRelevance ?? 50))
+
+  const apiKey = process.env.OPENAI_API_KEY
+  if (apiKey) {
+    try {
+      const { OpenAI } = await import('openai')
+      const client = new OpenAI({ apiKey })
+      const model = process.env.MODEL_NAME || 'gpt-4o-mini'
+      const prompt = `You are improving a short concept: "${concept}".\n`+
+        `Current scores (0-100): narrative=${narrative}, ttp=${ttp}, cross=${cross}, commercial=${commercial}.\n`+
+        `Propose 4 targeted enhancements. For each, return: text, target (one of origin|hook|arc|pivots|evidence|resolution), and deltas { narrative, ttp, cross, commercial } indicating expected score changes (integers, +/-).\n`+
+        `Return JSON: { suggestions: [{ text, target, deltas: { narrative, ttp, cross, commercial } }] }`
+      const resp = await client.chat.completions.create({
+        model,
+        messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
+        temperature: 0.6,
+        max_tokens: 420,
+      })
+      const raw = resp.choices?.[0]?.message?.content || '{}'
+      try { const parsed = JSON.parse(raw); return parsed } catch {}
+    } catch { /* fallthrough */ }
+  }
+  // Heuristic fallback with simple deltas
+  const lc = (concept || '').toLowerCase()
+  const hasLoop = lc.includes('loop')
+  const hasCollab = lc.includes('collab') || lc.includes('duet') || lc.includes('stitch')
+  const suggestions = [
+    { text: 'Condense the opening hook to 7–10 words', target: 'hook', deltas: { narrative: 6, ttp: 2, cross: 0, commercial: 1 } },
+    { text: 'Define a loopable 7–10s beat with a visible cue', target: 'arc', deltas: { narrative: hasLoop ? 2 : 6, ttp: 4, cross: 3, commercial: 2 } },
+    { text: 'Add a duet/stitch prompt to invite creator responses', target: 'resolution', deltas: { narrative: 2, ttp: 1, cross: 2, commercial: hasCollab ? 2 : 6 } },
+    { text: 'Add platform‑native captions stating the promise in frame 1', target: 'evidence', deltas: { narrative: 4, ttp: 2, cross: 3, commercial: 1 } },
+  ]
+  return { suggestions }
+}
+
 export function scoreConceptMvp(concept: string, graph: TrendGraph) {
   const text = concept.toLowerCase()
   const trendLabels = graph.nodes.filter(n => n.kind === 'trend').map(n => n.label.toLowerCase())

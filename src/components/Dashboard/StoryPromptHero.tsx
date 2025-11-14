@@ -49,6 +49,12 @@ export default function StoryPromptHero() {
     setConcept(text)
     setActivated(true)
     try { logActivity('Story assessed') } catch {}
+    // Seed clarifying question into Co‑Pilot
+    try {
+      const q = `Quick clarity check: Who is the primary audience and what is the first 7–10 word promise you want them to read?`
+      window.dispatchEvent(new CustomEvent('open-chat'))
+      window.dispatchEvent(new CustomEvent('copilot-insert', { detail: { text: q } }))
+    } catch {}
     try {
       // Always try public project creation first for MVP
       const p = await api.createPublicProject({ concept: text, graph: snapshot(), focusId: null })

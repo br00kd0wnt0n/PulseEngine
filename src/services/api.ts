@@ -24,9 +24,21 @@ export const api = {
     '/ai/score',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph }) }
   ),
+  enhancements: (concept: string, graph: any) => request<any>(
+    '/ai/enhancements',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph }) }
+  ),
   recommendations: (concept: string, graph: any) => request<any>(
     '/ai/recommendations',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph }) }
+  ),
+  debrief: (concept: string) => request<any>(
+    '/ai/debrief',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept }) }
+  ),
+  opportunities: (concept: string) => request<any>(
+    '/ai/opportunities',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept }) }
   ),
   createProject: (payload: { concept: string; persona?: string; platforms?: string[]; areasOfInterest?: string[]; graph?: any; focusId?: string | null }) =>
     request<any>('/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),

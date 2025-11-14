@@ -73,6 +73,21 @@ export default function NarrativeFramework() {
     try { window.dispatchEvent(new CustomEvent('copilot-insert', { detail: { text } })) } catch {}
   }
 
+  // Listen for external apply to a target block
+  useEffect(() => {
+    function onApply(e: any) {
+      const { target, text } = e?.detail || {}
+      if (!target || !text) return
+      const idx = blocks.findIndex(b => b.key === target)
+      if (idx < 0) return
+      setBlocks(bs => bs.map((x, i) => i === idx ? { ...x, content: text } : x))
+      setTouched(t => ({ ...t, [blocks[idx]?.id || target]: true }))
+      try { logActivity(`Applied to ${target}: ${text}`) } catch {}
+    }
+    window.addEventListener('nf-apply' as any, onApply as any)
+    return () => window.removeEventListener('nf-apply' as any, onApply as any)
+  }, [blocks])
+
   // Mark touched when user edits
   function onEdit(idx: number, value: string) {
     const b = blocks[idx]
