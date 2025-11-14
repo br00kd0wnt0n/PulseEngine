@@ -77,8 +77,14 @@ router.get('/users', async (req, res) => {
 
 router.get('/assets', async (req, res) => {
   try {
-    const assets = await AppDataSource.query('SELECT id, name, tags, metadata, "ownerId", "createdAt" FROM content_assets ORDER BY "createdAt" DESC LIMIT 10')
-    res.json({ ok: true, assets })
+    const limit = parseInt(req.query.limit as string) || 100
+    const offset = parseInt(req.query.offset as string) || 0
+    const assets = await AppDataSource.query(
+      'SELECT id, name, tags, metadata, "ownerId", "createdAt" FROM content_assets ORDER BY "createdAt" DESC LIMIT $1 OFFSET $2',
+      [limit, offset]
+    )
+    const total = await AppDataSource.query('SELECT COUNT(*) as count FROM content_assets')
+    res.json({ ok: true, assets, total: parseInt(total[0].count), limit, offset })
   } catch (e: any) {
     res.status(500).json({ ok: false, error: e?.message || String(e) })
   }
