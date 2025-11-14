@@ -8,6 +8,7 @@ export class ContentAsset {
   @Column({ type: 'jsonb', default: {} }) tags!: Record<string, any>
   @Column({ type: 'jsonb', default: {} }) metadata!: Record<string, any>
   @Column({ type: 'uuid' }) ownerId!: string
+  @Column({ type: 'uuid', nullable: true }) projectId?: string | null
   @CreateDateColumn() createdAt!: Date
   @UpdateDateColumn() updatedAt!: Date
 }

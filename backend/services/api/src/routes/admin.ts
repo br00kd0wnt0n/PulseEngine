@@ -79,11 +79,20 @@ router.get('/assets', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 100
     const offset = parseInt(req.query.offset as string) || 0
+    const rkbOnly = req.query.rkbOnly === 'true'
+
+    let whereClause = ''
+    let countWhereClause = ''
+    if (rkbOnly) {
+      whereClause = 'WHERE "projectId" IS NULL'
+      countWhereClause = 'WHERE "projectId" IS NULL'
+    }
+
     const assets = await AppDataSource.query(
-      'SELECT id, name, tags, metadata, "ownerId", "createdAt" FROM content_assets ORDER BY "createdAt" DESC LIMIT $1 OFFSET $2',
+      `SELECT id, name, tags, metadata, "ownerId", "createdAt" FROM content_assets ${whereClause} ORDER BY "createdAt" DESC LIMIT $1 OFFSET $2`,
       [limit, offset]
     )
-    const total = await AppDataSource.query('SELECT COUNT(*) as count FROM content_assets')
+    const total = await AppDataSource.query(`SELECT COUNT(*) as count FROM content_assets ${countWhereClause}`)
     res.json({ ok: true, assets, total: parseInt(total[0].count), limit, offset })
   } catch (e: any) {
     res.status(500).json({ ok: false, error: e?.message || String(e) })

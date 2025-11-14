@@ -42,12 +42,12 @@ async function main() {
   // URL parsing and social link extraction (lightweight placeholder)
   app.post('/ingest/url', async (req, res) => {
     try {
-      const { url, ownerId } = req.body || {}
+      const { url, ownerId, projectId } = req.body || {}
       if (!url || !ownerId) return res.status(400).json({ error: 'url and ownerId required' })
       await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
       const parsed = parseUrl(url)
       const repo = ds.getRepository(ContentAsset)
-      const a = repo.create({ name: parsed.title, url, tags: parsed.tags, metadata: parsed.metadata, ownerId })
+      const a = repo.create({ name: parsed.title, url, tags: parsed.tags, metadata: parsed.metadata, ownerId, projectId: projectId || null })
       await repo.save(a)
       res.status(201).json(a)
     } catch (e: any) {
@@ -60,6 +60,7 @@ async function main() {
   app.post('/ingest/upload', upload.array('files'), async (req, res) => {
     try {
       const ownerId = (req.body?.ownerId as string) || ''
+      const projectId = (req.body?.projectId as string) || null
       if (!ownerId) return res.status(400).json({ error: 'ownerId required' })
       await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
       const files = (req.files as Express.Multer.File[]) || []
@@ -74,6 +75,7 @@ async function main() {
         const payload = {
           schema: 'kb.v1',
           ownerId,
+          projectId,
           name: f.originalname,
           size: f.size,
           mime: f.mimetype,
@@ -99,7 +101,7 @@ async function main() {
           req.log?.error({ err: e }, 'object-store-failure-or-encryption-missing')
         }
         // 4) Persist only light reference row; do not store file
-        const a = repo.create({ name: f.originalname, url: null, tags: analysis.tags, metadata: { insights }, ownerId })
+        const a = repo.create({ name: f.originalname, url: null, tags: analysis.tags, metadata: { insights }, ownerId, projectId })
         saved.push(await repo.save(a))
         // 5) Ephemeral buffer auto-dropped by garbage collector
       }
@@ -114,11 +116,12 @@ async function main() {
   app.post('/ingest/pdf', upload.single('file'), async (req, res) => {
     try {
       const ownerId = (req.body?.ownerId as string) || ''
+      const projectId = (req.body?.projectId as string) || null
       if (!ownerId || !req.file) return res.status(400).json({ error: 'ownerId and file required' })
       await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
       const meta = await analyzeFile(req.file)
       const repo = ds.getRepository(ContentAsset)
-      const a = repo.create({ name: req.file.originalname, tags: meta.tags, metadata: meta.metadata, ownerId })
+      const a = repo.create({ name: req.file.originalname, tags: meta.tags, metadata: meta.metadata, ownerId, projectId })
       await repo.save(a)
       res.status(201).json(a)
     } catch (e: any) {

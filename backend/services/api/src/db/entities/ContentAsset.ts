@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, Index } from 'typeorm'
 import { User } from './User.js'
+import { Project } from './Project.js'
 
 @Entity({ name: 'content_assets' })
 export class ContentAsset {
@@ -17,6 +18,10 @@ export class ContentAsset {
   @ManyToOne(() => User, { eager: false, onDelete: 'CASCADE' }) owner!: User
   @Index()
   @Column('uuid') ownerId!: string
+
+  @ManyToOne(() => Project, { eager: false, onDelete: 'CASCADE', nullable: true }) project?: Project
+  @Index()
+  @Column({ type: 'uuid', nullable: true }) projectId?: string
 
   @CreateDateColumn() createdAt!: Date
   @UpdateDateColumn() updatedAt!: Date
