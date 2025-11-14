@@ -90,5 +90,36 @@ router.get('/assets', async (req, res) => {
   }
 })
 
+router.post('/assets/bulk-tag', async (req, res) => {
+  try {
+    const { tag } = req.body
+    if (!tag || typeof tag !== 'string') {
+      return res.status(400).json({ ok: false, error: 'Tag is required' })
+    }
+
+    // Get all assets
+    const assets = await AppDataSource.query('SELECT id, tags FROM content_assets')
+
+    let updated = 0
+    for (const asset of assets) {
+      const currentTags = asset.tags || {}
+
+      // Add the new tag if it doesn't exist
+      if (!Object.values(currentTags).includes(tag)) {
+        const updatedTags = { ...currentTags, [`tag_${Date.now()}_${Math.random()}`]: tag }
+        await AppDataSource.query(
+          'UPDATE content_assets SET tags = $1 WHERE id = $2',
+          [JSON.stringify(updatedTags), asset.id]
+        )
+        updated++
+      }
+    }
+
+    res.json({ ok: true, message: `Added '${tag}' to ${updated} assets`, updated, total: assets.length })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
 export default router
 
