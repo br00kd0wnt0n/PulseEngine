@@ -19,7 +19,11 @@ export default function ScoringEnhancements() {
     setScore(null); setEnh(null)
     ;(async () => {
       try {
-        const [s, e] = await Promise.all([api.score(concept, graph), api.enhancements(concept, graph)])
+        const region = (localStorage.getItem('region') || '').replace(/"/g,'')
+        const persona = (localStorage.getItem('persona') || '').replace(/"/g,'')
+        const mods = [region?`Region: ${region}`:'', persona?`Persona: ${persona}`:''].filter(Boolean).join('; ')
+        const modConcept = mods ? `${concept} (${mods})` : concept
+        const [s, e] = await Promise.all([api.score(modConcept, graph), api.enhancements(modConcept, graph)])
         if (!cancel) {
           setScore(s); setEnh(e)
           // persist compact score snapshot for co‑pilot guidance
@@ -52,7 +56,11 @@ export default function ScoringEnhancements() {
       // re-score after a short delay
       setTimeout(async () => {
         try {
-          const s = await api.score(concept, graph)
+          const region = (localStorage.getItem('region') || '').replace(/"/g,'')
+          const persona = (localStorage.getItem('persona') || '').replace(/"/g,'')
+          const mods = [region?`Region: ${region}`:'', persona?`Persona: ${persona}`:''].filter(Boolean).join('; ')
+          const modConcept = mods ? `${concept} (${mods})` : concept
+          const s = await api.score(modConcept, graph)
           setScore(s)
           try {
             const pid = localStorage.getItem('activeProjectId') || 'local'

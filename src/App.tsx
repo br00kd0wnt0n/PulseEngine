@@ -1,6 +1,8 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from './components/Layout/Sidebar'
 import Topbar from './components/Layout/Topbar'
+import CitationOverlay from './components/shared/CitationOverlay'
+import { CitationProvider } from './context/CitationContext'
 import pkg from '../package.json'
 
 export default function App() {
@@ -10,9 +12,12 @@ export default function App() {
       <Sidebar />
       <div className="flex flex-col min-h-screen">
         <Topbar />
-        <main className="p-6 md:p-8 space-y-6">
-          <Outlet />
-        </main>
+        <CitationProvider>
+          <main className="p-6 md:p-8 space-y-6">
+            <Outlet />
+          </main>
+          <CitationOverlay />
+        </CitationProvider>
         <footer className="px-6 md:px-8 py-4 text-xs text-white/40 border-t border-white/5 text-center">
           Ralph 2025 · Storytelling Intelligence · Prototype · Vers {pkg.version || '0.0.0'}
         </footer>

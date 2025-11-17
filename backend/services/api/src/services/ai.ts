@@ -59,7 +59,7 @@ export async function narrativeFromTrends(graph: TrendGraph, focusId?: string | 
 }
 
 // Debrief: recap + key points + did-you-know insights
-export async function generateDebrief(concept: string, userId?: string | null) {
+export async function generateDebrief(concept: string, userId?: string | null, persona?: string | null) {
   const ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
   const cacheKey = sha({ t: 'debrief', concept, s: summarySig(ctx) })
   const cached = await cacheGet<any>(cacheKey)
@@ -71,7 +71,7 @@ export async function generateDebrief(concept: string, userId?: string | null) {
       const client = new OpenAI({ apiKey })
       const model = process.env.MODEL_NAME || 'gpt-4o-mini'
       const contextStr = formatContextForPrompt(ctx)
-      const prompt = `Concept: "${concept}"\n\n`+
+      const prompt = `Persona: ${persona || 'General'}\nConcept: "${concept}"\n\n`+
         (contextStr?`Context (concise):\n${contextStr}\n\n`:'')+
         `Return JSON with brief (2–3 sentences), summary (1 sentence), keyPoints (4 bullets), didYouKnow (3 items).`
       const resp = await client.chat.completions.create({
@@ -101,7 +101,7 @@ export async function generateDebrief(concept: string, userId?: string | null) {
 }
 
 // Opportunities: ranked with impact
-export async function generateOpportunities(concept: string, userId?: string | null) {
+export async function generateOpportunities(concept: string, userId?: string | null, persona?: string | null) {
   const ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
   const cacheKey = sha({ t: 'opps', concept, s: summarySig(ctx) })
   const cached = await cacheGet<any>(cacheKey)
@@ -113,7 +113,7 @@ export async function generateOpportunities(concept: string, userId?: string | n
       const client = new OpenAI({ apiKey })
       const model = process.env.MODEL_NAME || 'gpt-4o-mini'
       const contextStr = formatContextForPrompt(ctx)
-      const prompt = `Concept: "${concept}"\n\n`+
+      const prompt = `Persona: ${persona || 'General'}\nConcept: "${concept}"\n\n`+
         (contextStr?`Context (concise):\n${contextStr}\n\n`:'')+
         `Identify 5 opportunities with title, why, and impact (0-100). Return JSON { opportunities: [{ title, why, impact }], rationale }.`
       const resp = await client.chat.completions.create({
@@ -149,7 +149,7 @@ function summarySig(ctx: RetrievalContext) {
 }
 
 // Enhancements with estimated impact and targets
-export async function generateEnhancements(concept: string, graph: TrendGraph, userId?: string | null) {
+export async function generateEnhancements(concept: string, graph: TrendGraph, userId?: string | null, persona?: string | null) {
   // Baseline scores for impact estimation
   const base = scoreConceptMvp(concept, graph)
   const narrative = base.scores.narrativeStrength
@@ -163,7 +163,7 @@ export async function generateEnhancements(concept: string, graph: TrendGraph, u
       const { OpenAI } = await import('openai')
       const client = new OpenAI({ apiKey })
       const model = process.env.MODEL_NAME || 'gpt-4o-mini'
-      const prompt = `You are improving a short concept: "${concept}".\n`+
+      const prompt = `You are improving a short concept for persona ${persona || 'General'}: "${concept}".\n`+
         `Current scores (0-100): narrative=${narrative}, ttp=${ttp}, cross=${cross}, commercial=${commercial}.\n`+
         `Propose 4 targeted enhancements. For each, return: text, target (one of origin|hook|arc|pivots|evidence|resolution), and deltas { narrative, ttp, cross, commercial } indicating expected score changes (integers, +/-).\n`+
         `Return JSON: { suggestions: [{ text, target, deltas: { narrative, ttp, cross, commercial } }] }`
@@ -217,7 +217,8 @@ function clamp(n: number, min: number, max: number) { return Math.max(min, Math.
 export async function generateRecommendations(
   concept: string,
   graph: TrendGraph,
-  userId?: string | null
+  userId?: string | null,
+  persona?: string | null
 ) {
   console.log('[RAG] generateRecommendations called:', { concept, userId, hasGraph: !!graph })
 
@@ -248,7 +249,7 @@ export async function generateRecommendations(
       // Format context for prompt
       const contextStr = formatContextForPrompt(context)
 
-      const prompt = `You are a storytelling strategist. Given this story concept: "${concept}"\n\n` +
+      const prompt = `You are a storytelling strategist for persona: ${persona || 'General'}. Given this story concept: "${concept}"\n\n` +
         (contextStr ? `# RELEVANT CONTEXT:\n${contextStr}\n\n` : '') +
         `# TASK:\n` +
         `Provide 4 categories of recommendations with 3 concise, practical bullets each:\n` +

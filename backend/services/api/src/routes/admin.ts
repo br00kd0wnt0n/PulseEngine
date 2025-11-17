@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { runSeed } from '../seed/runner.js'
 import { AppDataSource } from '../db/data-source.js'
+import { collectAllMetrics, cleanupOldMetrics, getMetricsSummary } from '../services/external/apify.js'
 
 const router = Router()
 
@@ -178,6 +179,40 @@ router.delete('/assets/:id', async (req, res) => {
 
     await AppDataSource.query('DELETE FROM content_assets WHERE id = $1', [id])
     res.json({ ok: true, message: 'Asset deleted', id })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
+// Apify trend collection endpoints
+
+router.post('/collect-trends', async (req, res) => {
+  try {
+    console.log('[ADMIN] Manual trend collection triggered')
+    const results = await collectAllMetrics()
+    res.json({ ok: true, results, message: 'Trend collection complete' })
+  } catch (e: any) {
+    console.error('[ADMIN] Trend collection failed:', e)
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
+router.post('/cleanup-metrics', async (req, res) => {
+  try {
+    const daysToKeep = parseInt(req.body?.daysToKeep || '30')
+    console.log(`[ADMIN] Manual cleanup triggered (keeping last ${daysToKeep} days)`)
+    const deleted = await cleanupOldMetrics(daysToKeep)
+    res.json({ ok: true, deleted, message: `Deleted ${deleted} old metrics` })
+  } catch (e: any) {
+    console.error('[ADMIN] Cleanup failed:', e)
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
+router.get('/metrics-summary', async (req, res) => {
+  try {
+    const summary = await getMetricsSummary()
+    res.json({ ok: true, summary })
   } catch (e: any) {
     res.status(500).json({ ok: false, error: e?.message || String(e) })
   }

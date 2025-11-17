@@ -13,7 +13,7 @@ const examples = [
 ]
 
 export default function StoryPromptHero() {
-  const { concept, setConcept, activated, setActivated, frameworkScores, keyDrivers, recsDensity } = useDashboard()
+  const { concept, setConcept, activated, setActivated, frameworkScores, keyDrivers, recsDensity, region, setRegion, persona, setPersona } = useDashboard()
   const [projectId, setProjectId] = useState<string | null>(null)
   const [versions, setVersions] = useState<any[]>([])
   const [cursor, setCursor] = useState(0)
@@ -48,10 +48,19 @@ export default function StoryPromptHero() {
     if (!text) return
     setConcept(text)
     setActivated(true)
+    try {
+      localStorage.setItem('region', JSON.stringify(region))
+      localStorage.setItem('persona', JSON.stringify(persona))
+    } catch {}
     try { logActivity('Story assessed') } catch {}
     // Seed clarifying question into Co‑Pilot
     try {
-      const q = `Quick clarity check: Who is the primary audience and what is the first 7–10 word promise you want them to read?`
+      const p = (persona || '').toLowerCase()
+      const q = p.includes('creative')
+        ? `Quick clarity check (Creative Lead): What’s the first 7–10 word promise, and the pivotal moment that delivers it?`
+        : p.includes('content')
+        ? `Quick clarity check (Content Creator): Who are you making this for, and what’s the first 7–10 word promise they’ll see?`
+        : `Quick clarity check (Strategist): Who is the primary audience and what is the first 7–10 word promise you want them to read?`
       window.dispatchEvent(new CustomEvent('open-chat'))
       window.dispatchEvent(new CustomEvent('copilot-insert', { detail: { text: q } }))
     } catch {}
@@ -249,7 +258,7 @@ export default function StoryPromptHero() {
             <div className="text-xs text-white/60 mb-1">Current Story</div>
             <div className="font-semibold">{concept}</div>
             <div className="mt-2 text-xs text-white/60 flex items-center gap-2">
-              <span>Persona: {prefs.persona} • Focus: {prefs.platforms.join(', ')} • Areas: {prefs.areasOfInterest.join(', ')}</span>
+              <span>Persona: {persona} • Focus: {prefs.platforms.join(', ')} • Areas: {prefs.areasOfInterest.join(', ')} • Region: {region}</span>
               {dirty && <span className="px-2 py-0.5 rounded-full border border-ralph-pink/30 bg-ralph-pink/10 text-ralph-pink">Unsaved changes</span>}
             </div>
             {versions.length > 0 && (
@@ -334,6 +343,36 @@ export default function StoryPromptHero() {
 
       {/* Input area - Claude-like */}
       <div className="panel module p-6 md:p-8 transform-gpu animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
+        {/* Region modifiers */}
+        <div className="mb-3 text-left">
+          <div className="text-xs text-white/60 mb-1">Region</div>
+          <div className="flex flex-wrap gap-2">
+            {(['US','UK','US+UK','Worldwide'] as const).map(r => (
+              <button key={r} onClick={() => setRegion(r)} className={`text-[11px] px-2 py-1 rounded border ${region===r?'border-ralph-teal/50 bg-ralph-teal/10':'border-white/10 bg-white/5 hover:bg-white/10'}`}>{r}</button>
+            ))}
+          </div>
+        </div>
+        {/* Modifiers row */}
+        <div className="mb-3 text-left grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <div className="text-xs text-white/60 mb-1">Region</div>
+            <select value={region} onChange={(e)=>setRegion(e.target.value as any)} className="w-full bg-charcoal-800/70 border border-white/10 rounded px-2 py-2 text-sm">
+              <option>US</option>
+              <option>UK</option>
+              <option>US+UK</option>
+              <option>Worldwide</option>
+            </select>
+          </div>
+          <div>
+            <div className="text-xs text-white/60 mb-1">Persona</div>
+            <select value={persona} onChange={(e)=>setPersona(e.target.value as any)} className="w-full bg-charcoal-800/70 border border-white/10 rounded px-2 py-2 text-sm">
+              <option>Social Strategist</option>
+              <option>Creative Lead</option>
+              <option>Content Creator</option>
+            </select>
+          </div>
+        </div>
+
         <textarea
           className="w-full bg-charcoal-800/50 border border-white/10 rounded-lg p-4 text-base placeholder-white/40 resize-none focus:border-ralph-pink/50 focus:bg-charcoal-800/70 transition-all min-h-[120px]"
           placeholder="Describe your story concept, creative idea, or project vision..."

@@ -19,6 +19,7 @@ import versionsRoutes from './routes/versions.js'
 import conversationRoutes from './routes/conversation.js'
 import ingestionRoutes from './routes/ingestion.js'
 import { authMiddleware, attachRls } from './middleware/auth.js'
+import { startTrendCollector } from './services/scheduler/trend-collector.js'
 
 dotenv.config()
 const logger = pino({ level: process.env.NODE_ENV === 'production' ? 'info' : 'debug' })
@@ -63,7 +64,12 @@ async function main() {
   })
 
   const port = Number(process.env.PORT || 8080)
-  app.listen(port, () => logger.info(`API listening on ${port}`))
+  app.listen(port, () => {
+    logger.info(`API listening on ${port}`)
+
+    // Start daily trend collection scheduler
+    startTrendCollector()
+  })
 }
 
 function reqLog(req: express.Request) {

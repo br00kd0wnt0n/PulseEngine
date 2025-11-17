@@ -20,25 +20,25 @@ export const api = {
     '/ai/narrative',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ graph, focusId }) }
   ),
-  score: (concept: string, graph: any) => request<any>(
+  score: (concept: string, graph: any, opts?: { persona?: string; region?: string }) => request<any>(
     '/ai/score',
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph }) }
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph, ...(opts||{}) }) }
   ),
-  enhancements: (concept: string, graph: any) => request<any>(
+  enhancements: (concept: string, graph: any, opts?: { persona?: string; region?: string }) => request<any>(
     '/ai/enhancements',
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph }) }
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph, ...(opts||{}) }) }
   ),
-  recommendations: (concept: string, graph: any) => request<any>(
+  recommendations: (concept: string, graph: any, opts?: { persona?: string; region?: string }) => request<any>(
     '/ai/recommendations',
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph }) }
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph, ...(opts||{}) }) }
   ),
-  debrief: (concept: string) => request<any>(
+  debrief: (concept: string, opts?: { persona?: string; region?: string }) => request<any>(
     '/ai/debrief',
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept }) }
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(opts||{}) }) }
   ),
-  opportunities: (concept: string) => request<any>(
+  opportunities: (concept: string, opts?: { persona?: string; region?: string }) => request<any>(
     '/ai/opportunities',
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept }) }
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(opts||{}) }) }
   ),
   createProject: (payload: { concept: string; persona?: string; platforms?: string[]; areasOfInterest?: string[]; graph?: any; focusId?: string | null }) =>
     request<any>('/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),

@@ -7,7 +7,7 @@ import { scoreConcept } from '../../services/scoring'
 import { logActivity } from '../../utils/activity'
 
 export default function AtAGlanceV2() {
-  const { concept } = useDashboard()
+  const { concept, region, persona } = useDashboard()
   const { snapshot } = useTrends()
   const [vals, setVals] = useState<{ narrative: number; peak: number; cross: number }>({ narrative: 0, peak: 0, cross: 0 })
   const [prev, setPrev] = useState<{ narrative?: number; peak?: number; cross?: number }>({})
@@ -36,9 +36,10 @@ export default function AtAGlanceV2() {
     setHowText('Analyzing story fit with trends…')
     ;(async () => {
       try {
+        const modConcept = concept ? `${concept} (Region: ${region}; Persona: ${persona})` : ''
         const [s, r] = await Promise.all([
-          api.score(concept || '', snapshot()),
-          api.recommendations(concept || '', snapshot()),
+          api.score(modConcept || '', snapshot()),
+          api.recommendations(modConcept || '', snapshot()),
         ])
         if (cancel) return
         const narrative = Math.round((s?.scores?.narrativeStrength ?? analysis.scores.narrativeStrength) || 0)
@@ -69,7 +70,7 @@ export default function AtAGlanceV2() {
       }
     })()
     return () => { cancel = true }
-  }, [analysis, concept, snapshot])
+  }, [analysis, concept, region, persona, snapshot])
 
   // bump on events already handled by refreshKey
 

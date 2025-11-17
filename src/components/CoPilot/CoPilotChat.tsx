@@ -8,6 +8,7 @@ export default function CoPilotChat() {
   const { processed, addFiles, addUrl } = useUpload()
   const [items, setItems] = useState<any[]>([])
   const [text, setText] = useState('')
+  const [typing, setTyping] = useState(false)
   const inputRef = useRef<HTMLInputElement|null>(null)
   const fileRef = useRef<HTMLInputElement|null>(null)
   const activeProjectId = useMemo(() => {
@@ -83,13 +84,21 @@ export default function CoPilotChat() {
     function onSay(e: any) {
       const content = (e?.detail?.text || '').trim()
       if (!content) return
-      const key = `conv:${activeProjectId}`
-      const msg = { id: 'ai-'+Date.now(), role: 'ai', content, createdAt: new Date().toISOString() }
-      setItems((it) => {
-        const next = [...it, msg]
-        try { localStorage.setItem(key, JSON.stringify(next)) } catch {}
-        return next
-      })
+
+      // Show typing indicator
+      setTyping(true)
+
+      // Wait a moment then add message
+      setTimeout(() => {
+        const key = `conv:${activeProjectId}`
+        const msg = { id: 'ai-'+Date.now(), role: 'ai', content, createdAt: new Date().toISOString() }
+        setItems((it) => {
+          const next = [...it, msg]
+          try { localStorage.setItem(key, JSON.stringify(next)) } catch {}
+          return next
+        })
+        setTyping(false)
+      }, 800)
     }
     window.addEventListener('copilot-say' as any, onSay as any)
     return () => window.removeEventListener('copilot-say' as any, onSay as any)
@@ -115,6 +124,11 @@ export default function CoPilotChat() {
             {items.map((m, i) => (
               <div key={m.id || i} className={`p-2 rounded ${m.role === 'user' ? 'bg-white/5' : 'bg-ralph-purple/10'}`}>{m.content}</div>
             ))}
+            {typing && (
+              <div className="p-2 rounded bg-ralph-purple/10 text-white/50 text-xs italic animate-pulse">
+                Co-pilot typing...
+              </div>
+            )}
           </div>
           {/* Quick wins removed for now */}
           {/* Input */}

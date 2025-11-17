@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../services/api'
+import { CitationToken } from '../shared/CitationOverlay'
 import { useDashboard } from '../../context/DashboardContext'
+import LoadingSpinner from '../Common/LoadingSpinner'
 
 export default function DebriefOpportunities() {
   const { concept } = useDashboard()
@@ -9,6 +11,7 @@ export default function DebriefOpportunities() {
   const [opps, setOpps] = useState<{ opportunities: { title: string; why: string; impact: number }[]; rationale?: string; sources?: any } | null>(null)
   const [loading, setLoading] = useState(false)
   const [asOf, setAsOf] = useState<string>('')
+  const [integrated, setIntegrated] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let cancel = false
@@ -16,7 +19,11 @@ export default function DebriefOpportunities() {
     setLoading(true)
     ;(async () => {
       try {
-        const [d, o] = await Promise.all([api.debrief(concept), api.opportunities(concept)])
+        const region = (localStorage.getItem('region') || '').replace(/"/g,'')
+        const persona = (localStorage.getItem('persona') || '').replace(/"/g,'')
+        const mods = [region?`Region: ${region}`:'', persona?`Persona: ${persona}`:''].filter(Boolean).join('; ')
+        const modConcept = mods ? `${concept} (${mods})` : concept
+        const [d, o] = await Promise.all([api.debrief(modConcept), api.opportunities(modConcept)])
         if (!cancel) {
           setDebrief(d); setOpps(o); setAsOf(new Date().toLocaleString())
           try {
@@ -37,10 +44,14 @@ export default function DebriefOpportunities() {
     <div className="panel module p-4">
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold">DEBRIEF + OPPORTUNITIES</div>
-        {asOf && <div className="text-[11px] text-white/50">As of {asOf}</div>}
+        <div className="text-[11px] text-white/50 flex items-center gap-2">
+          {asOf && <span>As of {asOf}</span>}
+          {/* Persona attribution */}
+          {(() => { try { const p = JSON.parse(localStorage.getItem('persona')||'""'); return p ? <span>Persona considered: {p}</span> : null } catch { return null } })()}
+        </div>
       </div>
       {loading && (
-        <div className="text-xs text-white/60">Analyzing concept and context… generating debrief and ranked opportunities.</div>
+        <LoadingSpinner text="Analyzing concept and context… generating debrief and ranked opportunities." />
       )}
       {!loading && (
         <div className="grid lg:grid-cols-2 gap-4">
@@ -50,19 +61,38 @@ export default function DebriefOpportunities() {
             <div>
               <div className="text-xs text-white/60 mb-1">Key Points</div>
               <ul className="list-disc pl-5 space-y-1">
-                {debrief?.keyPoints?.map((p,i)=>(<li key={i} className="text-white/80">{p}</li>))}
+                {(debrief?.keyPoints || []).map((p,i)=>{
+                  // Map first two points to top trend references when available
+                  const core = (debrief?.sources?.core || []) as string[]
+                  const trends = core.filter(x => x.startsWith('trend:')).map(x => x.replace('trend:',''))
+                  const t = trends[i]
+                  return (
+                    <li key={i} className="text-white/80">
+                      {p}
+                      {t && i < 2 && (
+                        <span className="ml-1 align-middle"><CitationToken id={i+1} label={`Trend: ${t}`} detail={`Referenced trend: ${t}`} /></span>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           <div className="panel p-3 bg-ralph-teal/15 border border-ralph-teal/30">
             <div className="text-xs text-white/70 mb-1">Did You Know</div>
             <div className="flex flex-wrap gap-2">
-              {debrief?.didYouKnow?.map((x,i)=>(<span key={i} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-xs">{x}</span>))}
+              {debrief?.didYouKnow?.map((x,i)=>(
+                <span key={i} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-xs">
+                  {x} <span className="ml-1 align-middle text-ralph-pink">[{i+1}]</span>
+                </span>
+              ))}
             </div>
           </div>
           <Attribution sources={debrief?.sources} />
         </div>
         <div className="space-y-2 text-sm">
-          {opps?.opportunities?.map((o,i)=>(
+          {opps?.opportunities?.map((o,i)=>{
+            const isIntegrated = integrated.has(o.title)
+            return (
             <div key={i} className="panel p-2">
               <div className="flex items-center justify-between">
                 <div className="font-medium text-white/90">{o.title}</div>
@@ -70,10 +100,17 @@ export default function DebriefOpportunities() {
               </div>
               <div className="text-white/70 text-xs mt-1">{o.why}</div>
               <div className="mt-2 flex items-center gap-2">
-                <button onClick={() => integrateOpportunity(o)} className="text-[11px] px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10">Integrate</button>
+                <button
+                  onClick={() => { integrateOpportunity(o); setIntegrated(s => new Set(s).add(o.title)) }}
+                  className={`text-[11px] px-2 py-1 rounded border ${isIntegrated ? 'border-ralph-teal/40 bg-ralph-teal/20 text-white/90' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                  disabled={isIntegrated}
+                >
+                  {isIntegrated ? 'Added to Narrative' : 'Integrate'}
+                </button>
               </div>
             </div>
-          ))}
+            )
+          })}
           {opps?.rationale && <div className="text-xs text-white/50">{opps.rationale}</div>}
           <Attribution sources={opps?.sources} />
         </div>
@@ -99,13 +136,22 @@ function Attribution({ sources }: { sources?: any }) {
 }
 
 function integrateOpportunity(o: { title: string; why: string; impact: number }) {
-  const text = `Proposed component: ${o.title} — ${o.why}`
   try {
-    window.dispatchEvent(new CustomEvent('open-chat'))
-    window.dispatchEvent(new CustomEvent('copilot-insert', { detail: { text } }))
     const target = guessTarget(o.title)
+    const targetLabel = target ? ` to ${target.charAt(0).toUpperCase() + target.slice(1)}` : ''
+
+    // Apply to narrative framework if target found
     if (target) window.dispatchEvent(new CustomEvent('nf-apply', { detail: { target, text: o.title } }))
+
+    // Co-pilot confirmation message
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('copilot-say', {
+        detail: { text: `Added "${o.title}"${targetLabel}. ${o.why} This will update the narrative structure and concept proposal.` }
+      }))
+    }, 100)
+
     window.dispatchEvent(new CustomEvent('conversation-updated'))
+    window.dispatchEvent(new CustomEvent('debrief-interaction'))
   } catch {}
 }
 

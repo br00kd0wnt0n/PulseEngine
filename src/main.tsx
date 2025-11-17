@@ -10,9 +10,7 @@ import Creators from './pages/Creators'
 import Insights from './pages/Insights'
 import AdminDashboard from './pages/AdminDashboard'
 import RKB from './pages/RKB'
-import DashboardCoPilot from './pages/DashboardCoPilot'
-import DashboardCoPilotPlus from './pages/DashboardCoPilotPlus'
-import DashboardProgressive from './pages/DashboardProgressive'
+// Removed alternative views; Classic only with persistent Co‑Pilot
 import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
 import { ThemeProvider } from './context/ThemeContext'
@@ -29,8 +27,7 @@ const router = createBrowserRouter([
     path: '/',
     element: <App />,
     children: [
-      { index: true, element: <DashboardProgressive /> },
-      { path: 'classic', element: <Dashboard /> },
+      { index: true, element: <Dashboard /> },
       { path: 'trends', element: <Trends /> },
       { path: 'upload', element: <Upload /> },
       { path: 'creators', element: <Creators /> },
@@ -39,9 +36,7 @@ const router = createBrowserRouter([
       { path: 'projects/:id', element: <ProjectDetail /> },
       { path: 'admin', element: <AdminDashboard /> },
       { path: 'rkb', element: <RKB /> },
-      { path: 'copilot', element: <DashboardCoPilot /> },
-      { path: 'copilot2', element: <DashboardCoPilotPlus /> },
-      { path: 'progressive', element: <DashboardProgressive /> },
+      // Alternate view routes removed
     ],
   },
 ])

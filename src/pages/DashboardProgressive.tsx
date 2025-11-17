@@ -21,6 +21,7 @@ export default function DashboardProgressive() {
 
   const projectId = useMemo(() => { try { return localStorage.getItem('activeProjectId') || 'local' } catch { return 'local' } }, [])
   const storageKey = `progressive:stage:${projectId}`
+  const [showNarrative, setShowNarrative] = useState(false)
 
   // Load/save stage
   useEffect(() => {
@@ -28,6 +29,37 @@ export default function DashboardProgressive() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey])
   useEffect(() => { try { localStorage.setItem(storageKey, stage) } catch {} }, [stage, storageKey])
+
+  // Load/save narrative visibility
+  useEffect(() => {
+    try { const v = localStorage.getItem(`narrative:visible:${projectId}`); if (v === 'true') setShowNarrative(true) } catch {}
+  }, [projectId])
+  useEffect(() => {
+    try { localStorage.setItem(`narrative:visible:${projectId}`, showNarrative ? 'true' : 'false') } catch {}
+  }, [showNarrative, projectId])
+
+  // Track user interactions to reveal Narrative Deconstruction
+  useEffect(() => {
+    function onInteraction() {
+      if (!showNarrative) {
+        setShowNarrative(true)
+        // Trigger Co-pilot prompt
+        setTimeout(() => {
+          try {
+            window.dispatchEvent(new CustomEvent('copilot-say', {
+              detail: { text: 'Are you ready to progress to Narrative Structure? We can always come back to refine later…' }
+            }))
+          } catch {}
+        }, 500)
+      }
+    }
+    window.addEventListener('debrief-interaction', onInteraction as any)
+    window.addEventListener('conversation-updated', onInteraction as any)
+    return () => {
+      window.removeEventListener('debrief-interaction', onInteraction as any)
+      window.removeEventListener('conversation-updated', onInteraction as any)
+    }
+  }, [showNarrative])
 
   // Advance to foundation after initial submit
   useEffect(() => { if (activated && stage === 'initial') setStage('foundation') }, [activated, stage])
@@ -56,6 +88,17 @@ export default function DashboardProgressive() {
     }, 100)
     return () => clearTimeout(t)
   }, [stage])
+
+  // Auto-scroll when Narrative Deconstruction appears
+  useEffect(() => {
+    if (showNarrative) {
+      const t = setTimeout(() => {
+        const el = document.getElementById('anchor-narrative')
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 600)
+      return () => clearTimeout(t)
+    }
+  }, [showNarrative])
 
   // Co‑Pilot guidance prompts per stage + idle follow-ups
   useEffect(() => {
@@ -138,8 +181,8 @@ export default function DashboardProgressive() {
             </div>
             {/* DEBRIEF + OPPORTUNITIES */}
             <div id="anchor-debrief"><DebriefOpportunities /></div>
-            {/* Narrative Framework */}
-            <NarrativeFramework />
+            {/* Narrative Framework - only show after user interaction */}
+            {showNarrative && <div id="anchor-narrative"><NarrativeFramework /></div>}
             {/* Depth & beyond */}
             {(stage === 'depth' || stage === 'full') && (
               <div id="anchor-scoring"><ScoringEnhancements /></div>
@@ -177,7 +220,10 @@ function Stepper({ stage, onNext, onBack }: { stage: Stage; onNext: () => void; 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-[11px] text-white/60">
           {steps.map((s, i) => (
-            <div key={s.key} className={`px-2 py-1 rounded ${i === idx ? 'bg-ralph-teal/20 border border-ralph-teal/40 text-white' : 'bg-white/5 border border-white/10'}`}>{s.label}</div>
+            <div key={s.key} className="flex items-center gap-2">
+              <div className={`px-2 py-1 rounded ${i === idx ? 'bg-ralph-teal/20 border border-ralph-teal/40 text-white' : 'bg-white/5 border border-white/10'}`}>{s.label}</div>
+              {i < steps.length - 1 && <span className="text-white/40">&gt;</span>}
+            </div>
           ))}
         </div>
         <div className="flex items-center gap-2">

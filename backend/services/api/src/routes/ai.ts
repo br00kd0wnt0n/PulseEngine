@@ -34,12 +34,12 @@ router.post('/score', async (req, res) => {
 })
 
 router.post('/recommendations', async (req, res) => {
-  const { concept, graph } = req.body || {}
+  const { concept, graph, persona } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
     // Extract userId from request if authenticated (added by authMiddleware)
     const userId = (req as any).user?.sub || null
-    const data = await generateRecommendations(concept, graph || { nodes: [], links: [] }, userId)
+    const data = await generateRecommendations(concept, graph || { nodes: [], links: [] }, userId, persona || null)
     res.json(data)
   } catch (e: any) {
     res.status(500).json({ error: e?.message || 'failed' })
@@ -47,11 +47,11 @@ router.post('/recommendations', async (req, res) => {
 })
 
 router.post('/debrief', async (req, res) => {
-  const { concept } = req.body || {}
+  const { concept, persona } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
     const userId = (req as any).user?.sub || null
-    const data = await generateDebrief(concept, userId)
+    const data = await generateDebrief(concept, userId, persona || null)
     res.json(data)
   } catch (e: any) {
     res.status(500).json({ error: e?.message || 'failed' })
@@ -59,11 +59,11 @@ router.post('/debrief', async (req, res) => {
 })
 
 router.post('/opportunities', async (req, res) => {
-  const { concept } = req.body || {}
+  const { concept, persona } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
     const userId = (req as any).user?.sub || null
-    const data = await generateOpportunities(concept, userId)
+    const data = await generateOpportunities(concept, userId, persona || null)
     res.json(data)
   } catch (e: any) {
     res.status(500).json({ error: e?.message || 'failed' })
@@ -71,11 +71,11 @@ router.post('/opportunities', async (req, res) => {
 })
 
 router.post('/enhancements', async (req, res) => {
-  const { concept, graph } = req.body || {}
+  const { concept, graph, persona } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
     const userId = (req as any).user?.sub || null
-    const data = await generateEnhancements(concept, graph || { nodes: [], links: [] }, userId)
+    const data = await generateEnhancements(concept, graph || { nodes: [], links: [] }, userId, persona || null)
     res.json(data)
   } catch (e: any) {
     res.status(500).json({ error: e?.message || 'failed' })

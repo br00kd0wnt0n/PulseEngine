@@ -3,6 +3,7 @@ import { useDashboard } from '../../context/DashboardContext'
 import { useTrends } from '../../context/TrendContext'
 import { api } from '../../services/api'
 import { logActivity } from '../../utils/activity'
+import LoadingSpinner from '../Common/LoadingSpinner'
 
 type Block = {
   id: string
@@ -29,6 +30,7 @@ export default function NarrativeFramework() {
   const [dragId, setDragId] = useState<string | null>(null)
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [editing, setEditing] = useState<Record<string, boolean>>({})
+  const [loading, setLoading] = useState(false)
 
   const projectId = useMemo(() => { try { return localStorage.getItem('activeProjectId') || 'local' } catch { return 'local' } }, [])
   const storageKey = `nf:${projectId}`
@@ -101,11 +103,16 @@ export default function NarrativeFramework() {
     let cancel = false
     async function run() {
       if (!concept) return
+      setLoading(true)
       try {
+        const region = (localStorage.getItem('region') || '').replace(/"/g,'')
+        const persona = (localStorage.getItem('persona') || '').replace(/"/g,'')
+        const mods = [region?`Region: ${region}`:'', persona?`Persona: ${persona}`:''].filter(Boolean).join('; ')
+        const modConcept = mods ? `${concept} (${mods})` : concept
         const [recs, deb, opp] = await Promise.all([
-          api.recommendations(concept, snapshot()),
-          api.debrief(concept).catch(()=>null),
-          api.opportunities(concept).catch(()=>null)
+          api.recommendations(modConcept, snapshot()),
+          api.debrief(modConcept).catch(()=>null),
+          api.opportunities(modConcept).catch(()=>null)
         ])
         if (cancel || !recs) return
         setBlocks(bs => bs.map((b) => {
@@ -115,6 +122,7 @@ export default function NarrativeFramework() {
         }))
         try { logActivity('Narrative deconstruction auto‑filled from AI') } catch {}
       } catch {}
+      finally { if (!cancel) setLoading(false) }
     }
     run()
     function refresh() { run() }
@@ -133,6 +141,8 @@ export default function NarrativeFramework() {
         <div className="font-semibold">Narrative Deconstruction</div>
         <div className="text-xs text-white/60">Coherence: <span className="font-semibold text-white/80">{coherence}</span></div>
       </div>
+      {loading && <LoadingSpinner text="Deconstructing narrative structure from AI analysis…" />}
+      {!loading && (
       <div className="relative overflow-x-auto">
         <div className="flex items-stretch gap-3 min-w-full">
           {blocks.map((b, idx) => (
@@ -182,6 +192,7 @@ export default function NarrativeFramework() {
           ))}
         </div>
       </div>
+      )}
     </div>
   )
 }

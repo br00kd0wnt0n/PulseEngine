@@ -12,8 +12,7 @@ const nav = [
   { to: '/projects', label: 'Projects' },
   { to: '/admin', label: 'Backend' },
   { to: '/rkb', label: 'RKB' },
-  { to: '/classic', label: 'Classic Dashboard' },
-  { to: '/progressive', label: 'Progressive View' },
+  // Alternate views removed
 ]
 
 export default function Sidebar() {
