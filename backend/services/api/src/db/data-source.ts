@@ -14,6 +14,9 @@ import { Initial1710000000000 } from '../db/migrations/1710000000000-Initial.js'
 import { Rls1710000001000 } from '../db/migrations/1710000001000-RLS.js'
 import { MvpExtras1710000002000 } from '../db/migrations/1710000002000-MvpExtras.js'
 import { ConversationsVersions1710000003000 } from '../db/migrations/1710000003000-ConversationsVersions.js'
+import { VectorEmbeddings1710000004000 } from '../db/migrations/1710000004000-VectorEmbeddings.js'
+import { ContentAssetsProjectId1710000005000 } from '../db/migrations/1710000005000-ContentAssetsProjectId.js'
+import { PlatformMetrics1710000006000 } from '../db/migrations/1710000006000-PlatformMetrics.js'
 
 dotenv.config()
 
@@ -21,7 +24,15 @@ export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   entities: [User, Creator, Trend, ContentAsset, Project, AICache, PlatformMetric, ProjectVersion, ConversationMessage],
-  migrations: [Initial1710000000000, Rls1710000001000, MvpExtras1710000002000, ConversationsVersions1710000003000],
+  migrations: [
+    Initial1710000000000,
+    Rls1710000001000,
+    MvpExtras1710000002000,
+    ConversationsVersions1710000003000,
+    VectorEmbeddings1710000004000,
+    ContentAssetsProjectId1710000005000,
+    PlatformMetrics1710000006000
+  ],
   synchronize: false,
   logging: false,
 })
