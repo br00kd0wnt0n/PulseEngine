@@ -246,16 +246,17 @@ async function runActor(config: ApifyActorConfig, reportProgress: boolean = fals
   }
 
   try {
-    // Run the actor with maxItems enforced
+    // Run the actor
     const run = await client.actor(config.actorId).call(config.input, {
-      timeout: 300, // 5 minutes max
-      maxItems: config.maxItems // Hard limit on results returned
+      timeout: 300 // 5 minutes max
     })
 
-    // Get results from dataset (limited by maxItems above)
-    const { items } = await client.dataset(run.defaultDatasetId).listItems()
+    // Get results from dataset with explicit limit
+    const { items } = await client.dataset(run.defaultDatasetId).listItems({
+      limit: config.maxItems
+    })
 
-    console.log(`[APIFY] ${config.actorId} returned ${items.length} items`)
+    console.log(`[APIFY] ${config.actorId} returned ${items.length} items (limit: ${config.maxItems})`)
 
     // Store each item in platform_metrics
     const repo = AppDataSource.getRepository(PlatformMetric)
@@ -343,7 +344,12 @@ export function collectAllMetricsAsync(): string {
   ;(async () => {
     try {
       for (const config of ACTORS) {
-        await runActor(config, true) // reportProgress = true
+        try {
+          await runActor(config, true) // reportProgress = true
+        } catch (actorError: any) {
+          console.error(`[APIFY] Actor ${config.actorId} failed, continuing to next:`, actorError?.message || String(actorError))
+          // Don't break the loop - continue to next actor
+        }
       }
       collectionStatus.completeJob()
       console.log(`[APIFY] Job ${jobId} completed successfully`)
