@@ -144,7 +144,7 @@ export async function generateOpportunities(concept: string, userId?: string | n
 }
 
 function summarySig(ctx: RetrievalContext) {
-  const m = [ctx.userContent.length, ctx.coreKnowledge.length, ctx.liveMetrics.length, ctx.predictiveTrends.length]
+  const m = [ctx.projectContent.length, ctx.coreKnowledge.length, ctx.liveMetrics.length, ctx.predictiveTrends.length]
   return m.join('-')
 }
 
@@ -218,19 +218,21 @@ export async function generateRecommendations(
   concept: string,
   graph: TrendGraph,
   userId?: string | null,
-  persona?: string | null
+  persona?: string | null,
+  projectId?: string | null
 ) {
-  console.log('[RAG] generateRecommendations called:', { concept, userId, hasGraph: !!graph })
+  console.log('[RAG] generateRecommendations called:', { concept, userId, projectId, hasGraph: !!graph })
 
   // Retrieve context from all knowledge sources
   const context = await retrieveContext(concept, userId || null, {
     maxResults: 5,
     includeCore: true,
-    includeLive: true
+    includeLive: true,
+    projectId: projectId || null
   })
 
   console.log('[RAG] Context retrieved:', {
-    userContent: context.userContent.length,
+    projectContent: context.projectContent.length,
     coreKnowledge: context.coreKnowledge.length,
     liveMetrics: context.liveMetrics.length,
     predictiveTrends: context.predictiveTrends.length,

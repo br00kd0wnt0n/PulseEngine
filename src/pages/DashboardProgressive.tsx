@@ -14,7 +14,7 @@ import { useUpload } from '../context/UploadContext'
 type Stage = 'initial' | 'foundation' | 'depth' | 'full'
 
 export default function DashboardProgressive() {
-  const { concept, activated } = useDashboard()
+  const { concept, activated, persona, region } = useDashboard() as any
   const prefs = usePreferences()
   const { processed } = useUpload()
   const [stage, setStage] = useState<Stage>('initial')
@@ -170,7 +170,7 @@ export default function DashboardProgressive() {
               <div className="panel p-4 bg-ralph-teal/20 border border-ralph-teal/40">
                 <div className="text-xs text-white/70 mb-1">Current Story</div>
                 <div className="font-semibold truncate" title={concept}>{concept || 'No story yet'}</div>
-                <div className="mt-2 text-xs text-white/70">Persona: {prefs.persona} • Focus: {prefs.platforms.join(', ')} • Areas: {prefs.areasOfInterest.join(', ')}</div>
+                <div className="mt-2 text-xs text-white/70">Persona: {persona} • Region: {region}</div>
               </div>
               <div className="panel p-3">
                 <div className="text-xs text-white/60 mb-1">Context</div>

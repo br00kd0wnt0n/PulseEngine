@@ -64,4 +64,12 @@ export const api = {
   getConversation: (projectId: string) => request<any[]>(`/projects/${projectId}/conversation`),
   postConversation: (projectId: string, payload: { role: 'user'|'ai'; content: string }) =>
     request<any>(`/projects/${projectId}/conversation`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
+
+  // APIFY Admin endpoints
+  collectTrends: () => request<any>('/admin/collect-trends', { method: 'POST' }),
+  getMetricsSummary: () => request<any>('/admin/metrics-summary'),
+  cleanupMetrics: (days: number = 30) => request<any>(
+    '/admin/cleanup-metrics',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days }) }
+  ),
 }

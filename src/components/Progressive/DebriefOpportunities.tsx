@@ -5,7 +5,7 @@ import { useDashboard } from '../../context/DashboardContext'
 import LoadingSpinner from '../Common/LoadingSpinner'
 
 export default function DebriefOpportunities() {
-  const { concept } = useDashboard()
+  const { concept, persona, region } = useDashboard() as any
   // tabs removed; show both sections
   const [debrief, setDebrief] = useState<{ brief: string; summary: string; keyPoints: string[]; didYouKnow: string[]; sources?: any } | null>(null)
   const [opps, setOpps] = useState<{ opportunities: { title: string; why: string; impact: number }[]; rationale?: string; sources?: any } | null>(null)
@@ -19,11 +19,10 @@ export default function DebriefOpportunities() {
     setLoading(true)
     ;(async () => {
       try {
-        const region = (localStorage.getItem('region') || '').replace(/"/g,'')
-        const persona = (localStorage.getItem('persona') || '').replace(/"/g,'')
-        const mods = [region?`Region: ${region}`:'', persona?`Persona: ${persona}`:''].filter(Boolean).join('; ')
-        const modConcept = mods ? `${concept} (${mods})` : concept
-        const [d, o] = await Promise.all([api.debrief(modConcept), api.opportunities(modConcept)])
+        const [d, o] = await Promise.all([
+          api.debrief(concept, { persona, region }),
+          api.opportunities(concept, { persona, region })
+        ])
         if (!cancel) {
           setDebrief(d); setOpps(o); setAsOf(new Date().toLocaleString())
           try {
@@ -98,7 +97,23 @@ export default function DebriefOpportunities() {
                 <div className="font-medium text-white/90">{o.title}</div>
                 <div className="text-xs px-2 py-0.5 rounded border border-white/10 bg-white/5">Impact {o.impact}</div>
               </div>
-              <div className="text-white/70 text-xs mt-1">{o.why}</div>
+              <div className="text-white/70 text-xs mt-1">
+                {o.why}
+                {(() => {
+                  const core = (opps?.sources?.core || []) as string[]
+                  const trends = core.filter(x => x.startsWith('trend:')).map(x => x.replace('trend:',''))
+                  const match = trends.find(t => o.title.toLowerCase().includes(t.toLowerCase()))
+                  if (match && (window as any).__registerCitation) {
+                    const id = (window as any).__registerCitation('Trend', `Opportunity informed by trend: ${match}`)
+                    return id ? <span className="ml-1 align-middle text-ralph-pink">[{id}]</span> : null
+                  }
+                  if ((opps?.sources?.user || []).length && (window as any).__registerCitation) {
+                    const id = (window as any).__registerCitation('Your KB', 'Opportunity informed by your uploaded knowledge base')
+                    return id ? <span className="ml-1 align-middle text-ralph-pink">[{id}]</span> : null
+                  }
+                  return null
+                })()}
+              </div>
               <div className="mt-2 flex items-center gap-2">
                 <button
                   onClick={() => { integrateOpportunity(o); setIntegrated(s => new Set(s).add(o.title)) }}
@@ -113,6 +128,9 @@ export default function DebriefOpportunities() {
           })}
           {opps?.rationale && <div className="text-xs text-white/50">{opps.rationale}</div>}
           <Attribution sources={opps?.sources} />
+          <div className="text-[11px] text-white/60 mt-2">
+            <button onClick={() => { try { window.dispatchEvent(new CustomEvent('open-citation', { detail: { id: 'all' } })) } catch {} }} className="underline hover:text-white/80">View all citations</button>
+          </div>
         </div>
         </div>
       )}

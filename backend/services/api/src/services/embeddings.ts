@@ -7,9 +7,7 @@
 
 import crypto from 'crypto'
 import { AppDataSource } from '../db/data-source.js'
-
-// Simple in-memory cache for embeddings (keyed by text hash)
-const embeddingCache = new Map<string, number[]>()
+import { embeddingCache } from './cache.js'
 
 function textHash(text: string): string {
   return crypto.createHash('sha256').update(text).digest('hex')
@@ -21,10 +19,11 @@ function textHash(text: string): string {
 export async function generateEmbedding(text: string): Promise<number[] | null> {
   const hash = textHash(text)
 
-  // Check cache first
-  if (embeddingCache.has(hash)) {
+  // Check LRU cache first (with TTL expiration)
+  const cached = embeddingCache.get(hash)
+  if (cached) {
     console.log('[EMBEDDING] Cache hit for text:', text.substring(0, 50))
-    return embeddingCache.get(hash)!
+    return cached
   }
 
   const apiKey = process.env.OPENAI_API_KEY
@@ -46,7 +45,7 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
 
     const embedding = response.data[0].embedding
 
-    // Cache the result
+    // Cache the result in LRU cache
     embeddingCache.set(hash, embedding)
 
     return embedding
@@ -67,15 +66,16 @@ export async function generateEmbeddingsBatch(texts: string[]): Promise<(number[
     return texts.map(() => null)
   }
 
-  // Check cache for all texts first
+  // Check LRU cache for all texts first
   const results: (number[] | null)[] = []
   const uncachedTexts: string[] = []
   const uncachedIndexes: number[] = []
 
   for (let i = 0; i < texts.length; i++) {
     const hash = textHash(texts[i])
-    if (embeddingCache.has(hash)) {
-      results[i] = embeddingCache.get(hash)!
+    const cached = embeddingCache.get(hash)
+    if (cached) {
+      results[i] = cached
       console.log(`[EMBEDDING] Cache hit for text ${i+1}/${texts.length}`)
     } else {
       results[i] = null // placeholder

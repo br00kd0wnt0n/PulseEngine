@@ -34,12 +34,12 @@ router.post('/score', async (req, res) => {
 })
 
 router.post('/recommendations', async (req, res) => {
-  const { concept, graph, persona } = req.body || {}
+  const { concept, graph, persona, projectId } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
     // Extract userId from request if authenticated (added by authMiddleware)
     const userId = (req as any).user?.sub || null
-    const data = await generateRecommendations(concept, graph || { nodes: [], links: [] }, userId, persona || null)
+    const data = await generateRecommendations(concept, graph || { nodes: [], links: [] }, userId, persona || null, projectId || null)
     res.json(data)
   } catch (e: any) {
     res.status(500).json({ error: e?.message || 'failed' })

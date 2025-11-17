@@ -107,12 +107,10 @@ export default function NarrativeFramework() {
       try {
         const region = (localStorage.getItem('region') || '').replace(/"/g,'')
         const persona = (localStorage.getItem('persona') || '').replace(/"/g,'')
-        const mods = [region?`Region: ${region}`:'', persona?`Persona: ${persona}`:''].filter(Boolean).join('; ')
-        const modConcept = mods ? `${concept} (${mods})` : concept
         const [recs, deb, opp] = await Promise.all([
-          api.recommendations(modConcept, snapshot()),
-          api.debrief(modConcept).catch(()=>null),
-          api.opportunities(modConcept).catch(()=>null)
+          api.recommendations(concept, snapshot(), { persona, region }),
+          api.debrief(concept, { persona, region }).catch(()=>null),
+          api.opportunities(concept, { persona, region }).catch(()=>null)
         ])
         if (cancel || !recs) return
         setBlocks(bs => bs.map((b) => {

@@ -36,10 +36,9 @@ export default function AtAGlanceV2() {
     setHowText('Analyzing story fit with trends…')
     ;(async () => {
       try {
-        const modConcept = concept ? `${concept} (Region: ${region}; Persona: ${persona})` : ''
         const [s, r] = await Promise.all([
-          api.score(modConcept || '', snapshot()),
-          api.recommendations(modConcept || '', snapshot()),
+          api.score(concept || '', snapshot(), { persona, region }),
+          api.recommendations(concept || '', snapshot(), { persona, region }),
         ])
         if (cancel) return
         const narrative = Math.round((s?.scores?.narrativeStrength ?? analysis.scores.narrativeStrength) || 0)

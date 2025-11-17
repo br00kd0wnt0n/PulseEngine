@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, StatusOverview } from '../services/api'
+import { useToast } from '../context/ToastContext'
 
 function bytes(n: number | null | undefined) {
   if (n == null) return '—'
@@ -14,10 +15,25 @@ export default function TrendsAdmin() {
   const [data, setData] = useState<StatusOverview | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [collecting, setCollecting] = useState(false)
+  const { show } = useToast()
 
   async function load() {
     setLoading(true); setError(null)
     try { const d = await api.statusOverview(); setData(d) } catch (e: any) { setError(String(e)) } finally { setLoading(false) }
+  }
+
+  async function collectTrends() {
+    setCollecting(true)
+    try {
+      await api.collectTrends()
+      show('Trend collection started! Check back in a few minutes.', 'success')
+      await load() // Refresh data
+    } catch (e: any) {
+      show(`Failed to collect trends: ${e.message}`, 'error')
+    } finally {
+      setCollecting(false)
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -30,7 +46,16 @@ export default function TrendsAdmin() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="font-semibold text-lg">Trends API Management</div>
-        <button onClick={load} className="text-xs px-3 py-1.5 rounded border border-white/10 bg-white/5 hover:bg-white/10">Refresh</button>
+        <div className="flex gap-2">
+          <button
+            onClick={collectTrends}
+            disabled={collecting}
+            className="text-xs px-3 py-1.5 rounded border border-white/10 bg-ralph-pink/60 hover:bg-ralph-pink disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {collecting ? 'Collecting...' : 'Collect Trends'}
+          </button>
+          <button onClick={load} className="text-xs px-3 py-1.5 rounded border border-white/10 bg-white/5 hover:bg-white/10">Refresh</button>
+        </div>
       </div>
 
       {loading && <div className="text-white/60 text-sm">Loading…</div>}

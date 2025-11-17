@@ -228,5 +228,104 @@ router.get('/metrics-summary', async (req, res) => {
   }
 })
 
+// Check RKB embedding status
+router.get('/rkb-status', async (req, res) => {
+  try {
+    // Count RKB assets (projectId IS NULL)
+    const totalRkb = await AppDataSource.query(
+      `SELECT COUNT(*) as count FROM content_assets WHERE "projectId" IS NULL`
+    )
+
+    // Count RKB assets WITH embeddings
+    const withEmbeddings = await AppDataSource.query(
+      `SELECT COUNT(*) as count FROM content_assets WHERE "projectId" IS NULL AND embedding IS NOT NULL`
+    )
+
+    // Count RKB assets WITHOUT embeddings
+    const withoutEmbeddings = await AppDataSource.query(
+      `SELECT COUNT(*) as count FROM content_assets WHERE "projectId" IS NULL AND embedding IS NULL`
+    )
+
+    // Sample assets without embeddings
+    const samples = await AppDataSource.query(
+      `SELECT id, name, "createdAt" FROM content_assets WHERE "projectId" IS NULL AND embedding IS NULL LIMIT 10`
+    )
+
+    res.json({
+      ok: true,
+      rkb: {
+        total: parseInt(totalRkb[0].count),
+        withEmbeddings: parseInt(withEmbeddings[0].count),
+        withoutEmbeddings: parseInt(withoutEmbeddings[0].count),
+        samplesWithoutEmbeddings: samples
+      }
+    })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
+// Clear all RKB assets (projectId IS NULL) - USE WITH CAUTION!
+router.post('/clear-rkb', async (req, res) => {
+  try {
+    const { confirm } = req.body
+
+    if (confirm !== 'DELETE_ALL_RKB') {
+      return res.status(400).json({
+        ok: false,
+        error: 'Must provide confirm: "DELETE_ALL_RKB" to proceed',
+        warning: 'This will delete ALL RKB assets (projectId IS NULL). Project-specific assets will NOT be affected.'
+      })
+    }
+
+    // Count before deletion
+    const countBefore = await AppDataSource.query(
+      `SELECT COUNT(*) as count FROM content_assets WHERE "projectId" IS NULL`
+    )
+
+    // Delete all RKB assets
+    const result = await AppDataSource.query(
+      `DELETE FROM content_assets WHERE "projectId" IS NULL`
+    )
+
+    const deletedCount = result[1] || parseInt(countBefore[0].count)
+
+    res.json({
+      ok: true,
+      message: `Deleted ${deletedCount} RKB assets`,
+      deleted: deletedCount,
+      note: 'Project-specific assets (projectId != NULL) were NOT affected'
+    })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
+// Clear RKB assets WITHOUT embeddings only
+router.post('/clear-rkb-no-embeddings', async (req, res) => {
+  try {
+    // Count before deletion
+    const countBefore = await AppDataSource.query(
+      `SELECT COUNT(*) as count FROM content_assets WHERE "projectId" IS NULL AND embedding IS NULL`
+    )
+
+    // Delete RKB assets without embeddings
+    const result = await AppDataSource.query(
+      `DELETE FROM content_assets WHERE "projectId" IS NULL AND embedding IS NULL`
+    )
+
+    const deletedCount = result[1] || parseInt(countBefore[0].count)
+
+    res.json({
+      ok: true,
+      message: `Deleted ${deletedCount} RKB assets without embeddings`,
+      deleted: deletedCount,
+      note: 'RKB assets WITH embeddings were preserved'
+    })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
 export default router
 

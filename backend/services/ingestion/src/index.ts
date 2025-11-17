@@ -46,8 +46,20 @@ async function main() {
       if (!url || !ownerId) return res.status(400).json({ error: 'url and ownerId required' })
       await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
       const parsed = parseUrl(url)
+
+      // Generate embedding for URL content
+      const embeddingText = formatForEmbedding({ name: parsed.title, metadata: parsed.metadata, tags: parsed.tags })
+      const embedding = await generateEmbedding(embeddingText)
+
       const repo = ds.getRepository(ContentAsset)
       const a = repo.create({ name: parsed.title, url, tags: parsed.tags, metadata: parsed.metadata, ownerId, projectId: projectId || null })
+
+      // Set embedding if generated
+      if (embedding) {
+        (a as any).embedding = `[${embedding.join(',')}]`
+        logger.info(`[EMBEDDING] Saved embedding for URL: ${url}`)
+      }
+
       await repo.save(a)
       res.status(201).json(a)
     } catch (e: any) {
@@ -70,8 +82,12 @@ async function main() {
         // 1) In-memory analysis
         const analysis = await analyzeFile(f)
         const insights = deriveInsights(analysis)
-        const embeddings = embedMinimal(analysis)
-        // 2) Compose minimal metadata payload
+
+        // 2) Generate real embeddings for semantic search
+        const embeddingText = formatForEmbedding({ name: f.originalname, metadata: analysis.metadata, tags: analysis.tags })
+        const embedding = await generateEmbedding(embeddingText)
+
+        // 3) Compose minimal metadata payload
         const payload = {
           schema: 'kb.v1',
           ownerId,
@@ -83,11 +99,11 @@ async function main() {
             tags: analysis.tags,
             snippet: (analysis.metadata?.text || '').slice(0, 500),
             insights,
-            embeddings,
+            hasEmbedding: embedding !== null,
           },
           createdAt: new Date().toISOString(),
         }
-        // 3) Encrypt and store to object storage (optional; do not fail ingestion if misconfigured)
+        // 4) Encrypt and store to object storage (optional; do not fail ingestion if misconfigured)
         try {
           const keyId = process.env.DATA_KEY_ID || 'v1'
           const enc = encryptPayload(payload, keyId)
@@ -100,10 +116,24 @@ async function main() {
         } catch (e) {
           req.log?.error({ err: e }, 'object-store-failure-or-encryption-missing')
         }
-        // 4) Persist only light reference row; do not store file
-        const a = repo.create({ name: f.originalname, url: null, tags: analysis.tags, metadata: { insights }, ownerId, projectId })
+        // 5) Persist reference row with embedding
+        const a = repo.create({
+          name: f.originalname,
+          url: null,
+          tags: analysis.tags,
+          metadata: { insights, text: analysis.metadata?.text },
+          ownerId,
+          projectId
+        })
+
+        // Set embedding if generated
+        if (embedding) {
+          (a as any).embedding = `[${embedding.join(',')}]`
+          logger.info(`[EMBEDDING] Saved embedding for: ${f.originalname}`)
+        }
+
         saved.push(await repo.save(a))
-        // 5) Ephemeral buffer auto-dropped by garbage collector
+        // 6) Ephemeral buffer auto-dropped by garbage collector
       }
       res.status(201).json(saved)
     } catch (e: any) {
@@ -120,8 +150,20 @@ async function main() {
       if (!ownerId || !req.file) return res.status(400).json({ error: 'ownerId and file required' })
       await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
       const meta = await analyzeFile(req.file)
+
+      // Generate embedding for PDF content
+      const embeddingText = formatForEmbedding({ name: req.file.originalname, metadata: meta.metadata, tags: meta.tags })
+      const embedding = await generateEmbedding(embeddingText)
+
       const repo = ds.getRepository(ContentAsset)
       const a = repo.create({ name: req.file.originalname, tags: meta.tags, metadata: meta.metadata, ownerId, projectId })
+
+      // Set embedding if generated
+      if (embedding) {
+        (a as any).embedding = `[${embedding.join(',')}]`
+        logger.info(`[EMBEDDING] Saved embedding for PDF: ${req.file.originalname}`)
+      }
+
       await repo.save(a)
       res.status(201).json(a)
     } catch (e: any) {
@@ -185,12 +227,51 @@ function deriveInsights(a: { tags: any; metadata: any }) {
   return { keyPhrases: uniq.slice(0, 8) }
 }
 
-function embedMinimal(a: { metadata: any }) {
-  // Deterministic tiny embedding (placeholder). Replace with model embeddings later.
-  const text: string = a.metadata?.text || ''
-  const hash = crypto.createHash('sha256').update(text).digest()
-  const vec = Array.from(hash.slice(0, 16)).map(b => (b / 255) * 2 - 1)
-  return { dim: 16, values: vec }
+/**
+ * Generate real OpenAI embeddings for content
+ * Uses text-embedding-3-small (1536 dimensions)
+ */
+async function generateEmbedding(text: string): Promise<number[] | null> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    logger.warn('[EMBEDDING] No OPENAI_API_KEY, skipping embedding generation')
+    return null
+  }
+
+  try {
+    const { OpenAI } = await import('openai')
+    const client = new OpenAI({ apiKey })
+
+    logger.info('[EMBEDDING] Generating embedding for content')
+    const response = await client.embeddings.create({
+      model: 'text-embedding-3-small',
+      input: text.substring(0, 8000), // Limit to ~8k chars to stay within token limits
+      encoding_format: 'float'
+    })
+
+    return response.data[0].embedding
+  } catch (error) {
+    logger.error({ err: error }, '[EMBEDDING] Failed to generate embedding')
+    return null
+  }
+}
+
+/**
+ * Format content for embedding generation
+ */
+function formatForEmbedding(asset: { name: string; metadata?: any; tags?: any }): string {
+  const parts = [asset.name]
+
+  if (asset.metadata?.text) {
+    // Include first 500 chars of extracted text
+    parts.push(asset.metadata.text.substring(0, 500))
+  }
+
+  if (asset.tags?.ext) {
+    parts.push(`type: ${asset.tags.ext}`)
+  }
+
+  return parts.join(', ')
 }
 
 function safeName(n: string) { return n.replace(/[^a-zA-Z0-9._-]/g, '_') }

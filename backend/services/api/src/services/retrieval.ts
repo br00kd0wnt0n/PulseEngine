@@ -2,10 +2,14 @@
  * Multi-Source RAG Retrieval Service
  *
  * Retrieves context from multiple knowledge sources:
- * 1. User Personal KB (uploaded files)
- * 2. Core RKB (platform trends, creators, patterns)
+ * 1. Project-Specific Content (user's brief and contextual uploads for current project)
+ * 2. Core RKB (Ralph Knowledge Base: trends, creators, industry examples - projectId IS NULL)
  * 3. Live Social Data (Apify, platform APIs)
  * 4. Predictive Trends (Google Trends, forecasts)
+ *
+ * Architecture:
+ * - Core RKB (projectId = NULL): Industry examples, best practices - available to all users
+ * - Project Content (projectId = UUID): User's contextual uploads - scoped to that project
  */
 
 import { AppDataSource } from '../db/data-source.js'
@@ -37,15 +41,15 @@ function extractKeywords(concept: string): string[] {
 }
 
 export interface RetrievalContext {
-  userContent: string[]      // User's uploaded files
-  coreKnowledge: string[]    // Platform trends, creators, patterns
-  liveMetrics: string[]      // Real-time social data
-  predictiveTrends: string[] // Forecast signals
+  projectContent: string[]    // Project-specific contextual uploads
+  coreKnowledge: string[]     // Core RKB (trends, creators, industry examples)
+  liveMetrics: string[]       // Real-time social data
+  predictiveTrends: string[]  // Forecast signals
   sources: {
-    user: string[]           // Attribution: which user files
-    core: string[]           // Attribution: which core knowledge
-    live: string[]           // Attribution: which APIs
-    predictive: string[]     // Attribution: which forecasts
+    project: string[]         // Attribution: which project files
+    core: string[]            // Attribution: which RKB knowledge
+    live: string[]            // Attribution: which APIs
+    predictive: string[]      // Attribution: which forecasts
   }
 }
 
@@ -55,59 +59,63 @@ export interface RetrievalContext {
 export async function retrieveContext(
   concept: string,
   userId: string | null,
-  options: { maxResults?: number; includeCore?: boolean; includeLive?: boolean } = {}
+  options: { maxResults?: number; includeCore?: boolean; includeLive?: boolean; projectId?: string | null } = {}
 ): Promise<RetrievalContext> {
   console.log('[RETRIEVAL] retrieveContext called:', { concept, userId, options })
-  const { maxResults = 10, includeCore = true, includeLive = true } = options
+  const { maxResults = 10, includeCore = true, includeLive = true, projectId = null } = options
 
   const context: RetrievalContext = {
-    userContent: [],
+    projectContent: [],
     coreKnowledge: [],
     liveMetrics: [],
     predictiveTrends: [],
-    sources: { user: [], core: [], live: [], predictive: [] }
+    sources: { project: [], core: [], live: [], predictive: [] }
   }
 
-  // 1. Query user's personal KB (if logged in)
-  if (userId) {
-    console.log('[RETRIEVAL] Querying user content for userId:', userId)
-    const userAssets = await retrieveUserContent(userId, concept, maxResults)
-    console.log('[RETRIEVAL] User content found:', userAssets.content.length, 'items')
-    context.userContent = userAssets.content
-    context.sources.user = userAssets.sources
-  } else {
-    console.log('[RETRIEVAL] Skipping user content (no userId)')
-  }
+  // Parallelize all retrieval queries for maximum performance
+  console.log('[RETRIEVAL] Running parallel queries:', {
+    projectId: !!projectId,
+    includeCore,
+    includeLive
+  })
 
-  // 2. Query core RKB (platform knowledge)
-  if (includeCore) {
-    console.log('[RETRIEVAL] Querying core knowledge...')
-    const coreData = await retrieveCoreKnowledge(concept, maxResults)
-    console.log('[RETRIEVAL] Core knowledge found:', coreData.content.length, 'items')
-    context.coreKnowledge = coreData.content
-    context.sources.core = coreData.sources
-  }
+  const [projectAssets, coreData, liveData, predictive] = await Promise.all([
+    // 1. Query project-specific content (if projectId provided)
+    projectId
+      ? retrieveProjectContent(projectId, concept, maxResults)
+      : Promise.resolve({ content: [], sources: [] }),
 
-  // 3. Query live social metrics (if enabled)
-  if (includeLive) {
-    console.log('[RETRIEVAL] Querying live metrics...')
-    const liveData = await retrieveLiveMetrics(concept, maxResults)
-    console.log('[RETRIEVAL] Live metrics found:', liveData.content.length, 'items')
-    context.liveMetrics = liveData.content
-    context.sources.live = liveData.sources
-  }
+    // 2. Query core RKB (platform knowledge + industry examples)
+    includeCore
+      ? retrieveCoreKnowledge(concept, maxResults)
+      : Promise.resolve({ content: [], sources: [] }),
 
-  // 4. Query predictive trends
-  if (includeLive) {
-    console.log('[RETRIEVAL] Querying predictive trends...')
-    const predictive = await retrievePredictiveTrends(concept, maxResults)
-    console.log('[RETRIEVAL] Predictive trends found:', predictive.content.length, 'items')
-    context.predictiveTrends = predictive.content
-    context.sources.predictive = predictive.sources
-  }
+    // 3. Query live social metrics (if enabled)
+    includeLive
+      ? retrieveLiveMetrics(concept, maxResults)
+      : Promise.resolve({ content: [], sources: [] }),
+
+    // 4. Query predictive trends
+    includeLive
+      ? retrievePredictiveTrends(concept, maxResults)
+      : Promise.resolve({ content: [], sources: [] })
+  ])
+
+  // Assign results to context
+  context.projectContent = projectAssets.content
+  context.sources.project = projectAssets.sources
+
+  context.coreKnowledge = coreData.content
+  context.sources.core = coreData.sources
+
+  context.liveMetrics = liveData.content
+  context.sources.live = liveData.sources
+
+  context.predictiveTrends = predictive.content
+  context.sources.predictive = predictive.sources
 
   console.log('[RETRIEVAL] Final context:', {
-    userContent: context.userContent.length,
+    projectContent: context.projectContent.length,
     coreKnowledge: context.coreKnowledge.length,
     liveMetrics: context.liveMetrics.length,
     predictiveTrends: context.predictiveTrends.length
@@ -117,51 +125,52 @@ export async function retrieveContext(
 }
 
 /**
- * Retrieve user's uploaded content relevant to concept
+ * Retrieve project-specific contextual uploads relevant to concept
+ * Only returns content_assets where projectId matches (user's brief and context files)
  */
-async function retrieveUserContent(
-  userId: string,
+async function retrieveProjectContent(
+  projectId: string,
   concept: string,
   limit: number
 ): Promise<{ content: string[]; sources: string[] }> {
-  console.log('[USER CONTENT] Retrieving content for user:', userId, 'concept:', concept)
+  console.log('[PROJECT CONTENT] Retrieving content for projectId:', projectId, 'concept:', concept)
 
   // Generate embedding for the concept
   const conceptEmbedding = await generateEmbedding(concept)
 
+  const repo = AppDataSource.getRepository(ContentAsset)
+
   if (!conceptEmbedding) {
     // Fallback to keyword-based text search
-    console.log('[USER CONTENT] No embedding, using keyword-based text search fallback')
+    console.log('[PROJECT CONTENT] No embedding, using keyword-based text search fallback')
 
     const keywords = extractKeywords(concept)
-    console.log('[USER CONTENT] Extracted keywords:', keywords)
+    console.log('[PROJECT CONTENT] Extracted keywords:', keywords)
 
     if (keywords.length === 0) {
-      console.log('[USER CONTENT] No keywords extracted, returning empty results')
+      console.log('[PROJECT CONTENT] No keywords extracted, returning empty results')
       return { content: [], sources: [] }
     }
-
-    const repo = AppDataSource.getRepository(ContentAsset)
 
     // Build OR conditions for each keyword
     const conditions = keywords
       .map((_, i) => `(asset.name ILIKE :keyword${i} OR asset.metadata::text ILIKE :keyword${i} OR asset.tags::text ILIKE :keyword${i})`)
       .join(' OR ')
 
-    const params: any = { userId }
+    const params: any = { projectId }
     keywords.forEach((kw, i) => {
       params[`keyword${i}`] = `%${kw}%`
     })
 
     const assets = await repo
       .createQueryBuilder('asset')
-      .where('asset.ownerId = :userId', { userId })
+      .where('asset.projectId = :projectId', { projectId })
       .andWhere(`(${conditions})`, params)
       .orderBy('asset.createdAt', 'DESC')
       .limit(limit)
       .getMany()
 
-    console.log('[USER CONTENT] Found', assets.length, 'assets matching keywords')
+    console.log('[PROJECT CONTENT] Found', assets.length, 'assets matching keywords')
 
     const content = assets.map(a => {
       const snippet = a.metadata?.insights?.snippet || a.metadata?.text || ''
@@ -170,35 +179,43 @@ async function retrieveUserContent(
     return { content, sources: assets.map(a => a.name) }
   }
 
-  // Use semantic search
-  const assets = await searchSimilar('content_assets', conceptEmbedding, limit, { ownerId: userId })
+  // Use semantic search with projectId filter
+  // Note: searchSimilar currently filters by ownerId, we need to use raw query for projectId
+  const embeddingStr = `[${conceptEmbedding.join(',')}]`
+  const query = `
+    SELECT *, 1 - (embedding <=> $1::vector) as similarity
+    FROM content_assets
+    WHERE embedding IS NOT NULL AND "projectId" = $2
+    ORDER BY embedding <=> $1::vector
+    LIMIT $3
+  `
+  const assets = await AppDataSource.query(query, [embeddingStr, projectId, limit])
 
-  console.log('[USER CONTENT] Found', assets.length, 'similar assets')
+  console.log('[PROJECT CONTENT] Found', assets.length, 'similar project assets')
 
   if (assets.length === 0) {
-    console.log('[USER CONTENT] Semantic search returned no results, falling back to keyword search')
+    console.log('[PROJECT CONTENT] Semantic search returned no results, falling back to keyword search')
     const keywords = extractKeywords(concept)
-    console.log('[USER CONTENT] Extracted keywords for fallback:', keywords)
+    console.log('[PROJECT CONTENT] Extracted keywords for fallback:', keywords)
 
     if (keywords.length > 0) {
-      const repo = AppDataSource.getRepository(ContentAsset)
       const conditions = keywords
         .map((_, i) => `(asset.name ILIKE :keyword${i} OR asset.metadata::text ILIKE :keyword${i} OR asset.tags::text ILIKE :keyword${i})`)
         .join(' OR ')
-      const params: any = { userId }
+      const params: any = { projectId }
       keywords.forEach((kw, i) => {
         params[`keyword${i}`] = `%${kw}%`
       })
 
       const fallbackAssets = await repo
         .createQueryBuilder('asset')
-        .where('asset.ownerId = :userId', { userId })
+        .where('asset.projectId = :projectId', { projectId })
         .andWhere(`(${conditions})`, params)
         .orderBy('asset.createdAt', 'DESC')
         .limit(limit)
         .getMany()
 
-      console.log('[USER CONTENT] Fallback found', fallbackAssets.length, 'assets')
+      console.log('[PROJECT CONTENT] Fallback found', fallbackAssets.length, 'assets')
 
       const content = fallbackAssets.map(a => {
         const snippet = a.metadata?.insights?.snippet || a.metadata?.text || ''
@@ -210,25 +227,26 @@ async function retrieveUserContent(
     return { content: [], sources: [] }
   }
 
-  const content = assets.map(a => {
+  const content = assets.map((a: any) => {
     const snippet = a.metadata?.insights?.snippet || a.metadata?.text || ''
     const similarity = ((a.similarity || 0) * 100).toFixed(1)
     return `[${a.name}] (${similarity}% match): ${snippet}`
   })
 
-  const sources = assets.map(a => a.name)
+  const sources = assets.map((a: any) => a.name)
 
   return { content, sources }
 }
 
 /**
- * Retrieve platform core knowledge (trends, creators, patterns)
+ * Retrieve Core RKB (Ralph Knowledge Base)
+ * Includes: trends, creators, and content_assets where projectId IS NULL (industry examples)
  */
 async function retrieveCoreKnowledge(
   concept: string,
   limit: number
 ): Promise<{ content: string[]; sources: string[] }> {
-  console.log('[CORE] retrieveCoreKnowledge called:', { concept, limit })
+  console.log('[CORE RKB] retrieveCoreKnowledge called:', { concept, limit })
   const content: string[] = []
   const sources: string[] = []
 
@@ -263,7 +281,7 @@ async function retrieveCoreKnowledge(
       .createQueryBuilder('trend')
       .where(trendConditions, trendParams)
       .orderBy('trend.createdAt', 'DESC')
-      .limit(Math.floor(limit / 2))
+      .limit(Math.floor(limit / 3))
       .getMany()
 
     console.log('[CORE] Found', trends.length, 'trends matching keywords')
@@ -290,7 +308,7 @@ async function retrieveCoreKnowledge(
       .createQueryBuilder('creator')
       .where(creatorConditions, creatorParams)
       .orderBy('creator.createdAt', 'DESC')
-      .limit(Math.floor(limit / 2))
+      .limit(Math.floor(limit / 3))
       .getMany()
 
     console.log('[CORE] Found', creators.length, 'creators matching keywords')
@@ -300,14 +318,64 @@ async function retrieveCoreKnowledge(
       sources.push(`creator:${creator.name}`)
     }
 
+    // Search RKB content_assets (projectId IS NULL)
+    const assetRepo = AppDataSource.getRepository(ContentAsset)
+    const assetConditions = keywords
+      .map((_, i) => `(asset.name ILIKE :keyword${i} OR asset.metadata::text ILIKE :keyword${i} OR asset.tags::text ILIKE :keyword${i})`)
+      .join(' OR ')
+
+    const assetParams: any = {}
+    keywords.forEach((kw, i) => {
+      assetParams[`keyword${i}`] = `%${kw}%`
+    })
+
+    const rkbAssets = await assetRepo
+      .createQueryBuilder('asset')
+      .where('asset.projectId IS NULL')
+      .andWhere(`(${assetConditions})`, assetParams)
+      .orderBy('asset.createdAt', 'DESC')
+      .limit(Math.floor(limit / 3))
+      .getMany()
+
+    console.log('[CORE] Found', rkbAssets.length, 'RKB assets matching keywords')
+
+    for (const asset of rkbAssets) {
+      const snippet = asset.metadata?.text || asset.metadata?.insights?.snippet || ''
+      content.push(`RKB Example: ${asset.name} - ${snippet.substring(0, 100)}`)
+      sources.push(`rkb:${asset.name}`)
+    }
+
     return { content, sources }
   }
 
-  // Use semantic search for trends
-  console.log('[CORE] Using semantic search for trends')
-  const trends = await searchSimilar('trends', conceptEmbedding, Math.floor(limit / 2))
-  console.log('[CORE] Found', trends.length, 'similar trends')
+  // Parallelize all three semantic searches for better performance
+  console.log('[CORE] Running parallel semantic searches for trends, creators, and RKB assets')
+  const embeddingStr = `[${conceptEmbedding.join(',')}]`
 
+  const [trends, creators, rkbAssets] = await Promise.all([
+    // Search trends
+    searchSimilar('trends', conceptEmbedding, Math.floor(limit / 3)),
+
+    // Search creators
+    searchSimilar('creators', conceptEmbedding, Math.floor(limit / 3)),
+
+    // Search RKB content_assets (projectId IS NULL)
+    AppDataSource.query(`
+      SELECT *, 1 - (embedding <=> $1::vector) as similarity
+      FROM content_assets
+      WHERE embedding IS NOT NULL AND "projectId" IS NULL
+      ORDER BY embedding <=> $1::vector
+      LIMIT $2
+    `, [embeddingStr, Math.floor(limit / 3)])
+  ])
+
+  console.log('[CORE] Parallel search results:', {
+    trends: trends.length,
+    creators: creators.length,
+    rkbAssets: rkbAssets.length
+  })
+
+  // Process trends results
   for (const trend of trends) {
     const platformHint = trend.signals?.platform || 'multi-platform'
     const similarity = ((trend.similarity || 0) * 100).toFixed(1)
@@ -315,15 +383,19 @@ async function retrieveCoreKnowledge(
     sources.push(`trend:${trend.label}`)
   }
 
-  // Use semantic search for creators
-  console.log('[CORE] Using semantic search for creators')
-  const creators = await searchSimilar('creators', conceptEmbedding, Math.floor(limit / 2))
-  console.log('[CORE] Found', creators.length, 'similar creators')
-
+  // Process creators results
   for (const creator of creators) {
     const similarity = ((creator.similarity || 0) * 100).toFixed(1)
     content.push(`Creator: ${creator.name} (${creator.platform}, ${similarity}% match)`)
     sources.push(`creator:${creator.name}`)
+  }
+
+  // Process RKB assets results
+  for (const asset of rkbAssets) {
+    const snippet = asset.metadata?.text || asset.metadata?.insights?.snippet || ''
+    const similarity = ((asset.similarity || 0) * 100).toFixed(1)
+    content.push(`RKB Example: ${asset.name} (${similarity}% match) - ${snippet.substring(0, 100)}`)
+    sources.push(`rkb:${asset.name}`)
   }
 
   // If semantic search returned no results, fall back to keyword search
@@ -438,20 +510,20 @@ async function retrievePredictiveTrends(
 export function formatContextForPrompt(context: RetrievalContext): string {
   const sections: string[] = []
 
-  if (context.userContent.length > 0) {
-    sections.push(`## Your Knowledge Base:\n${context.userContent.join('\n')}`)
+  if (context.projectContent.length > 0) {
+    sections.push(`## Project Contextual Files:\n${context.projectContent.join('\n')}`)
   }
 
   if (context.coreKnowledge.length > 0) {
-    sections.push(`## Platform Knowledge:\n${context.coreKnowledge.join('\n')}`)
+    sections.push(`## Ralph Knowledge Base (RKB):\n${context.coreKnowledge.join('\n')}`)
   }
 
   if (context.liveMetrics.length > 0) {
-    sections.push(`## Live Trends (Last 7 Days):\n${context.liveMetrics.join('\n')}`)
+    sections.push(`## Live Social Trends (Last 7 Days):\n${context.liveMetrics.join('\n')}`)
   }
 
   if (context.predictiveTrends.length > 0) {
-    sections.push(`## Predicted Trends:\n${context.predictiveTrends.join('\n')}`)
+    sections.push(`## Predicted Trend Forecasts:\n${context.predictiveTrends.join('\n')}`)
   }
 
   return sections.join('\n\n')
