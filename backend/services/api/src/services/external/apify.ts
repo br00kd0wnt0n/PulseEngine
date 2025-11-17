@@ -179,8 +179,12 @@ const ACTORS: ApifyActorConfig[] = [
     metricType: 'trending_topic',
     maxItems: 50, // Global cap enforced by APIFY client
     input: {
-      articleUrls: ['https://en.wikipedia.org/wiki/List_of_Internet_phenomena'],
-      maxDepth: 1
+      pages: [
+        'https://en.wikipedia.org/wiki/List_of_Internet_phenomena',
+        'https://en.wikipedia.org/wiki/Viral_phenomenon',
+        'https://en.wikipedia.org/wiki/Internet_meme'
+      ],
+      content: 'markdown'
     },
     extractData: (item: any) => ({
       engagement: 0,
