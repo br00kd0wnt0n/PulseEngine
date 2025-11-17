@@ -147,8 +147,14 @@ const ACTORS: ApifyActorConfig[] = [
     metricType: 'trending_news',
     maxItems: 50, // Global cap enforced by APIFY client
     input: {
-      queries: ['viral trends', 'social media trends', 'trending now'],
-      maxArticles: 30
+      query: 'viral trends OR social media trends OR trending',
+      topics: [],
+      language: 'US:en',
+      maxItems: 50,
+      fetchArticleDetails: true,
+      proxyConfiguration: {
+        useApifyProxy: true
+      }
     },
     extractData: (item: any) => ({
       engagement: 0, // News doesn't have direct engagement
