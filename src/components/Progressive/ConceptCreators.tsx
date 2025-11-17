@@ -52,7 +52,8 @@ export default function ConceptCreators() {
           </div>
         </div>
         <div>
-          <div className="text-xs text-white/60 mb-1">Top Creators</div>
+          <div className="text-xs text-white/60 mb-1">Need a Creative Partner?</div>
+          <div className="text-[11px] text-white/50 mb-2">Here are some top matches for this project.</div>
           <div className="space-y-2">
             {top.map((c) => (
               <div key={c.id} className="panel p-2">

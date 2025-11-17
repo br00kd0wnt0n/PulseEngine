@@ -11,7 +11,7 @@ import { useDashboard } from '../context/DashboardContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { useUpload } from '../context/UploadContext'
 
-type Stage = 'initial' | 'foundation' | 'depth' | 'full'
+type Stage = 'initial' | 'foundation' | 'narrative' | 'depth' | 'full'
 
 export default function DashboardProgressive() {
   const { concept, activated, persona, region } = useDashboard() as any
@@ -38,28 +38,12 @@ export default function DashboardProgressive() {
     try { localStorage.setItem(`narrative:visible:${projectId}`, showNarrative ? 'true' : 'false') } catch {}
   }, [showNarrative, projectId])
 
-  // Track user interactions to reveal Narrative Deconstruction
+  // Show Narrative Deconstruction after foundation stage is loaded
   useEffect(() => {
-    function onInteraction() {
-      if (!showNarrative) {
-        setShowNarrative(true)
-        // Trigger Co-pilot prompt
-        setTimeout(() => {
-          try {
-            window.dispatchEvent(new CustomEvent('copilot-say', {
-              detail: { text: 'Are you ready to progress to Narrative Structure? We can always come back to refine later…' }
-            }))
-          } catch {}
-        }, 500)
-      }
+    if (stage === 'foundation' || stage === 'narrative' || stage === 'depth' || stage === 'full') {
+      setShowNarrative(true)
     }
-    window.addEventListener('debrief-interaction', onInteraction as any)
-    window.addEventListener('conversation-updated', onInteraction as any)
-    return () => {
-      window.removeEventListener('debrief-interaction', onInteraction as any)
-      window.removeEventListener('conversation-updated', onInteraction as any)
-    }
-  }, [showNarrative])
+  }, [stage])
 
   // Advance to foundation after initial submit
   useEffect(() => { if (activated && stage === 'initial') setStage('foundation') }, [activated, stage])
@@ -70,7 +54,9 @@ export default function DashboardProgressive() {
       const convKey = `conv:${projectId}`
       let convCount = 0
       try { convCount = (JSON.parse(localStorage.getItem(convKey) || '[]') as any[]).length } catch {}
-      if (stage === 'foundation' && convCount >= 1) setStage('depth')
+      // Auto-advance to narrative after debrief is loaded
+      if (stage === 'foundation' && convCount >= 1) setStage('narrative')
+      if (stage === 'narrative' && convCount >= 2) setStage('depth')
       if (stage === 'depth' && convCount >= 3) setStage('full')
     }
     window.addEventListener('conversation-updated', advance as any)
@@ -80,7 +66,7 @@ export default function DashboardProgressive() {
 
   // Subtle auto-scroll when stage advances to reveal new sections
   useEffect(() => {
-    const id = stage === 'foundation' ? 'anchor-debrief' : stage === 'depth' ? 'anchor-scoring' : stage === 'full' ? 'anchor-concept' : ''
+    const id = stage === 'foundation' ? 'anchor-debrief' : stage === 'narrative' ? 'anchor-narrative' : stage === 'depth' ? 'anchor-scoring' : stage === 'full' ? 'anchor-concept' : ''
     if (!id) return
     const t = setTimeout(() => {
       const el = document.getElementById(id)
@@ -120,8 +106,13 @@ export default function DashboardProgressive() {
     if (stage === 'foundation') {
       const oppHint = topOpps.length ? ` For example: ${topOpps.join(', ')}.` : ''
       say(`Read the DEBRIEF + OPPORTUNITIES I put together.${oppHint} Decide if you want to integrate any of the ideas — I can update the narrative for you.`)
-      const didHint = did[0] ? ` “${did[0]}” might spark something.` : ' there might be something that sparks an idea.'
-      idleTimer = setTimeout(() => say(`Check out the DID YOU KNOWs —${didHint}`), 20000)
+      const didHint = did[0] ? ` "${did[0]}" might spark something.` : ' there might be something that sparks an idea.'
+      idleTimer = setTimeout(() => say(`Check out the DID YOU KNOWs —${didHint} Ready to move on? Just let me know…`), 20000)
+    } else if (stage === 'narrative') {
+      const missing = emptyNodes.slice(0,2)
+      const missingHint = missing.length ? ` I still need: ${missing.join(', ')}.` : ''
+      say(`Now review the Narrative Deconstruction.${missingHint} If you agree, continue; if not, click Edit on any node to refine and Save — I will reassess.`)
+      idleTimer = setTimeout(() => say(`Want me to propose a tighter hook or a clearer pivot? Tell me, and I'll integrate it. Ready to move on?`), 20000)
     } else if (stage === 'depth') {
       const missing = emptyNodes.slice(0,2)
       const missingHint = missing.length ? ` I still need: ${missing.join(', ')}.` : ''
@@ -135,10 +126,10 @@ export default function DashboardProgressive() {
         if (typeof score.ttpWeeks === 'number' && score.ttpWeeks > 6) tips.push('time‑to‑peak looks longer — a loopable beat could speed it up')
         if (tips.length) scoreHint = ` Also, ${tips[0]}.`
       }
-      say(`Now review the Narrative Deconstruction.${missingHint}${scoreHint} If you agree, continue; if not, click Edit on any node to refine and Save — I will reassess scores and suggestions.`)
-      idleTimer = setTimeout(() => say(`Want me to propose a tighter hook or a clearer pivot? Tell me, and I’ll integrate it into the framework.`), 20000)
+      say(`Review the scores and enhancements.${scoreHint} If you want to refine, just ask — I can adjust the narrative framework.`)
+      idleTimer = setTimeout(() => say(`The scores look good? Ready to see the final concept + creators?`), 20000)
     } else if (stage === 'full') {
-      say(`Here’s a synthesized concept proposal with top creators attached. Feel free to adjust any narrative nodes and I’ll keep this updated.`)
+      say(`Here's your synthesized concept proposal with creative partners attached. Feel free to adjust any narrative nodes and I'll keep this updated.`)
     }
     function resetIdle() { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null } }
     window.addEventListener('conversation-updated', resetIdle as any)
@@ -188,10 +179,7 @@ export default function DashboardProgressive() {
               <div id="anchor-scoring"><ScoringEnhancements /></div>
             )}
             {stage === 'full' && (
-              <>
-                <div id="anchor-concept"><ConceptCreators /></div>
-                <CreatorPanel />
-              </>
+              <div id="anchor-concept"><ConceptCreators /></div>
             )}
           </div>
           {/* Side Co‑Pilot */}
@@ -210,9 +198,10 @@ export default function DashboardProgressive() {
 function Stepper({ stage, onNext, onBack }: { stage: Stage; onNext: () => void; onBack: () => void }) {
   const steps: { key: Stage; label: string }[] = [
     { key: 'initial', label: 'Brief' },
-    { key: 'foundation', label: 'Narrative Foundation' },
-    { key: 'depth', label: 'Strategic Refinement' },
-    { key: 'full', label: 'Full Proposal' },
+    { key: 'foundation', label: 'Debrief + Opportunities' },
+    { key: 'narrative', label: 'Narrative Deconstruction' },
+    { key: 'depth', label: 'Scoring + Enhancements' },
+    { key: 'full', label: 'Concept + Creators' },
   ]
   const idx = steps.findIndex(s => s.key === stage)
   return (
@@ -235,5 +224,5 @@ function Stepper({ stage, onNext, onBack }: { stage: Stage; onNext: () => void; 
   )
 }
 
-function next(s: Stage): Stage { return s === 'initial' ? 'foundation' : s === 'foundation' ? 'depth' : s === 'depth' ? 'full' : 'full' }
-function prev(s: Stage): Stage { return s === 'full' ? 'depth' : s === 'depth' ? 'foundation' : s === 'foundation' ? 'initial' : 'initial' }
+function next(s: Stage): Stage { return s === 'initial' ? 'foundation' : s === 'foundation' ? 'narrative' : s === 'narrative' ? 'depth' : s === 'depth' ? 'full' : 'full' }
+function prev(s: Stage): Stage { return s === 'full' ? 'depth' : s === 'depth' ? 'narrative' : s === 'narrative' ? 'foundation' : s === 'foundation' ? 'initial' : 'initial' }
