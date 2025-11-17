@@ -201,15 +201,19 @@ const ACTORS: ApifyActorConfig[] = [
     })
   },
 
-  // 7. Fandom Scraper
+  // 7. Fandom Scraper - Entertainment trending topics
   {
     actorId: 'kuaima/Fandom',
     platform: 'fandom',
     metricType: 'trending_fandom',
     maxItems: 50, // Global cap enforced by APIFY client
     input: {
-      wikis: ['tiktok', 'youtube', 'memes'],
-      maxPages: 20
+      startUrls: [
+        { url: 'https://www.fandom.com/topics/movies' },
+        { url: 'https://www.fandom.com/topics/games' },
+        { url: 'https://www.fandom.com/topics/tv' }
+      ],
+      download_image: false
     },
     extractData: (item: any) => ({
       engagement: item.views || 0,
