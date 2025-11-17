@@ -60,101 +60,129 @@ export async function narrativeFromTrends(graph: TrendGraph, focusId?: string | 
 
 // Debrief: recap + key points + did-you-know insights
 export async function generateDebrief(concept: string, userId?: string | null, persona?: string | null) {
-  let ctx
   try {
-    ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
-  } catch (err) {
-    console.error('[AI] retrieveContext failed for debrief:', err)
-    // Fallback to empty context if retrieval fails
-    ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
-  }
-  const cacheKey = sha({ t: 'debrief', concept, s: summarySig(ctx) })
-  const cached = await cacheGet<any>(cacheKey)
-  if (cached) return cached
-  const apiKey = process.env.OPENAI_API_KEY
-  if (apiKey) {
+    let ctx
     try {
-      const { OpenAI } = await import('openai')
-      const client = new OpenAI({ apiKey })
-      const model = process.env.MODEL_NAME || 'gpt-4o-mini'
-      const contextStr = formatContextForPrompt(ctx)
-      const prompt = `Persona: ${persona || 'General'}\nConcept: "${concept}"\n\n`+
-        (contextStr?`Context (concise):\n${contextStr}\n\n`:'')+
-        `Return JSON with brief (2–3 sentences), summary (1 sentence), keyPoints (4 bullets), didYouKnow (3 items).`
-      const resp = await client.chat.completions.create({
-        model,
-        messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
-        temperature: 0.5,
-        max_tokens: 350,
-      })
-      const raw = resp.choices?.[0]?.message?.content || '{}'
+      ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
+    } catch (err) {
+      console.error('[AI] retrieveContext failed for debrief:', err)
+      // Fallback to empty context if retrieval fails
+      ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
+    }
+    const cacheKey = sha({ t: 'debrief', concept, s: summarySig(ctx) })
+    const cached = await cacheGet<any>(cacheKey)
+    if (cached) return cached
+    const apiKey = process.env.OPENAI_API_KEY
+    if (apiKey) {
       try {
-        const parsed = JSON.parse(raw)
-        const withSources = { ...parsed, sources: ctx.sources }
-        await cacheSet(cacheKey, withSources)
-        return withSources
+        const { OpenAI } = await import('openai')
+        const client = new OpenAI({ apiKey })
+        const model = process.env.MODEL_NAME || 'gpt-4o-mini'
+        const contextStr = formatContextForPrompt(ctx)
+        const prompt = `Persona: ${persona || 'General'}\nConcept: "${concept}"\n\n`+
+          (contextStr?`Context (concise):\n${contextStr}\n\n`:'')+
+          `Return JSON with brief (2–3 sentences), summary (1 sentence), keyPoints (4 bullets), didYouKnow (3 items).`
+        const resp = await client.chat.completions.create({
+          model,
+          messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
+          temperature: 0.5,
+          max_tokens: 350,
+        })
+        const raw = resp.choices?.[0]?.message?.content || '{}'
+        try {
+          const parsed = JSON.parse(raw)
+          const withSources = { ...parsed, sources: ctx.sources }
+          await cacheSet(cacheKey, withSources)
+          return withSources
+        } catch {}
       } catch {}
-    } catch {}
+    }
+    const heuristic = {
+      brief: `Recap for "${concept}": short‑form concept with collaborative hooks and platform‑native framing.`,
+      summary: 'Opportunity in native hooks + remixable beats.',
+      keyPoints: [ 'Clarify the promise in line one', 'Define a loopable moment', 'Map platform trims', 'Plan 1 macro + 3 micro collabs' ],
+      didYouKnow: [ 'Loops increase completion by 18–35%', 'Remix prompts lift creator adoption', 'Native captions boost recall' ],
+      sources: ctx.sources,
+    }
+    await cacheSet(cacheKey, heuristic)
+    return heuristic
+  } catch (err) {
+    console.error('[AI] generateDebrief failed:', err)
+    // Return minimal fallback response if everything fails
+    return {
+      brief: `Exploring "${concept}": a concept with collaborative potential.`,
+      summary: 'Analyzing opportunities.',
+      keyPoints: [ 'Define the core hook', 'Identify platform opportunities', 'Plan collaborations', 'Build engagement loops' ],
+      didYouKnow: [ 'Short-form content drives 60%+ social engagement', 'Collaborations expand reach 3-5x', 'Platform-native formats perform better' ],
+      sources: { project: [], core: [], live: [], predictive: [] },
+    }
   }
-  const heuristic = {
-    brief: `Recap for "${concept}": short‑form concept with collaborative hooks and platform‑native framing.`,
-    summary: 'Opportunity in native hooks + remixable beats.',
-    keyPoints: [ 'Clarify the promise in line one', 'Define a loopable moment', 'Map platform trims', 'Plan 1 macro + 3 micro collabs' ],
-    didYouKnow: [ 'Loops increase completion by 18–35%', 'Remix prompts lift creator adoption', 'Native captions boost recall' ],
-    sources: ctx.sources,
-  }
-  await cacheSet(cacheKey, heuristic)
-  return heuristic
 }
 
 // Opportunities: ranked with impact
 export async function generateOpportunities(concept: string, userId?: string | null, persona?: string | null) {
-  let ctx
   try {
-    ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
-  } catch (err) {
-    console.error('[AI] retrieveContext failed for opportunities:', err)
-    // Fallback to empty context if retrieval fails
-    ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
-  }
-  const cacheKey = sha({ t: 'opps', concept, s: summarySig(ctx) })
-  const cached = await cacheGet<any>(cacheKey)
-  if (cached) return cached
-  const apiKey = process.env.OPENAI_API_KEY
-  if (apiKey) {
+    let ctx
     try {
-      const { OpenAI } = await import('openai')
-      const client = new OpenAI({ apiKey })
-      const model = process.env.MODEL_NAME || 'gpt-4o-mini'
-      const contextStr = formatContextForPrompt(ctx)
-      const prompt = `Persona: ${persona || 'General'}\nConcept: "${concept}"\n\n`+
-        (contextStr?`Context (concise):\n${contextStr}\n\n`:'')+
-        `Identify 5 opportunities with title, why, and impact (0-100). Return JSON { opportunities: [{ title, why, impact }], rationale }.`
-      const resp = await client.chat.completions.create({
-        model,
-        messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
-        temperature: 0.6,
-        max_tokens: 380,
-      })
-      const raw = resp.choices?.[0]?.message?.content || '{}'
+      ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
+    } catch (err) {
+      console.error('[AI] retrieveContext failed for opportunities:', err)
+      // Fallback to empty context if retrieval fails
+      ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
+    }
+    const cacheKey = sha({ t: 'opps', concept, s: summarySig(ctx) })
+    const cached = await cacheGet<any>(cacheKey)
+    if (cached) return cached
+    const apiKey = process.env.OPENAI_API_KEY
+    if (apiKey) {
       try {
-        const parsed = JSON.parse(raw)
-        const withSources = { ...parsed, sources: ctx.sources }
-        await cacheSet(cacheKey, withSources)
-        return withSources
+        const { OpenAI } = await import('openai')
+        const client = new OpenAI({ apiKey })
+        const model = process.env.MODEL_NAME || 'gpt-4o-mini'
+        const contextStr = formatContextForPrompt(ctx)
+        const prompt = `Persona: ${persona || 'General'}\nConcept: "${concept}"\n\n`+
+          (contextStr?`Context (concise):\n${contextStr}\n\n`:'')+
+          `Identify 5 opportunities with title, why, and impact (0-100). Return JSON { opportunities: [{ title, why, impact }], rationale }.`
+        const resp = await client.chat.completions.create({
+          model,
+          messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
+          temperature: 0.6,
+          max_tokens: 380,
+        })
+        const raw = resp.choices?.[0]?.message?.content || '{}'
+        try {
+          const parsed = JSON.parse(raw)
+          const withSources = { ...parsed, sources: ctx.sources }
+          await cacheSet(cacheKey, withSources)
+          return withSources
+        } catch {}
       } catch {}
-    } catch {}
+    }
+    const opportunities = [
+      { title: 'Sharpen the opening hook', why: 'Improves comprehension and retention', impact: 78 },
+      { title: 'Add duet/stitch prompt', why: 'Boosts creator participation', impact: 72 },
+      { title: 'Platform-native captions', why: 'Increases message recall', impact: 64 },
+      { title: 'Remixable beat (7–10s)', why: 'Encourages replays and loops', impact: 70 },
+      { title: 'Macro + micro collab mix', why: 'Combines reach with authenticity', impact: 68 },
+    ]
+    const heuristic = { opportunities, rationale: 'Based on common uplift levers across short‑form and collab patterns.', sources: ctx.sources }
+    await cacheSet(cacheKey, heuristic)
+    return heuristic
+  } catch (err) {
+    console.error('[AI] generateOpportunities failed:', err)
+    // Return minimal fallback response if everything fails
+    return {
+      opportunities: [
+        { title: 'Define the core hook', why: 'Clear messaging drives engagement', impact: 75 },
+        { title: 'Platform-specific format', why: 'Native content performs better', impact: 70 },
+        { title: 'Collaboration strategy', why: 'Expands reach and authenticity', impact: 72 },
+        { title: 'Engagement loops', why: 'Increases completion and sharing', impact: 68 },
+        { title: 'Multi-platform distribution', why: 'Maximizes audience reach', impact: 65 },
+      ],
+      rationale: 'Core opportunities for content optimization.',
+      sources: { project: [], core: [], live: [], predictive: [] },
+    }
   }
-  const opportunities = [
-    { title: 'Sharpen the opening hook', why: 'Improves comprehension and retention', impact: 78 },
-    { title: 'Add duet/stitch prompt', why: 'Boosts creator participation', impact: 72 },
-    { title: 'Platform-native captions', why: 'Increases message recall', impact: 64 },
-    { title: 'Remixable beat (7–10s)', why: 'Encourages replays and loops', impact: 70 },
-    { title: 'Macro + micro collab mix', why: 'Combines reach with authenticity', impact: 68 },
-  ]
-  const heuristic = { opportunities, rationale: 'Based on common uplift levers across short‑form and collab patterns.', sources: ctx.sources }
-  await cacheSet(cacheKey, heuristic)
-  return heuristic
 }
 
 function summarySig(ctx: RetrievalContext) {
