@@ -12,6 +12,7 @@ interface ApifyActorConfig {
   platform: string
   metricType: string
   input: Record<string, any>
+  maxItems: number // Global limit enforced by APIFY client
   extractData: (item: any) => { engagement: number; velocity: number; value: Record<string, any>; metadata: Record<string, any> }
 }
 
@@ -24,6 +25,7 @@ const ACTORS: ApifyActorConfig[] = [
     actorId: 'clockworks/tiktok-hashtag-scraper',
     platform: 'tiktok',
     metricType: 'trending_hashtag',
+    maxItems: 100, // Global cap enforced by APIFY client
     input: {
       hashtags: ['viral', 'fyp', 'trending', 'dance', 'ai', 'fashion'],
       resultsPerHashtag: 20,
@@ -53,6 +55,7 @@ const ACTORS: ApifyActorConfig[] = [
     actorId: 'apify/instagram-hashtag-scraper',
     platform: 'instagram',
     metricType: 'trending_hashtag',
+    maxItems: 100, // Global cap enforced by APIFY client
     input: {
       hashtags: ['viral', 'trending', 'reels', 'fashion', 'ai'],
       resultsLimit: 50
@@ -81,9 +84,10 @@ const ACTORS: ApifyActorConfig[] = [
     actorId: 'apidojo/tweet-scraper',
     platform: 'twitter',
     metricType: 'trending_tweet',
+    maxItems: 100, // Global cap enforced by APIFY client - prevents runaway scraping
     input: {
       searchTerms: ['#viral', '#trending', '#ai', '#tech'],
-      maxTweets: 50,
+      maxTweets: 25, // Reduced from 50 - applies per search term
       includeReplies: false
     },
     extractData: (item: any) => ({
@@ -110,6 +114,7 @@ const ACTORS: ApifyActorConfig[] = [
     actorId: 'streamers/youtube-scraper',
     platform: 'youtube',
     metricType: 'trending_video',
+    maxItems: 100, // Global cap enforced by APIFY client
     input: {
       searchKeywords: ['viral', 'trending', 'popular', 'ai', 'tutorial'],
       maxResults: 50
@@ -138,6 +143,7 @@ const ACTORS: ApifyActorConfig[] = [
     actorId: 'lhotanova/google-news-scraper',
     platform: 'news',
     metricType: 'trending_news',
+    maxItems: 50, // Global cap enforced by APIFY client
     input: {
       queries: ['viral trends', 'social media trends', 'trending now'],
       maxArticles: 30
@@ -163,6 +169,7 @@ const ACTORS: ApifyActorConfig[] = [
     actorId: 'jupri/wiki-scraper',
     platform: 'wiki',
     metricType: 'trending_topic',
+    maxItems: 50, // Global cap enforced by APIFY client
     input: {
       articleUrls: ['https://en.wikipedia.org/wiki/List_of_Internet_phenomena'],
       maxDepth: 1
@@ -187,6 +194,7 @@ const ACTORS: ApifyActorConfig[] = [
     actorId: 'kuaima/Fandom',
     platform: 'fandom',
     metricType: 'trending_fandom',
+    maxItems: 50, // Global cap enforced by APIFY client
     input: {
       wikis: ['tiktok', 'youtube', 'memes'],
       maxPages: 20
@@ -222,12 +230,13 @@ async function runActor(config: ApifyActorConfig, reportProgress: boolean = fals
   }
 
   try {
-    // Run the actor
+    // Run the actor with maxItems enforced
     const run = await client.actor(config.actorId).call(config.input, {
-      timeout: 300 // 5 minutes max
+      timeout: 300, // 5 minutes max
+      maxItems: config.maxItems // Hard limit on results returned
     })
 
-    // Get results from dataset
+    // Get results from dataset (limited by maxItems above)
     const { items } = await client.dataset(run.defaultDatasetId).listItems()
 
     console.log(`[APIFY] ${config.actorId} returned ${items.length} items`)

@@ -13,6 +13,7 @@ function bytes(n: number | null | undefined) {
 
 export default function TrendsAdmin() {
   const [data, setData] = useState<StatusOverview | null>(null)
+  const [metricsSummary, setMetricsSummary] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [collecting, setCollecting] = useState(false)
@@ -21,7 +22,14 @@ export default function TrendsAdmin() {
 
   async function load() {
     setLoading(true); setError(null)
-    try { const d = await api.statusOverview(); setData(d) } catch (e: any) { setError(String(e)) } finally { setLoading(false) }
+    try {
+      const [overview, metrics] = await Promise.all([
+        api.statusOverview(),
+        api.getMetricsSummary()
+      ])
+      setData(overview)
+      setMetricsSummary(metrics.summary)
+    } catch (e: any) { setError(String(e)) } finally { setLoading(false) }
   }
 
   async function pollStatus() {
@@ -64,9 +72,20 @@ export default function TrendsAdmin() {
     pollStatus()
   }, [])
 
-  const trendsJob: any = (data as any)?.trends?.job || {}
-  const agents: any[] = (data as any)?.trends?.agents || []
-  const lastRun = trendsJob.lastRun ? new Date(trendsJob.lastRun).toLocaleString() : '—'
+  const totalMetrics = metricsSummary?.total || 0
+  const platformMetrics = metricsSummary?.byPlatform || {}
+  const lastUpdate = metricsSummary?.lastUpdate ? new Date(metricsSummary.lastUpdate).toLocaleString() : '—'
+
+  // Platform display names
+  const platformNames: Record<string, string> = {
+    tiktok: 'TikTok',
+    instagram: 'Instagram',
+    twitter: 'Twitter',
+    youtube: 'YouTube',
+    news: 'News',
+    wiki: 'Wikipedia',
+    fandom: 'Fandom'
+  }
 
   return (
     <div className="space-y-6">
@@ -141,28 +160,34 @@ export default function TrendsAdmin() {
 
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="panel p-3">
-          <div className="text-xs text-white/60">Daily Job</div>
-          <div className="mt-1 text-sm">Last run: {lastRun}</div>
-          <div className="text-sm">Items: {trendsJob.count ?? '—'}</div>
-          <div className="text-sm">Storage: {bytes(trendsJob.storageBytes)}</div>
-          <div className="mt-2 text-[11px] text-white/60">Status: {trendsJob.ok ? 'OK' : 'Issues detected'}</div>
+          <div className="text-xs text-white/60">Collection Summary</div>
+          <div className="mt-1 text-sm">Last updated: {lastUpdate}</div>
+          <div className="text-sm">Total items: {totalMetrics.toLocaleString()}</div>
+          <div className="mt-2 text-[11px] text-white/60">
+            Status: {totalMetrics > 0 ? 'Data Available' : 'No data yet'}
+          </div>
         </div>
         <div className="panel p-3 lg:col-span-2">
-          <div className="text-xs text-white/60 mb-2">Agents</div>
+          <div className="text-xs text-white/60 mb-2">Platform Metrics</div>
           <div className="grid md:grid-cols-2 gap-2">
-            {agents.map((a, i) => (
-              <div className="panel p-2" key={i}>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium">{a.name}</div>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${a.ok?'bg-emerald-500/20 text-emerald-300':'bg-red-500/20 text-red-300'}`}>{a.ok?'OK':'Issue'}</span>
+            {Object.entries(platformNames).map(([key, name]) => {
+              const count = platformMetrics[key] || 0
+              const hasData = count > 0
+              return (
+                <div className="panel p-2" key={key}>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-medium">{name}</div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${hasData ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-white/60'}`}>
+                      {hasData ? 'OK' : 'No data'}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-white/60">Items: {count.toLocaleString()}</div>
+                  {hasData && (
+                    <div className="text-[11px] text-emerald-300">Last updated: {lastUpdate}</div>
+                  )}
                 </div>
-                <div className="text-[11px] text-white/60">Status: {a.status}</div>
-                <div className="text-[11px] text-white/60">Last run: {a.lastRun ? new Date(a.lastRun).toLocaleString() : '—'}</div>
-                {Array.isArray(a.issues) && a.issues.length > 0 && (
-                  <div className="mt-1 text-[11px] text-red-300">{a.issues.join(', ')}</div>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>
