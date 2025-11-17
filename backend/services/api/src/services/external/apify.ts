@@ -79,8 +79,8 @@ const ACTORS: ApifyActorConfig[] = [
     })
   },
 
-  // 3. Tweet Scraper
-  {
+  // 3. Tweet Scraper - DISABLED: actor ignores maxTweets parameter
+  /* {
     actorId: 'apidojo/tweet-scraper',
     platform: 'twitter',
     metricType: 'trending_tweet',
@@ -107,7 +107,7 @@ const ACTORS: ApifyActorConfig[] = [
         url: item.url
       }
     })
-  },
+  }, */
 
   // 4. YouTube Scraper
   {
