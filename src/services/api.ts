@@ -67,6 +67,7 @@ export const api = {
 
   // APIFY Admin endpoints
   collectTrends: () => request<any>('/admin/collect-trends', { method: 'POST' }),
+  getCollectionStatus: () => request<any>('/admin/collect-trends/status'),
   getMetricsSummary: () => request<any>('/admin/metrics-summary'),
   cleanupMetrics: (days: number = 30) => request<any>(
     '/admin/cleanup-metrics',

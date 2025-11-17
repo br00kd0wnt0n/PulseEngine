@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { runSeed } from '../seed/runner.js'
 import { AppDataSource } from '../db/data-source.js'
-import { collectAllMetrics, cleanupOldMetrics, getMetricsSummary } from '../services/external/apify.js'
+import { collectAllMetrics, collectAllMetricsAsync, cleanupOldMetrics, getMetricsSummary, getCollectionStatus } from '../services/external/apify.js'
 
 const router = Router()
 
@@ -198,11 +198,49 @@ router.delete('/projects/clear-all', async (req, res) => {
 
 router.post('/collect-trends', async (req, res) => {
   try {
-    console.log('[ADMIN] Manual trend collection triggered')
-    const results = await collectAllMetrics()
-    res.json({ ok: true, results, message: 'Trend collection complete' })
+    // Check if a collection is already running
+    const currentStatus = getCollectionStatus()
+    if (currentStatus && currentStatus.status === 'running') {
+      return res.status(409).json({
+        ok: false,
+        error: 'Collection already in progress',
+        jobId: currentStatus.jobId,
+        status: currentStatus
+      })
+    }
+
+    console.log('[ADMIN] Manual trend collection triggered (async)')
+    const jobId = collectAllMetricsAsync()
+    res.json({
+      ok: true,
+      jobId,
+      message: 'Trend collection started in background',
+      note: 'Poll /admin/collect-trends/status for progress'
+    })
   } catch (e: any) {
     console.error('[ADMIN] Trend collection failed:', e)
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
+router.get('/collect-trends/status', async (req, res) => {
+  try {
+    const status = getCollectionStatus()
+
+    if (!status) {
+      return res.json({
+        ok: true,
+        status: null,
+        message: 'No collection job running'
+      })
+    }
+
+    res.json({
+      ok: true,
+      status
+    })
+  } catch (e: any) {
+    console.error('[ADMIN] Failed to get collection status:', e)
     res.status(500).json({ ok: false, error: e?.message || String(e) })
   }
 })

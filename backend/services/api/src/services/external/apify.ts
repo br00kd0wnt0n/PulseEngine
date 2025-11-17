@@ -1,6 +1,7 @@
 import { ApifyClient } from 'apify-client'
 import { AppDataSource } from '../../db/data-source.js'
 import { PlatformMetric } from '../../db/entities/PlatformMetric.js'
+import { collectionStatus } from './collection-status.js'
 
 const client = new ApifyClient({
   token: process.env.APIFY_API_TOKEN || ''
@@ -210,8 +211,15 @@ const ACTORS: ApifyActorConfig[] = [
 /**
  * Run a single Apify actor and store results
  */
-async function runActor(config: ApifyActorConfig): Promise<number> {
+async function runActor(config: ApifyActorConfig, reportProgress: boolean = false): Promise<number> {
   console.log(`[APIFY] Running actor: ${config.actorId} for platform: ${config.platform}`)
+
+  if (reportProgress) {
+    collectionStatus.updateActor(config.actorId, {
+      status: 'running',
+      startedAt: new Date()
+    })
+  }
 
   try {
     // Run the actor
@@ -249,15 +257,34 @@ async function runActor(config: ApifyActorConfig): Promise<number> {
     }
 
     console.log(`[APIFY] Saved ${saved}/${items.length} items for ${config.platform}`)
+
+    if (reportProgress) {
+      collectionStatus.updateActor(config.actorId, {
+        status: 'completed',
+        itemsSaved: saved,
+        completedAt: new Date()
+      })
+    }
+
     return saved
-  } catch (error) {
+  } catch (error: any) {
     console.error(`[APIFY] Error running ${config.actorId}:`, error)
+
+    if (reportProgress) {
+      collectionStatus.updateActor(config.actorId, {
+        status: 'failed',
+        error: error?.message || String(error),
+        completedAt: new Date()
+      })
+    }
+
     return 0
   }
 }
 
 /**
- * Run all configured Apify actors
+ * Run all configured Apify actors (SYNCHRONOUS - blocks until complete)
+ * Use this for cron jobs where you want to wait for completion
  */
 export async function collectAllMetrics(): Promise<{ total: number; byPlatform: Record<string, number> }> {
   console.log('[APIFY] Starting collection from all actors...')
@@ -266,13 +293,49 @@ export async function collectAllMetrics(): Promise<{ total: number; byPlatform: 
   let total = 0
 
   for (const config of ACTORS) {
-    const saved = await runActor(config)
+    const saved = await runActor(config, false)
     results[config.platform] = (results[config.platform] || 0) + saved
     total += saved
   }
 
   console.log('[APIFY] Collection complete:', { total, byPlatform: results })
   return { total, byPlatform: results }
+}
+
+/**
+ * Run all configured Apify actors ASYNC (fire-and-forget with progress tracking)
+ * Returns immediately with jobId, collection runs in background
+ */
+export function collectAllMetricsAsync(): string {
+  // Start a new job
+  const jobId = collectionStatus.startJob(
+    ACTORS.map(a => ({ actorId: a.actorId, platform: a.platform }))
+  )
+
+  console.log(`[APIFY] Starting async collection job: ${jobId}`)
+
+  // Run collection in background (don't await)
+  ;(async () => {
+    try {
+      for (const config of ACTORS) {
+        await runActor(config, true) // reportProgress = true
+      }
+      collectionStatus.completeJob()
+      console.log(`[APIFY] Job ${jobId} completed successfully`)
+    } catch (error: any) {
+      collectionStatus.failJob(error?.message || String(error))
+      console.error(`[APIFY] Job ${jobId} failed:`, error)
+    }
+  })()
+
+  return jobId
+}
+
+/**
+ * Get current collection status
+ */
+export function getCollectionStatus() {
+  return collectionStatus.getStatus()
 }
 
 /**
