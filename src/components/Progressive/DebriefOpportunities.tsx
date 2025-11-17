@@ -105,11 +105,11 @@ export default function DebriefOpportunities() {
                   const match = trends.find(t => o.title.toLowerCase().includes(t.toLowerCase()))
                   if (match && (window as any).__registerCitation) {
                     const id = (window as any).__registerCitation('Trend', `Opportunity informed by trend: ${match}`)
-                    return id ? <span className="ml-1 align-middle text-ralph-pink">[{id}]</span> : null
+                    return id ? <span className="ml-1 align-middle"><CitationToken id={id} label="Trend" detail={`Opportunity informed by trend: ${match}`} /></span> : null
                   }
                   if ((opps?.sources?.user || []).length && (window as any).__registerCitation) {
                     const id = (window as any).__registerCitation('Your KB', 'Opportunity informed by your uploaded knowledge base')
-                    return id ? <span className="ml-1 align-middle text-ralph-pink">[{id}]</span> : null
+                    return id ? <span className="ml-1 align-middle"><CitationToken id={id} label="Your KB" detail="Opportunity informed by your uploaded knowledge base" /></span> : null
                   }
                   return null
                 })()}
