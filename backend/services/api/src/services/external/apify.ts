@@ -116,8 +116,10 @@ const ACTORS: ApifyActorConfig[] = [
     metricType: 'trending_video',
     maxItems: 100, // Global cap enforced by APIFY client
     input: {
-      searchKeywords: ['viral', 'trending', 'popular'],
-      maxResults: 100
+      searchQueries: ['viral', 'trending', 'popular', 'ai'],
+      maxResults: 25,
+      maxResultsShorts: 0,
+      maxResultStreams: 0
     },
     extractData: (item: any) => ({
       engagement: (item.viewCount || 0) + (item.likes || 0),
