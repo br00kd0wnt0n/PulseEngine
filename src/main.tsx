@@ -13,6 +13,7 @@ import RKB from './pages/RKB'
 // Removed alternative views; Classic only with persistent Co‑Pilot
 import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
+import TrendsAdmin from './pages/TrendsAdmin'
 import { ThemeProvider } from './context/ThemeContext'
 import { TrendProvider } from './context/TrendContext'
 import { CreatorProvider } from './context/CreatorContext'
@@ -35,6 +36,7 @@ const router = createBrowserRouter([
       { path: 'projects', element: <Projects /> },
       { path: 'projects/:id', element: <ProjectDetail /> },
       { path: 'admin', element: <AdminDashboard /> },
+      { path: 'trends-admin', element: <TrendsAdmin /> },
       { path: 'rkb', element: <RKB /> },
       // Alternate view routes removed
     ],

@@ -7,9 +7,10 @@ import { useUpload } from '../../context/UploadContext'
 import { logActivity } from '../../utils/activity'
 
 const examples = [
-  'Launch a dance challenge using AI music loops',
-  'Retro gaming remix trend for Shorts',
-  'Creator collab for tutorial-to-trend pipeline',
+  'Social strategy for multi-generational toy brand breaking into new market: double viewership in 6 months while re-inventing legacy IP',
+  'Web-series pilot: musicians visiting guitar shops after hours - scalable to merch/multi-city, attract brand partnerships for new IP',
+  'Final season Netflix campaign: drive re-watch with behind-the-scenes content and exclusive new material for superfans',
+  'Video game expansion launch: real-world + online storytelling across platforms with unexpected brand tie-ins and niche creator collabs',
 ]
 
 export default function StoryPromptHero() {

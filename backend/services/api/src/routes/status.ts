@@ -25,6 +25,55 @@ router.get('/overview', async (_req, res) => {
     ORDER BY bytes DESC
   `)
 
+  // Trends job status: last run inferred from most recent trend row
+  let trendsJob: any = { ok: true, lastRun: null, count: 0, storageBytes: 0 }
+  try {
+    const [row] = await db.query('SELECT MAX("createdAt") as last, COUNT(*)::int as cnt FROM trends')
+    trendsJob.lastRun = row?.last || null
+    trendsJob.count = row?.cnt || 0
+    const trendsTable = (tables || []).find((t: any) => t.name === 'trends')
+    trendsJob.storageBytes = trendsTable?.bytes || 0
+  } catch (e) {
+    // keep defaults
+  }
+
+  // Apify agents: real fetch if env present; else placeholder
+  let agents: any[] = []
+  try {
+    const token = process.env.APIFY_TOKEN
+    const ids = (process.env.APIFY_ACTOR_IDS || '').split(',').map(s => s.trim()).filter(Boolean)
+    if (token && ids.length) {
+      agents = await Promise.all(ids.map(async (id) => {
+        try {
+          const actResp = await fetch(`https://api.apify.com/v2/acts/${id}`)
+          const act = await actResp.json()
+          const runsResp = await fetch(`https://api.apify.com/v2/acts/${id}/runs?token=${token}&limit=1&desc=true`)
+          const runs = await runsResp.json()
+          const last = runs?.data?.items?.[0]
+          return {
+            name: act?.data?.title || id,
+            ok: last?.status === 'SUCCEEDED',
+            status: last?.status || 'unknown',
+            lastRun: last?.startedAt || null,
+            issues: last?.status === 'FAILED' ? [last?.errorMessage || 'Run failed'] : [],
+          }
+        } catch (e: any) {
+          return { name: id, ok: false, status: 'error', lastRun: null, issues: [e?.message || 'fetch error'] }
+        }
+      }))
+    } else {
+      agents = Array.from({ length: 7 }).map((_, i) => ({
+        name: `Agent #${i + 1}`,
+        ok: true,
+        status: 'idle',
+        lastRun: trendsJob.lastRun,
+        issues: [],
+      }))
+    }
+  } catch {
+    agents = Array.from({ length: 7 }).map((_, i) => ({ name: `Agent #${i + 1}`, ok: true, status: 'idle', lastRun: trendsJob.lastRun, issues: [] }))
+  }
+
   const ai = {
     ok: !!process.env.OPENAI_API_KEY,
     model: process.env.MODEL_NAME || 'gpt-4o-mini',
@@ -45,6 +94,7 @@ router.get('/overview', async (_req, res) => {
       sizeBytes: dbSize?.bytes ?? null,
       tables,
     },
+    trends: { job: trendsJob, agents },
     stats: {
       users: users?.c ?? 0,
       creators: creators?.c ?? 0,

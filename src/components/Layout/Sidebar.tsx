@@ -11,6 +11,7 @@ const nav = [
   { to: '/insights', label: 'Insights' },
   { to: '/projects', label: 'Projects' },
   { to: '/admin', label: 'Backend' },
+  { to: '/trends-admin', label: 'Trends Admin' },
   { to: '/rkb', label: 'RKB' },
   // Alternate views removed
 ]

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useDashboard } from '../../context/DashboardContext'
+import { CitationToken } from '../shared/CitationOverlay'
 import { useCreators } from '../../context/CreatorContext'
 
 type Block = { id: string; key: string; title: string; content: string }
@@ -29,11 +30,26 @@ export default function ConceptCreators() {
         <div className="lg:col-span-2">
           <div className="text-white/90 font-medium">{refined.oneLiner}</div>
           <ul className="mt-2 list-disc pl-5 space-y-1 text-sm">
-            {refined.bullets.map((b, i) => <li key={i} className="text-white/80">{b}</li>)}
+            {refined.bullets.map((b, i) => {
+              // Add citation token for trend line if present
+              const isTrendLine = b.startsWith('Top vectors:')
+              const trendNames = isTrendLine ? b.replace('Top vectors:','').split(',').map(s => s.trim()).filter(Boolean) : []
+              let token: JSX.Element | null = null
+              if (isTrendLine && trendNames.length) {
+                try {
+                  const id = (window as any).__registerCitation?.('Trends', `Top vectors referenced: ${trendNames.join(', ')}`)
+                  if (id) token = <span className="ml-1 align-middle"><CitationToken id={id} label={'Trends'} detail={`Top vectors referenced: ${trendNames.join(', ')}`} /></span>
+                } catch {}
+              }
+              return <li key={i} className="text-white/80">{b} {token}</li>
+            })}
           </ul>
           {refined.proposal && (
             <div className="mt-3 text-sm text-white/80 leading-relaxed whitespace-pre-wrap">{refined.proposal}</div>
           )}
+          <div className="mt-2 text-[11px] text-white/60">
+            <button onClick={() => { try { window.dispatchEvent(new CustomEvent('open-citation', { detail: { id: 'all' } })) } catch {} }} className="underline hover:text-white/80">View all citations</button>
+          </div>
         </div>
         <div>
           <div className="text-xs text-white/60 mb-1">Top Creators</div>
@@ -45,7 +61,15 @@ export default function ConceptCreators() {
                   <div className="text-[10px] text-white/60">{c.platform}</div>
                 </div>
                 <div className="text-[11px] text-white/60">{c.category}</div>
-                <div className="text-[11px] text-white/50 mt-1">Why: {explainWhy(c.tags)}</div>
+                <div className="text-[11px] text-white/50 mt-1">
+                  Why: {explainWhy(c.tags)}{' '}
+                  {(() => {
+                    try {
+                      const id = (window as any).__registerCitation?.(`Creator: ${c.name}`, `Suggested creator match: ${c.name} (${c.platform} • ${c.category})`)
+                      return id ? <CitationToken id={id} label={`Creator: ${c.name}`} detail={`Suggested creator match: ${c.name} (${c.platform} • ${c.category})`} /> : null
+                    } catch { return null }
+                  })()}
+                </div>
               </div>
             ))}
           </div>
