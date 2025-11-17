@@ -60,7 +60,14 @@ export async function narrativeFromTrends(graph: TrendGraph, focusId?: string | 
 
 // Debrief: recap + key points + did-you-know insights
 export async function generateDebrief(concept: string, userId?: string | null, persona?: string | null) {
-  const ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
+  let ctx
+  try {
+    ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
+  } catch (err) {
+    console.error('[AI] retrieveContext failed for debrief:', err)
+    // Fallback to empty context if retrieval fails
+    ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
+  }
   const cacheKey = sha({ t: 'debrief', concept, s: summarySig(ctx) })
   const cached = await cacheGet<any>(cacheKey)
   if (cached) return cached
@@ -102,7 +109,14 @@ export async function generateDebrief(concept: string, userId?: string | null, p
 
 // Opportunities: ranked with impact
 export async function generateOpportunities(concept: string, userId?: string | null, persona?: string | null) {
-  const ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
+  let ctx
+  try {
+    ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
+  } catch (err) {
+    console.error('[AI] retrieveContext failed for opportunities:', err)
+    // Fallback to empty context if retrieval fails
+    ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
+  }
   const cacheKey = sha({ t: 'opps', concept, s: summarySig(ctx) })
   const cached = await cacheGet<any>(cacheKey)
   if (cached) return cached
@@ -224,12 +238,19 @@ export async function generateRecommendations(
   console.log('[RAG] generateRecommendations called:', { concept, userId, projectId, hasGraph: !!graph })
 
   // Retrieve context from all knowledge sources
-  const context = await retrieveContext(concept, userId || null, {
-    maxResults: 5,
-    includeCore: true,
-    includeLive: true,
-    projectId: projectId || null
-  })
+  let context
+  try {
+    context = await retrieveContext(concept, userId || null, {
+      maxResults: 5,
+      includeCore: true,
+      includeLive: true,
+      projectId: projectId || null
+    })
+  } catch (err) {
+    console.error('[AI] retrieveContext failed for recommendations:', err)
+    // Fallback to empty context if retrieval fails
+    context = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
+  }
 
   console.log('[RAG] Context retrieved:', {
     projectContent: context.projectContent.length,
