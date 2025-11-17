@@ -87,6 +87,9 @@ export default function TrendsAdmin() {
     fandom: 'Fandom'
   }
 
+  // Platforms that are temporarily disabled
+  const skippedPlatforms = new Set(['twitter'])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -173,16 +176,43 @@ export default function TrendsAdmin() {
             {Object.entries(platformNames).map(([key, name]) => {
               const count = platformMetrics[key] || 0
               const hasData = count > 0
+              const isSkipped = skippedPlatforms.has(key)
+
+              // Determine status badge
+              let statusBadge: { text: string; className: string; tooltip?: string }
+              if (isSkipped) {
+                statusBadge = {
+                  text: 'Skipped',
+                  className: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+                  tooltip: 'Actor temporarily disabled due to technical issues'
+                }
+              } else if (hasData) {
+                statusBadge = {
+                  text: 'OK',
+                  className: 'bg-emerald-500/20 text-emerald-300'
+                }
+              } else {
+                statusBadge = {
+                  text: 'No data',
+                  className: 'bg-white/10 text-white/60'
+                }
+              }
+
               return (
                 <div className="panel p-2" key={key}>
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-medium">{name}</div>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${hasData ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-white/60'}`}>
-                      {hasData ? 'OK' : 'No data'}
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded ${statusBadge.className}`}
+                      title={statusBadge.tooltip}
+                    >
+                      {statusBadge.text}
                     </span>
                   </div>
-                  <div className="text-[11px] text-white/60">Items: {count.toLocaleString()}</div>
-                  {hasData && (
+                  <div className="text-[11px] text-white/60">
+                    {isSkipped ? 'Temporarily disabled' : `Items: ${count.toLocaleString()}`}
+                  </div>
+                  {hasData && !isSkipped && (
                     <div className="text-[11px] text-emerald-300">Last updated: {lastUpdate}</div>
                   )}
                 </div>
