@@ -7,10 +7,22 @@ import { useUpload } from '../../context/UploadContext'
 import { logActivity } from '../../utils/activity'
 
 const examples = [
-  'Social strategy for multi-generational toy brand breaking into new market: double viewership in 6 months while re-inventing legacy IP',
-  'Web-series pilot: musicians visiting guitar shops after hours - scalable to merch/multi-city, attract brand partnerships for new IP',
-  'Final season Netflix campaign: drive re-watch with behind-the-scenes content and exclusive new material for superfans',
-  'Video game expansion launch: real-world + online storytelling across platforms with unexpected brand tie-ins and niche creator collabs',
+  {
+    short: 'Multi-generational toy brand breaking into new market...',
+    full: 'Social strategy for multi-generational toy brand breaking into new market: double viewership in 6 months while re-inventing legacy IP'
+  },
+  {
+    short: 'Web-series pilot: musicians visiting guitar shops...',
+    full: 'Web-series pilot: musicians visiting guitar shops after hours - scalable to merch/multi-city, attract brand partnerships for new IP'
+  },
+  {
+    short: 'Final season Netflix campaign with behind-the-scenes...',
+    full: 'Final season Netflix campaign: drive re-watch with behind-the-scenes content and exclusive new material for superfans'
+  },
+  {
+    short: 'Video game expansion with real-world storytelling...',
+    full: 'Video game expansion launch: real-world + online storytelling across platforms with unexpected brand tie-ins and niche creator collabs'
+  },
 ]
 
 export default function StoryPromptHero() {
@@ -344,33 +356,23 @@ export default function StoryPromptHero() {
 
       {/* Input area - Claude-like */}
       <div className="panel module p-6 md:p-8 transform-gpu animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
-        {/* Region modifiers */}
-        <div className="mb-3 text-left">
-          <div className="text-xs text-white/60 mb-1">Region</div>
-          <div className="flex flex-wrap gap-2">
-            {(['US','UK','US+UK','Worldwide'] as const).map(r => (
-              <button key={r} onClick={() => setRegion(r)} className={`text-[11px] px-2 py-1 rounded border ${region===r?'border-ralph-teal/50 bg-ralph-teal/10':'border-white/10 bg-white/5 hover:bg-white/10'}`}>{r}</button>
-            ))}
-          </div>
-        </div>
-        {/* Modifiers row */}
+        {/* Modifiers row - Region and Persona on same level */}
         <div className="mb-3 text-left grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <div className="text-xs text-white/60 mb-1">Region</div>
-            <select value={region} onChange={(e)=>setRegion(e.target.value as any)} className="w-full bg-charcoal-800/70 border border-white/10 rounded px-2 py-2 text-sm">
-              <option>US</option>
-              <option>UK</option>
-              <option>US+UK</option>
-              <option>Worldwide</option>
-            </select>
+            <div className="flex flex-wrap gap-2">
+              {(['US','UK','US+UK','Worldwide'] as const).map(r => (
+                <button key={r} onClick={() => setRegion(r)} className={`text-[11px] px-2 py-1 rounded border ${region===r?'border-ralph-teal/50 bg-ralph-teal/10':'border-white/10 bg-white/5 hover:bg-white/10'}`}>{r}</button>
+              ))}
+            </div>
           </div>
           <div>
             <div className="text-xs text-white/60 mb-1">Persona</div>
-            <select value={persona} onChange={(e)=>setPersona(e.target.value as any)} className="w-full bg-charcoal-800/70 border border-white/10 rounded px-2 py-2 text-sm">
-              <option>Social Strategist</option>
-              <option>Creative Lead</option>
-              <option>Content Creator</option>
-            </select>
+            <div className="flex flex-wrap gap-2">
+              {(['Social Strategist', 'Creative Lead', 'Content Creator'] as const).map(p => (
+                <button key={p} onClick={() => setPersona(p)} className={`text-[11px] px-2 py-1 rounded border ${persona===p?'border-ralph-teal/50 bg-ralph-teal/10':'border-white/10 bg-white/5 hover:bg-white/10'}`}>{p}</button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -417,17 +419,18 @@ export default function StoryPromptHero() {
           </div>
         )}
 
-        {/* Example prompts */}
+        {/* Example prompts - 2x2 grid with truncated text */}
         <div className="mt-4 mb-4">
           <div className="text-xs text-white/50 mb-3 text-left">Try an example:</div>
-          <div className="flex flex-wrap gap-2 justify-start">
-            {examples.map(e => (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {examples.map((e, idx) => (
               <button
-                key={e}
-                onClick={() => setValue(e)}
-                className="px-3 py-2 rounded-lg text-sm border border-white/10 bg-charcoal-700/30 hover:bg-charcoal-700/50 hover:border-ralph-pink/30 transition-all"
+                key={idx}
+                onClick={() => setValue(e.full)}
+                className="px-3 py-2 rounded-lg text-sm text-left border border-white/10 bg-charcoal-700/30 hover:bg-charcoal-700/50 hover:border-ralph-pink/30 transition-all"
+                title={e.full}
               >
-                {e}
+                {e.short}
               </button>
             ))}
           </div>
@@ -436,9 +439,6 @@ export default function StoryPromptHero() {
         {/* Submit button and upload hint */}
         <div className="flex items-center justify-between mt-6">
           <div className="flex items-center gap-3">
-            <div className="text-xs text-white/40">
-              {prefs.persona} • {prefs.platforms.join(', ')}
-            </div>
             {/* Hidden file input */}
             <input
               ref={fileInputRef}

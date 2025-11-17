@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, StatusOverview } from '../services/api'
 import { useToast } from '../context/ToastContext'
-import KnowledgeBaseBuilder from '../components/Admin/KnowledgeBaseBuilder'
 
 function bytes(n: number | null) {
   if (n == null) return '—'
@@ -103,8 +102,6 @@ export default function AdminDashboard() {
         </div>
         <div className="mt-2 text-xs text-white/60">Planned data/API integrations: TikTok/YouTube/Instagram trend signals, creator metrics, and analytics overlays. Vector search (pgvector) for retrieval-augmented generation (RAG).</div>
       </div>
-
-      <KnowledgeBaseBuilder />
     </div>
   )
 }

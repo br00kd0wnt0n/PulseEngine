@@ -184,6 +184,16 @@ router.delete('/assets/:id', async (req, res) => {
   }
 })
 
+router.delete('/projects/clear-all', async (req, res) => {
+  try {
+    const result = await AppDataSource.query('DELETE FROM projects')
+    const deletedCount = result[1] || 0
+    res.json({ ok: true, message: `Deleted ${deletedCount} projects`, deleted: deletedCount })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || String(e) })
+  }
+})
+
 // Apify trend collection endpoints
 
 router.post('/collect-trends', async (req, res) => {

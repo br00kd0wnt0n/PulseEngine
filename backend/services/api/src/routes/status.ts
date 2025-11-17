@@ -40,8 +40,18 @@ router.get('/overview', async (_req, res) => {
   // Apify agents: real fetch if env present; else placeholder
   let agents: any[] = []
   try {
-    const token = process.env.APIFY_TOKEN
-    const ids = (process.env.APIFY_ACTOR_IDS || '').split(',').map(s => s.trim()).filter(Boolean)
+    const token = process.env.APIFY_API_TOKEN
+    // If no APIFY_ACTOR_IDS env, use the 7 actors configured in apify.ts
+    const defaultActors = [
+      'clockworks/tiktok-hashtag-scraper',
+      'apify/instagram-hashtag-scraper',
+      'apidojo/tweet-scraper',
+      'streamers/youtube-scraper',
+      'lhotanova/google-news-scraper',
+      'jupri/wiki-scraper',
+      'kuaima/Fandom'
+    ]
+    const ids = (process.env.APIFY_ACTOR_IDS || defaultActors.join(',')).split(',').map(s => s.trim()).filter(Boolean)
     if (token && ids.length) {
       agents = await Promise.all(ids.map(async (id) => {
         try {

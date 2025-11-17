@@ -5,15 +5,10 @@ import LogoMark from '../LogoMark'
 
 const nav = [
   { to: '/', label: 'Dashboard' },
-  { to: '/trends', label: 'Trends' },
-  { to: '/upload', label: 'Upload' },
   { to: '/creators', label: 'Creators' },
-  { to: '/insights', label: 'Insights' },
   { to: '/projects', label: 'Projects' },
   { to: '/admin', label: 'Backend' },
-  { to: '/trends-admin', label: 'Trends Admin' },
   { to: '/rkb', label: 'RKB' },
-  // Alternate views removed
 ]
 
 export default function Sidebar() {

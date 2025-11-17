@@ -26,10 +26,20 @@ const logger = pino({ level: process.env.NODE_ENV === 'production' ? 'info' : 'd
 
 async function main() {
   await AppDataSource.initialize()
+
+  // Run migrations - fail loudly if there are issues
   try {
-    await AppDataSource.runMigrations()
+    logger.info('Running database migrations...')
+    const migrations = await AppDataSource.runMigrations()
+    if (migrations.length > 0) {
+      logger.info({ migrations: migrations.map(m => m.name) }, 'Migrations completed successfully')
+    } else {
+      logger.info('No pending migrations')
+    }
   } catch (e) {
-    logger.warn({ err: e }, 'Migration run skipped or failed; proceeding')
+    logger.error({ err: e }, 'FATAL: Database migration failed')
+    logger.error('Application cannot start with failed migrations. Please fix the database schema.')
+    throw new Error(`Migration failed: ${e instanceof Error ? e.message : String(e)}`)
   }
   const app = express()
   app.use(helmet())
