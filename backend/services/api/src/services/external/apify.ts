@@ -111,29 +111,29 @@ const ACTORS: ApifyActorConfig[] = [
 
   // 4. YouTube Scraper
   {
-    actorId: 'streamers/youtube-scraper',
+    actorId: 'bernardo/youtube-scraper',
     platform: 'youtube',
     metricType: 'trending_video',
     maxItems: 100, // Global cap enforced by APIFY client
     input: {
-      searchKeywords: ['viral', 'trending', 'popular', 'ai', 'tutorial'],
-      maxResults: 50
+      searchKeywords: ['viral', 'trending', 'popular'],
+      maxResults: 100
     },
     extractData: (item: any) => ({
-      engagement: (item.views || 0) + (item.likes || 0) + (item.comments || 0),
-      velocity: (item.views || 0) / Math.max(1, Math.floor((Date.now() - new Date(item.date).getTime()) / (1000 * 60 * 60))),
+      engagement: (item.viewCount || 0) + (item.likes || 0),
+      velocity: (item.viewCount || 0) / Math.max(1, Math.floor((Date.now() - new Date(item.uploadDate || Date.now()).getTime()) / (1000 * 60 * 60))),
       value: {
         videoId: item.id,
         title: item.title,
-        channelName: item.channelName,
-        views: item.views,
+        channelName: item.channelTitle || item.channelName,
+        views: item.viewCount,
         likes: item.likes,
-        comments: item.comments,
+        description: item.description?.substring(0, 200),
         duration: item.duration
       },
       metadata: {
-        date: item.date,
-        url: item.url
+        uploadDate: item.uploadDate,
+        url: item.url || `https://www.youtube.com/watch?v=${item.id}`
       }
     })
   },
