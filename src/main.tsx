@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './index.css'
 import App from './App'
 import Dashboard from './pages/Dashboard'
+import DashboardProgressive from './pages/DashboardProgressive'
 import Trends from './pages/Trends'
 import Upload from './pages/Upload'
 import Creators from './pages/Creators'
@@ -28,7 +29,7 @@ const router = createBrowserRouter([
     path: '/',
     element: <App />,
     children: [
-      { index: true, element: <Dashboard /> },
+      { index: true, element: <DashboardProgressive /> },
       { path: 'trends', element: <Trends /> },
       { path: 'upload', element: <Upload /> },
       { path: 'creators', element: <Creators /> },
