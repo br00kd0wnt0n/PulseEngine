@@ -128,14 +128,30 @@ export default function ScoringEnhancements() {
 function impactBadge(s: any) {
   const d = s?.deltas
   if (d && (d.narrative || d.ttp || d.cross || d.commercial)) {
-    const parts = [] as string[]
-    if (d.narrative) parts.push(`N ${fmt(d.narrative)}`)
-    if (d.ttp) parts.push(`T ${fmt(d.ttp)}`)
-    if (d.cross) parts.push(`X ${fmt(d.cross)}`)
-    if (d.commercial) parts.push(`C ${fmt(d.commercial)}`)
-    return parts.join(' · ')
+    const metrics = []
+    if (d.narrative) metrics.push({ label: 'Narrative', value: d.narrative, key: 'N' })
+    if (d.ttp) metrics.push({ label: 'Timing', value: d.ttp, key: 'T' })
+    if (d.cross) metrics.push({ label: 'Cross-platform', value: d.cross, key: 'X' })
+    if (d.commercial) metrics.push({ label: 'Commercial', value: d.commercial, key: 'C' })
+
+    return (
+      <div className="flex flex-wrap gap-1.5 text-[10px]">
+        {metrics.map((m, i) => (
+          <span
+            key={i}
+            className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10"
+            title={`${m.label} impact: ${fmt(m.value)}`}
+          >
+            <span className="text-white/50">{m.label}</span>
+            <span className={`ml-1 font-medium ${m.value > 0 ? 'text-ralph-cyan' : 'text-red-400'}`}>
+              {fmt(m.value)}
+            </span>
+          </span>
+        ))}
+      </div>
+    )
   }
-  return '~impact'
+  return <span className="text-[10px] text-white/40">No impact data</span>
 }
 
 function fmt(n: number) { return n>0?`+${n}`:`${n}` }
