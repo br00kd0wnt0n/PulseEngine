@@ -135,10 +135,11 @@ function synthesizeRefined(concept: string, blocks: Block[]) {
   const byKey = (k: string) => blocks.find(b => b.key === k)?.content?.trim() || ''
   const hook = byKey('hook')
   const premise = byKey('origin') || concept
+  const arc = byKey('arc')
   const pivot = byKey('pivots')
   const evidence = byKey('evidence')
   const resolution = byKey('resolution')
-  const oneLiner = hook || `Premise: ${premise}`
+  const oneLiner = hook || concept
   const pid = localStorage.getItem('activeProjectId') || 'local'
   let deb: any = null
   let trends: string[] = []
@@ -151,13 +152,22 @@ function synthesizeRefined(concept: string, blocks: Block[]) {
   const extra = deb?.summary ? [`Summary: ${deb.summary}`] : []
   const trendLine = trends.length ? [`Top vectors: ${trends.join(', ')}`] : []
   const bullets = [...extra, ...trendLine, pivot, evidence, resolution].filter(Boolean).slice(0,3)
-  const proposalParts = [
-    hook || `Premise: ${premise}`,
-    pivot ? `Pivotal moment: ${pivot}` : '',
-    evidence ? `Evidence: ${evidence}` : '',
-    resolution ? `Outcome: ${resolution}` : '',
-  ].filter(Boolean)
-  const proposal = proposalParts.join('\n')
+
+  // Build a proper narrative proposal (avoid duplication with oneLiner)
+  const proposalParts = []
+  if (hook && premise !== concept) {
+    // If we have both hook and premise, show premise as context
+    proposalParts.push(`Campaign Premise: ${premise}`)
+  } else if (!hook && premise) {
+    // If no hook, start with premise
+    proposalParts.push(premise)
+  }
+  if (arc) proposalParts.push(`Narrative Arc: ${arc}`)
+  if (pivot) proposalParts.push(`Pivotal Moment: ${pivot}`)
+  if (evidence) proposalParts.push(`Supporting Evidence: ${evidence}`)
+  if (resolution) proposalParts.push(`Expected Outcome: ${resolution}`)
+
+  const proposal = proposalParts.length > 0 ? proposalParts.join('\n\n') : ''
   return { oneLiner, bullets, proposal }
 }
 
