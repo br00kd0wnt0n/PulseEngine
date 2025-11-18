@@ -23,6 +23,10 @@ export default function FloatingAssistant() {
     setInputValue('')
   }
 
+  const dismissMessage = (id: number) => {
+    setMessages(prev => prev.filter(msg => msg.id !== id))
+  }
+
   return (
     <>
       {/* Floating notification pills on right side */}
@@ -30,16 +34,25 @@ export default function FloatingAssistant() {
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`p-3 rounded-lg backdrop-blur-md border text-sm shadow-lg transition-all ${
+            className={`group relative p-3 rounded-lg backdrop-blur-md border text-sm shadow-lg transition-all ${
               msg.type === 'user'
                 ? 'bg-ralph-cyan/20 border-ralph-cyan/40 ml-8'
                 : 'bg-charcoal-800/90 border-white/10'
             }`}
           >
+            {/* Dismiss button - shows on hover */}
+            <button
+              onClick={() => dismissMessage(msg.id)}
+              className="absolute top-2 right-2 w-5 h-5 rounded-full bg-charcoal-700/80 hover:bg-charcoal-600 border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Dismiss"
+            >
+              <span className="text-white/60 text-xs leading-none">✕</span>
+            </button>
+
             {msg.type === 'info' && (
               <div className="text-white/60 text-[10px] mb-1 uppercase tracking-wide">RalphBot</div>
             )}
-            <div className="text-white/90 leading-relaxed">{msg.text}</div>
+            <div className="text-white/90 leading-relaxed pr-6">{msg.text}</div>
           </div>
         ))}
       </div>
