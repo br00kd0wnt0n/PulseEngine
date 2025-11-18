@@ -147,10 +147,6 @@ export default function NarrativeFramework() {
             <div
               key={b.id}
               className="relative panel p-3 w-[260px] shrink-0"
-              draggable
-              onDragStart={() => setDragId(b.id)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => onDropReorder(b.id)}
             >
               <div className="text-xs text-white/60 mb-1 flex items-center justify-between">
                 <span>{b.title}</span>

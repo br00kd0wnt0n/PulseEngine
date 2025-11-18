@@ -4,7 +4,7 @@ import { useLayout } from '../../context/LayoutContext'
 import LogoMark from '../LogoMark'
 
 const nav = [
-  { to: '/', label: 'Dashboard' },
+  { to: '/', label: 'Project Dashboard' },
   { to: '/creators', label: 'Creators' },
   { to: '/projects', label: 'Projects' },
   { to: '/trends-admin', label: 'Trends' },
@@ -57,7 +57,31 @@ export default function Sidebar() {
             ))}
           </nav>
 
-          <div className="mt-auto text-[10px] text-white/40">Dark Mode {dark ? 'On' : 'Off'}</div>
+          <div className="border-t border-white/10 pt-3">
+            <button
+              onClick={() => {
+                // Clear project-related localStorage
+                const keysToRemove = ['activeProjectId', 'concept', 'persona', 'region']
+                keysToRemove.forEach(key => {
+                  try { localStorage.removeItem(key) } catch {}
+                })
+                // Also clear conversation and project data
+                const activeProjectId = localStorage.getItem('activeProjectId') || 'local'
+                try { localStorage.removeItem(`conv:${activeProjectId}`) } catch {}
+                try { localStorage.removeItem(`debrief:${activeProjectId}`) } catch {}
+                try { localStorage.removeItem(`opps:${activeProjectId}`) } catch {}
+
+                closeSidebar()
+                // Navigate to home/landing
+                window.location.href = '/'
+              }}
+              className="w-full px-3 py-2 text-sm rounded-md border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 hover:border-red-500/50 transition-colors"
+            >
+              Start Over
+            </button>
+          </div>
+
+          <div className="mt-2 text-[10px] text-white/40">Dark Mode {dark ? 'On' : 'Off'}</div>
         </div>
       </aside>
     </>

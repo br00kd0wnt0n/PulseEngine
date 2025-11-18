@@ -179,9 +179,26 @@ export async function generateOpportunities(concept: string, userId?: string | n
         const client = new OpenAI({ apiKey })
         const model = process.env.MODEL_NAME || 'gpt-4o-mini'
         const contextStr = formatContextForPrompt(ctx)
-        const prompt = `Persona: ${persona || 'General'}\nConcept: "${concept}"\n\n`+
-          (contextStr?`Context (concise):\n${contextStr}\n\n`:'')+
-          `Identify 5 opportunities with title, why, and impact (0-100). Return JSON { opportunities: [{ title, why, impact }], rationale }.`
+        const prompt = `You are a campaign strategist for persona: ${persona || 'General'}. Analyze this campaign concept: "${concept}"
+
+${contextStr ? `# RELEVANT CONTEXT (reference specific trends and data):
+${contextStr}
+
+` : ''}# YOUR TASK:
+Identify 5 HIGH-IMPACT campaign opportunities that are:
+- Specific to THIS concept (not generic tactics)
+- Grounded in the trending data and insights from context above
+- Actionable execution opportunities (not vague advice)
+- Campaign-focused (story beats, content formats, creator partnerships, platform plays)
+
+For each opportunity provide:
+- **title**: Clear, specific opportunity (e.g., "Launch with micro-influencer unboxing series on TikTok")
+- **why**: Business/strategic rationale tied to the concept and trends (50-80 chars)
+- **impact**: Estimated impact score 0-100 based on trend alignment and execution potential
+
+Also provide a brief **rationale** explaining how these opportunities work together as a campaign strategy.
+
+Return ONLY valid JSON: { opportunities: [{ title, why, impact }], rationale }`
         const resp = await client.chat.completions.create({
           model,
           messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
@@ -197,14 +214,49 @@ export async function generateOpportunities(concept: string, userId?: string | n
         } catch {}
       } catch {}
     }
+    // Context-aware heuristic fallback
+    const hasLiveMetrics = ctx.liveMetrics && ctx.liveMetrics.length > 0
+    const conceptLower = concept.toLowerCase()
+
+    // Extract opportunity hints from concept
+    const platforms = []
+    if (conceptLower.includes('tiktok') || conceptLower.includes('short')) platforms.push('TikTok')
+    if (conceptLower.includes('instagram') || conceptLower.includes('reel')) platforms.push('Instagram')
+    if (conceptLower.includes('youtube')) platforms.push('YouTube')
+    const platform = platforms[0] || 'TikTok'
+
     const opportunities = [
-      { title: 'Sharpen the opening hook', why: 'Improves comprehension and retention', impact: 78 },
-      { title: 'Add duet/stitch prompt', why: 'Boosts creator participation', impact: 72 },
-      { title: 'Platform-native captions', why: 'Increases message recall', impact: 64 },
-      { title: 'Remixable beat (7–10s)', why: 'Encourages replays and loops', impact: 70 },
-      { title: 'Macro + micro collab mix', why: 'Combines reach with authenticity', impact: 68 },
+      {
+        title: `Launch ${platform}-first content series for "${concept}"`,
+        why: hasLiveMetrics ? 'Aligns with trending formats in live data' : 'Platform-native content drives higher engagement',
+        impact: 82
+      },
+      {
+        title: `Partner with micro-influencers in target vertical`,
+        why: 'Authentic voices build trust and expand reach 3-5x',
+        impact: 78
+      },
+      {
+        title: `Create participatory campaign hooks (duets/remixes)`,
+        why: 'User-generated content amplifies organic reach',
+        impact: 75
+      },
+      {
+        title: `Develop multi-part episodic storytelling series`,
+        why: 'Serial content increases completion rates and return visits',
+        impact: 72
+      },
+      {
+        title: `Build cross-platform distribution strategy`,
+        why: 'Multi-channel presence maximizes total addressable audience',
+        impact: 68
+      },
     ]
-    const heuristic = { opportunities, rationale: 'Based on common uplift levers across short‑form and collab patterns.', sources: ctx.sources }
+    const heuristic = {
+      opportunities,
+      rationale: `Strategic campaign opportunities tailored for "${concept}"${hasLiveMetrics ? ' based on trending content patterns' : ''}.`,
+      sources: ctx.sources
+    }
     await cacheSet(cacheKey, heuristic)
     return heuristic
   } catch (err) {
@@ -244,10 +296,26 @@ export async function generateEnhancements(concept: string, graph: TrendGraph, u
       const { OpenAI } = await import('openai')
       const client = new OpenAI({ apiKey })
       const model = process.env.MODEL_NAME || 'gpt-4o-mini'
-      const prompt = `You are improving a short concept for persona ${persona || 'General'}: "${concept}".\n`+
-        `Current scores (0-100): narrative=${narrative}, ttp=${ttp}, cross=${cross}, commercial=${commercial}.\n`+
-        `Propose 4 targeted enhancements. For each, return: text, target (one of origin|hook|arc|pivots|evidence|resolution), and deltas { narrative, ttp, cross, commercial } indicating expected score changes (integers, +/-).\n`+
-        `Return JSON: { suggestions: [{ text, target, deltas: { narrative, ttp, cross, commercial } }] }`
+      const prompt = `You are a campaign strategist optimizing this concept for persona ${persona || 'General'}: "${concept}"
+
+Current campaign scores (0-100):
+- Narrative Strength: ${narrative}
+- Time to Peak: ${ttp}
+- Cross-Platform Potential: ${cross}
+- Commercial Viability: ${commercial}
+
+# YOUR TASK:
+Propose 4 SPECIFIC, ACTIONABLE enhancements to strengthen this campaign. Each enhancement should:
+- Be campaign-specific (not generic advice like "improve hook")
+- Target a specific narrative element: origin|hook|arc|pivots|evidence|resolution
+- Provide concrete execution guidance (e.g., "Open with 3-second product transformation visual before narration")
+
+For each enhancement provide:
+- **text**: Specific, actionable enhancement tied to "${concept}" (not generic)
+- **target**: Which narrative block it enhances (origin|hook|arc|pivots|evidence|resolution)
+- **deltas**: Expected score improvements { narrative, ttp, cross, commercial } (integers, can be 0 if no impact)
+
+Return ONLY valid JSON: { suggestions: [{ text, target, deltas: { narrative, ttp, cross, commercial } }] }`
       const resp = await client.chat.completions.create({
         model,
         messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
@@ -258,15 +326,35 @@ export async function generateEnhancements(concept: string, graph: TrendGraph, u
       try { const parsed = JSON.parse(raw); return parsed } catch {}
     } catch { /* fallthrough */ }
   }
-  // Heuristic fallback with simple deltas
+  // Context-aware heuristic fallback
   const lc = (concept || '').toLowerCase()
-  const hasLoop = lc.includes('loop')
-  const hasCollab = lc.includes('collab') || lc.includes('duet') || lc.includes('stitch')
+
+  // Extract enhancement hints from concept
+  const hasVideo = lc.includes('video') || lc.includes('content') || lc.includes('campaign')
+  const hasSocial = lc.includes('social') || lc.includes('tiktok') || lc.includes('instagram')
+  const hasBrand = lc.includes('brand') || lc.includes('product') || lc.includes('toy')
+
   const suggestions = [
-    { text: 'Condense the opening hook to 7–10 words', target: 'hook', deltas: { narrative: 6, ttp: 2, cross: 0, commercial: 1 } },
-    { text: 'Define a loopable 7–10s beat with a visible cue', target: 'arc', deltas: { narrative: hasLoop ? 2 : 6, ttp: 4, cross: 3, commercial: 2 } },
-    { text: 'Add a duet/stitch prompt to invite creator responses', target: 'resolution', deltas: { narrative: 2, ttp: 1, cross: 2, commercial: hasCollab ? 2 : 6 } },
-    { text: 'Add platform‑native captions stating the promise in frame 1', target: 'evidence', deltas: { narrative: 4, ttp: 2, cross: 3, commercial: 1 } },
+    {
+      text: `Lead "${concept}" with a 3-5 second visual hook that showcases the transformation or value proposition`,
+      target: 'hook',
+      deltas: { narrative: 8, ttp: 3, cross: 2, commercial: 4 }
+    },
+    {
+      text: hasVideo ? `Structure "${concept}" as 3-5 act story with clear beginning, conflict, and resolution beats` : `Build narrative arc for "${concept}" with clear story progression`,
+      target: 'arc',
+      deltas: { narrative: 6, ttp: 2, cross: 4, commercial: 2 }
+    },
+    {
+      text: hasSocial ? `Include user participation hooks (challenges, duets, or remix opportunities) tied to "${concept}"` : `Create shareable moments that invite audience participation`,
+      target: 'resolution',
+      deltas: { narrative: 3, ttp: 4, cross: 5, commercial: 6 }
+    },
+    {
+      text: hasBrand ? `Showcase authentic proof points (testimonials, before/after, or product demos) that validate "${concept}"` : `Add credibility through evidence and social proof`,
+      target: 'evidence',
+      deltas: { narrative: 5, ttp: 2, cross: 3, commercial: 5 }
+    },
   ]
   return { suggestions }
 }
