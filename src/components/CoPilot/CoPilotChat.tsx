@@ -14,6 +14,8 @@ export default function CoPilotChat() {
   const inputRef = useRef<HTMLInputElement|null>(null)
   const fileRef = useRef<HTMLInputElement|null>(null)
   const chatEndRef = useRef<HTMLDivElement|null>(null)
+  const chatContainerRef = useRef<HTMLDivElement|null>(null)
+  const [userScrolledUp, setUserScrolledUp] = useState(false)
   const activeProjectId = useMemo(() => {
     try { return localStorage.getItem('activeProjectId') || 'local' } catch { return 'local' }
   }, [])
@@ -124,10 +126,31 @@ export default function CoPilotChat() {
     return () => window.removeEventListener('copilot-say' as any, onSay as any)
   }, [activeProjectId])
 
-  // Auto-scroll to bottom when messages change
+  // Detect when user manually scrolls up
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [items, typewriterText, typing])
+    const container = chatContainerRef.current
+    if (!container) return
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+      // Consider user "at bottom" if within 100px
+      setUserScrolledUp(distanceFromBottom > 100)
+    }
+
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  // Smart auto-scroll: only when new messages arrive AND user hasn't scrolled up
+  useEffect(() => {
+    if (!userScrolledUp && items.length > 0) {
+      // Small delay to ensure DOM has updated
+      setTimeout(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 50)
+    }
+  }, [items.length, userScrolledUp]) // Only trigger on NEW messages, not during typewriter
 
   return (
     <div className="panel module p-4 bg-ralph-teal/10 animated-gradient-border" onDrop={onDrop} onDragOver={(e)=>e.preventDefault()}>
@@ -142,7 +165,7 @@ export default function CoPilotChat() {
         ))}
       </div>
       <div>
-          <div className="h-[28rem] md:h-[32rem] overflow-auto space-y-3 text-sm bg-charcoal-800/40 rounded p-3 border border-white/5">
+          <div ref={chatContainerRef} className="h-[28rem] md:h-[32rem] overflow-auto space-y-3 text-sm bg-charcoal-800/40 rounded p-3 border border-white/5">
             {items.length === 0 && (
               <div className="text-white/50 text-sm text-center py-8">Start the conversation — ask for hooks, beats, or creator approaches.</div>
             )}
