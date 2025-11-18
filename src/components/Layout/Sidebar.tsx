@@ -60,16 +60,28 @@ export default function Sidebar() {
           <div className="border-t border-white/10 pt-3">
             <button
               onClick={() => {
-                // Clear project-related localStorage
-                const keysToRemove = ['activeProjectId', 'concept', 'persona', 'region']
-                keysToRemove.forEach(key => {
+                // Get projectId BEFORE clearing it
+                const activeProjectId = localStorage.getItem('activeProjectId') || 'local'
+
+                // Clear all project-specific data
+                const projectKeys = [
+                  `conv:${activeProjectId}`,
+                  `debrief:${activeProjectId}`,
+                  `opps:${activeProjectId}`,
+                  `nf:${activeProjectId}`,
+                  `score:${activeProjectId}`,
+                  `progressive:stage:${activeProjectId}`,
+                  `narrative:visible:${activeProjectId}`,
+                ]
+                projectKeys.forEach(key => {
                   try { localStorage.removeItem(key) } catch {}
                 })
-                // Also clear conversation and project data
-                const activeProjectId = localStorage.getItem('activeProjectId') || 'local'
-                try { localStorage.removeItem(`conv:${activeProjectId}`) } catch {}
-                try { localStorage.removeItem(`debrief:${activeProjectId}`) } catch {}
-                try { localStorage.removeItem(`opps:${activeProjectId}`) } catch {}
+
+                // Clear global project settings
+                const globalKeys = ['activeProjectId', 'concept', 'persona', 'region']
+                globalKeys.forEach(key => {
+                  try { localStorage.removeItem(key) } catch {}
+                })
 
                 closeSidebar()
                 // Navigate to home/landing
