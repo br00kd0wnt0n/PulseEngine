@@ -88,7 +88,7 @@ export default function TrendsAdmin() {
   }
 
   // Platforms that are temporarily disabled
-  const skippedPlatforms = new Set(['twitter'])
+  const skippedPlatforms = new Set(['twitter', 'wiki'])
 
   return (
     <div className="space-y-6">

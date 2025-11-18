@@ -111,7 +111,7 @@ const ACTORS: ApifyActorConfig[] = [
 
   // 4. YouTube Scraper
   {
-    actorId: 'bernardo/youtube-scraper',
+    actorId: 'streamers/youtube-scraper',
     platform: 'youtube',
     metricType: 'trending_video',
     maxItems: 100, // Global cap enforced by APIFY client
@@ -172,8 +172,8 @@ const ACTORS: ApifyActorConfig[] = [
     })
   },
 
-  // 6. Wikipedia Scraper
-  {
+  // 6. Wikipedia Scraper - DISABLED: Wikipedia blocking scraper (404 errors)
+  /* {
     actorId: 'jupri/wiki-scraper',
     platform: 'wiki',
     metricType: 'trending_topic',
@@ -199,7 +199,7 @@ const ACTORS: ApifyActorConfig[] = [
         lastModified: item.lastModified
       }
     })
-  },
+  }, */
 
   // 7. Fandom Scraper - Entertainment trending topics
   {
