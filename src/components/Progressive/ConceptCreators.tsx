@@ -2,13 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { useDashboard } from '../../context/DashboardContext'
 import { CitationToken } from '../shared/CitationOverlay'
 import { useCreators } from '../../context/CreatorContext'
+import { api } from '../../services/api'
+import LoadingSpinner from '../Common/LoadingSpinner'
 
 type Block = { id: string; key: string; title: string; content: string }
 
 export default function ConceptCreators() {
-  const { concept } = useDashboard()
+  const { concept, persona, region } = useDashboard() as any
   const { recommended } = useCreators()
   const [blocks, setBlocks] = useState<Block[]>([])
+  const [aiProposal, setAiProposal] = useState<string | null>(null)
+  const [loadingProposal, setLoadingProposal] = useState(false)
 
   const projectId = useMemo(() => { try { return localStorage.getItem('activeProjectId') || 'local' } catch { return 'local' } }, [])
   const storageKey = `nf:${projectId}`
@@ -16,6 +20,40 @@ export default function ConceptCreators() {
   useEffect(() => {
     try { const raw = localStorage.getItem(storageKey); if (raw) setBlocks(JSON.parse(raw)) } catch {}
   }, [storageKey, concept])
+
+  // Generate AI proposal when concept or creators change
+  useEffect(() => {
+    let cancel = false
+    if (!concept || !recommended.length || !blocks.length) return
+
+    setLoadingProposal(true)
+    ;(async () => {
+      try {
+        const narrativeBlocks = blocks.map(b => ({ key: b.key, content: b.content }))
+        const creators = recommended.slice(0, 3).map(c => ({
+          name: c.name,
+          platform: c.platform,
+          category: c.category,
+          tags: c.tags
+        }))
+
+        const result = await api.conceptProposal(concept, narrativeBlocks, creators, { persona, projectId })
+        if (!cancel) {
+          setAiProposal(result.narrative)
+        }
+      } catch (err) {
+        console.error('Failed to generate concept proposal:', err)
+        if (!cancel) {
+          // Fallback to synthesized version
+          setAiProposal(null)
+        }
+      } finally {
+        if (!cancel) setLoadingProposal(false)
+      }
+    })()
+
+    return () => { cancel = true }
+  }, [concept, recommended, blocks, persona, projectId])
 
   const refined = useMemo(() => synthesizeRefined(concept, blocks), [concept, blocks])
   const top = (recommended || []).slice(0, 3)
@@ -28,28 +66,41 @@ export default function ConceptCreators() {
       </div>
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <div className="text-white/90 font-medium">{refined.oneLiner}</div>
-          <ul className="mt-2 list-disc pl-5 space-y-1 text-sm">
-            {refined.bullets.map((b, i) => {
-              // Add citation token for trend line if present
-              const isTrendLine = b.startsWith('Top vectors:')
-              const trendNames = isTrendLine ? b.replace('Top vectors:','').split(',').map(s => s.trim()).filter(Boolean) : []
-              let token: JSX.Element | null = null
-              if (isTrendLine && trendNames.length) {
-                try {
-                  const id = (window as any).__registerCitation?.('Trends', `Top vectors referenced: ${trendNames.join(', ')}`)
-                  if (id) token = <span className="ml-1 align-middle"><CitationToken id={id} label={'Trends'} detail={`Top vectors referenced: ${trendNames.join(', ')}`} /></span>
-                } catch {}
-              }
-              return <li key={i} className="text-white/80">{b} {token}</li>
-            })}
-          </ul>
-          {refined.proposal && (
-            <div className="mt-3 text-sm text-white/80 leading-relaxed whitespace-pre-wrap">{refined.proposal}</div>
+          {loadingProposal && (
+            <LoadingSpinner text="Crafting shareable campaign proposal with creator recommendations…" />
           )}
-          <div className="mt-2 text-[11px] text-white/60">
-            <button onClick={() => { try { window.dispatchEvent(new CustomEvent('open-citation', { detail: { id: 'all' } })) } catch {} }} className="underline hover:text-white/80">View all citations</button>
-          </div>
+          {!loadingProposal && (
+            <>
+              <div className="text-white/90 font-medium">{refined.oneLiner}</div>
+              {aiProposal ? (
+                <div className="mt-3 text-sm text-white/80 leading-relaxed">{aiProposal}</div>
+              ) : (
+                <>
+                  <ul className="mt-2 list-disc pl-5 space-y-1 text-sm">
+                    {refined.bullets.map((b, i) => {
+                      // Add citation token for trend line if present
+                      const isTrendLine = b.startsWith('Top vectors:')
+                      const trendNames = isTrendLine ? b.replace('Top vectors:','').split(',').map(s => s.trim()).filter(Boolean) : []
+                      let token: JSX.Element | null = null
+                      if (isTrendLine && trendNames.length) {
+                        try {
+                          const id = (window as any).__registerCitation?.('Trends', `Top vectors referenced: ${trendNames.join(', ')}`)
+                          if (id) token = <span className="ml-1 align-middle"><CitationToken id={id} label={'Trends'} detail={`Top vectors referenced: ${trendNames.join(', ')}`} /></span>
+                        } catch {}
+                      }
+                      return <li key={i} className="text-white/80">{b} {token}</li>
+                    })}
+                  </ul>
+                  {refined.proposal && (
+                    <div className="mt-3 text-sm text-white/80 leading-relaxed whitespace-pre-wrap">{refined.proposal}</div>
+                  )}
+                </>
+              )}
+              <div className="mt-2 text-[11px] text-white/60">
+                <button onClick={() => { try { window.dispatchEvent(new CustomEvent('open-citation', { detail: { id: 'all' } })) } catch {} }} className="underline hover:text-white/80">View all citations</button>
+              </div>
+            </>
+          )}
         </div>
         <div>
           <div className="text-xs text-white/60 mb-1">Need a Creative Partner?</div>

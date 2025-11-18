@@ -529,3 +529,106 @@ function buildHeuristicRecs(concept?: string) {
   }
   return { narrative, content, platform, collab, framework }
 }
+
+// Shareable Concept Proposal: AI-generated pitch narrative
+export async function generateConceptProposal(
+  concept: string,
+  narrativeBlocks: { key: string; content: string }[],
+  recommendedCreators: { name: string; platform: string; category: string; tags: string[] }[],
+  userId?: string | null,
+  persona?: string | null,
+  projectId?: string | null
+) {
+  try {
+    let ctx
+    try {
+      ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true, projectId: projectId || null })
+    } catch (err) {
+      console.error('[AI] retrieveContext failed for concept proposal:', err)
+      ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
+    }
+
+    const cacheKey = sha({ t: 'concept-proposal', concept, blocks: narrativeBlocks.map(b => b.content).join(''), creators: recommendedCreators.map(c => c.name).join(',') })
+    const cached = await cacheGet<string>(cacheKey)
+    if (cached) return { narrative: cached, sources: ctx.sources }
+
+    const apiKey = process.env.OPENAI_API_KEY
+    if (apiKey) {
+      try {
+        const { OpenAI } = await import('openai')
+        const client = new OpenAI({ apiKey })
+        const model = process.env.MODEL_NAME || 'gpt-4o-mini'
+        const contextStr = formatContextForPrompt(ctx)
+
+        // Extract narrative blocks
+        const hook = narrativeBlocks.find(b => b.key === 'hook')?.content || ''
+        const origin = narrativeBlocks.find(b => b.key === 'origin')?.content || ''
+        const arc = narrativeBlocks.find(b => b.key === 'arc')?.content || ''
+        const pivots = narrativeBlocks.find(b => b.key === 'pivots')?.content || ''
+        const evidence = narrativeBlocks.find(b => b.key === 'evidence')?.content || ''
+        const resolution = narrativeBlocks.find(b => b.key === 'resolution')?.content || ''
+
+        const prompt = `You are a creative strategist crafting a shareable campaign proposal for persona: ${persona || 'General'}.
+
+CAMPAIGN CONCEPT: "${concept}"
+
+NARRATIVE FRAMEWORK:
+- Origin: ${origin || concept}
+- Hook: ${hook}
+- Narrative Arc: ${arc}
+- Pivotal Moments: ${pivots}
+- Supporting Evidence: ${evidence}
+- Resolution/Outcome: ${resolution}
+
+RECOMMENDED CREATIVE PARTNERS:
+${recommendedCreators.map(c => `- ${c.name} (${c.platform} • ${c.category}): ${c.tags.slice(0, 2).join(', ')}`).join('\n')}
+
+${contextStr ? `# RELEVANT CONTEXT (reference these insights):
+${contextStr}
+
+` : ''}# YOUR TASK:
+Create a compelling shareable pitch narrative (5-7 sentences) that:
+
+1. Opens with the campaign hook and core concept
+2. Explains WHY this concept is strategically valuable right now (reference context/trends if available)
+3. Highlights the PIVOTAL MOMENTS or key story beats that make this campaign engaging
+4. Explains WHY these specific creators are perfect matches:
+   - Connect each creator to specific aspects of the campaign (e.g., "${recommendedCreators[0]?.name}'s ${recommendedCreators[0]?.tags[0]} expertise aligns with...")
+   - Show how their platforms/audiences amplify the campaign
+5. End with the expected OUTCOME/IMPACT and call-to-action
+
+Write as a cohesive pitch narrative, NOT a bulleted list. Make it compelling and specific to THIS concept and THESE creators.`
+
+        const resp = await client.chat.completions.create({
+          model,
+          messages: [
+            { role: 'system', content: 'You are a creative campaign strategist. Write compelling, specific, narrative-driven pitch decks.' },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.8,
+          max_tokens: 400,
+        })
+
+        const narrative = resp.choices?.[0]?.message?.content || ''
+        await cacheSet(cacheKey, narrative)
+        return { narrative, sources: ctx.sources }
+      } catch (err) {
+        console.error('[AI] OpenAI call failed for concept proposal:', err)
+      }
+    }
+
+    // Fallback: construct a narrative from blocks
+    const creatorNames = recommendedCreators.slice(0, 3).map(c => `${c.name} (${c.platform})`).join(', ')
+    const fallbackNarrative = `${narrativeBlocks.find(b => b.key === 'hook')?.content || concept}
+
+This campaign leverages ${creatorNames} to amplify reach across key platforms. ${narrativeBlocks.find(b => b.key === 'arc')?.content || 'The narrative arc builds from introduction to transformation.'} ${narrativeBlocks.find(b => b.key === 'pivots')?.content || 'Pivotal moments create engagement opportunities.'}
+
+${narrativeBlocks.find(b => b.key === 'resolution')?.content || 'Expected outcome: Strong engagement, clear call-to-action, and measurable impact.'}`
+
+    await cacheSet(cacheKey, fallbackNarrative)
+    return { narrative: fallbackNarrative, sources: ctx.sources }
+  } catch (err) {
+    console.error('[AI] generateConceptProposal failed:', err)
+    throw err
+  }
+}

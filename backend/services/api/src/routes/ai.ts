@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements } from '../services/ai.js'
+import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements, generateConceptProposal } from '../services/ai.js'
 
 const router = Router()
 
@@ -76,6 +76,25 @@ router.post('/enhancements', async (req, res) => {
   try {
     const userId = (req as any).user?.sub || null
     const data = await generateEnhancements(concept, graph || { nodes: [], links: [] }, userId, persona || null)
+    res.json(data)
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || 'failed' })
+  }
+})
+
+router.post('/concept-proposal', async (req, res) => {
+  const { concept, narrativeBlocks, recommendedCreators, persona, projectId } = req.body || {}
+  if (!concept) return res.status(400).json({ error: 'concept required' })
+  try {
+    const userId = (req as any).user?.sub || null
+    const data = await generateConceptProposal(
+      concept,
+      narrativeBlocks || [],
+      recommendedCreators || [],
+      userId,
+      persona || null,
+      projectId || null
+    )
     res.json(data)
   } catch (e: any) {
     res.status(500).json({ error: e?.message || 'failed' })

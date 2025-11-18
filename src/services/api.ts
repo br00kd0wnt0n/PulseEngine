@@ -40,6 +40,10 @@ export const api = {
     '/ai/opportunities',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(opts||{}) }) }
   ),
+  conceptProposal: (concept: string, narrativeBlocks: { key: string; content: string }[], recommendedCreators: any[], opts?: { persona?: string; projectId?: string }) => request<any>(
+    '/ai/concept-proposal',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, narrativeBlocks, recommendedCreators, ...(opts||{}) }) }
+  ),
   createProject: (payload: { concept: string; persona?: string; platforms?: string[]; areasOfInterest?: string[]; graph?: any; focusId?: string | null }) =>
     request<any>('/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
   createPublicProject: (payload: any) =>
