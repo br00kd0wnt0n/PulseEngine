@@ -42,7 +42,7 @@ export default function DebriefOpportunities() {
   return (
     <div className="panel module p-4">
       <div className="flex items-center justify-between mb-2">
-        <div className="font-semibold">DEBRIEF + OPPORTUNITIES</div>
+        <div className="font-semibold">DEBRIEF <span className="text-white/30">|</span> OPPORTUNITIES</div>
         <div className="text-[11px] text-white/50 flex items-center gap-2">
           {asOf && <span>As of {asOf}</span>}
           {/* Persona attribution */}

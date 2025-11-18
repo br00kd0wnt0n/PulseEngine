@@ -83,7 +83,7 @@ export default function ScoringEnhancements() {
   return (
     <div className="panel module p-4">
       <div className="flex items-center justify-between mb-2">
-        <div className="font-semibold">SCORING + ENHANCEMENTS</div>
+        <div className="font-semibold">SCORING <span className="text-white/30">|</span> ENHANCEMENTS</div>
         <div className="flex items-center gap-2">
           {updatedAfterApply && (
             <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-white/60">Updated after apply</span>
