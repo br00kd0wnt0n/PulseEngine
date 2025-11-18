@@ -10,6 +10,7 @@ import ConceptCreators from '../components/Progressive/ConceptCreators'
 import { useDashboard } from '../context/DashboardContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { useUpload } from '../context/UploadContext'
+import { exportAnalysis, downloadMarkdown, copyToClipboard } from '../utils/export'
 
 type Stage = 'initial' | 'foundation' | 'narrative' | 'depth' | 'full'
 
@@ -145,7 +146,7 @@ export default function DashboardProgressive() {
 
   return (
     <div className="space-y-6">
-      {stage !== 'initial' && <Stepper stage={stage} onNext={() => setStage(next(stage))} onBack={() => setStage(prev(stage))} />}
+      {stage !== 'initial' && <Stepper stage={stage} concept={concept} persona={persona} region={region} onNext={() => setStage(next(stage))} onBack={() => setStage(prev(stage))} />}
 
       {stage === 'initial' && (
         <div className="w-full max-w-3xl mx-auto px-4">
@@ -195,7 +196,7 @@ export default function DashboardProgressive() {
   )
 }
 
-function Stepper({ stage, onNext, onBack }: { stage: Stage; onNext: () => void; onBack: () => void }) {
+function Stepper({ stage, concept, persona, region, onNext, onBack }: { stage: Stage; concept: string; persona: string; region: string; onNext: () => void; onBack: () => void }) {
   const steps: { key: Stage; label: string }[] = [
     { key: 'initial', label: 'Brief' },
     { key: 'foundation', label: 'Debrief + Opportunities' },
@@ -204,6 +205,29 @@ function Stepper({ stage, onNext, onBack }: { stage: Stage; onNext: () => void; 
     { key: 'full', label: 'Concept + Creators' },
   ]
   const idx = steps.findIndex(s => s.key === stage)
+
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [exported, setExported] = useState(false)
+
+  const handleExport = () => {
+    const markdown = exportAnalysis(concept, persona, region)
+    const filename = `campaign-analysis-${new Date().toISOString().split('T')[0]}.md`
+    downloadMarkdown(markdown, filename)
+    setExported(true)
+    setTimeout(() => setExported(false), 2000)
+    setShowExportMenu(false)
+  }
+
+  const handleCopy = async () => {
+    const markdown = exportAnalysis(concept, persona, region)
+    const success = await copyToClipboard(markdown)
+    if (success) {
+      setExported(true)
+      setTimeout(() => setExported(false), 2000)
+    }
+    setShowExportMenu(false)
+  }
+
   return (
     <div className="panel p-3">
       <div className="flex items-center justify-between">
@@ -215,7 +239,31 @@ function Stepper({ stage, onNext, onBack }: { stage: Stage; onNext: () => void; 
             </div>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 relative">
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="text-xs px-3 py-1 rounded border border-white/20 bg-white/5 hover:bg-white/10 flex items-center gap-1"
+            >
+              {exported ? '✓ Exported' : '↓ Export'}
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1 bg-charcoal-800 border border-white/20 rounded-md shadow-lg z-50 min-w-[140px]">
+                <button
+                  onClick={handleExport}
+                  className="w-full text-left text-xs px-3 py-2 hover:bg-white/10 rounded-t-md"
+                >
+                  Download Markdown
+                </button>
+                <button
+                  onClick={handleCopy}
+                  className="w-full text-left text-xs px-3 py-2 hover:bg-white/10 rounded-b-md border-t border-white/10"
+                >
+                  Copy to Clipboard
+                </button>
+              </div>
+            )}
+          </div>
           <button onClick={onBack} disabled={idx<=0} className="text-xs px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40">Back</button>
           <button onClick={onNext} disabled={idx>=steps.length-1} className="text-xs px-2 py-1 rounded border border-white/10 bg-ralph-cyan/70 hover:bg-ralph-cyan disabled:opacity-40">Continue</button>
         </div>
