@@ -122,6 +122,11 @@ Return ONLY valid JSON. Make every field specific to "${concept}" and grounded i
     const hasCoreKnowledge = ctx.coreKnowledge && ctx.coreKnowledge.length > 0
     const conceptLower = concept.toLowerCase()
 
+    // Detect content type for appropriate strategy language
+    const isVideoContent = conceptLower.includes('video') || conceptLower.includes('clip') || conceptLower.includes('content')
+    const isCampaignStrategy = conceptLower.includes('campaign') || conceptLower.includes('strategy') || conceptLower.includes('brand')
+    const isShortForm = conceptLower.includes('tiktok') || conceptLower.includes('short') || conceptLower.includes('reel')
+
     // Extract platform hints from concept
     const platforms = []
     if (conceptLower.includes('tiktok') || conceptLower.includes('short')) platforms.push('TikTok')
@@ -129,14 +134,23 @@ Return ONLY valid JSON. Make every field specific to "${concept}" and grounded i
     if (conceptLower.includes('youtube')) platforms.push('YouTube')
     if (platforms.length === 0) platforms.push('TikTok', 'Instagram')
 
+    // Context-appropriate hook language
+    const hookPoint = isCampaignStrategy
+      ? `Lead with a compelling campaign narrative that immediately connects with audience values and current cultural moments`
+      : isVideoContent || isShortForm
+      ? `Lead with a strong visual hook in the first 3 seconds that showcases the core value of "${concept}"`
+      : `Open with an attention-grabbing campaign promise that resonates with target audience interests`
+
     const heuristic = {
-      brief: `"${concept}" aligns with current ${persona ? persona + ' ' : ''}audience interests${hasLiveMetrics ? ' and trending content patterns' : ''}. This campaign should focus on ${platforms.join(' and ')} with authentic storytelling that resonates with platform-native formats and engagement behaviors.`,
-      summary: `Create ${platforms[0]}-first content that turns "${concept}" into a shareable, participatory campaign.`,
+      brief: `"${concept}" aligns with current ${persona ? persona + ' ' : ''}audience interests${hasLiveMetrics ? ' and trending content patterns' : ''}. This ${isCampaignStrategy ? 'campaign strategy' : 'content approach'} should focus on ${platforms.join(' and ')} with authentic storytelling that resonates with platform-native formats and engagement behaviors.`,
+      summary: isCampaignStrategy
+        ? `Develop strategic campaign framework that positions "${concept}" for maximum cultural relevance and audience engagement`
+        : `Create ${platforms[0]}-first content that turns "${concept}" into a shareable, participatory ${isShortForm ? 'experience' : 'campaign'}.`,
       keyPoints: [
-        `Lead with a strong hook in the first 3 seconds that showcases the core value of "${concept}"`,
-        `Design content for ${platforms.join(' and ')} native formats (9:16 vertical, 15-60s duration, text overlays)`,
-        `Build in remix opportunities and collaboration hooks to amplify reach organically`,
-        `Plan multi-touchpoint campaign with launch content, creator partnerships, and audience participation beats`
+        hookPoint,
+        `Design content for ${platforms.join(' and ')} native formats${isShortForm ? ' (9:16 vertical, 15-60s duration, text overlays)' : ' with platform-specific optimizations'}`,
+        `Build in ${isCampaignStrategy ? 'strategic partnership opportunities and' : ''} remix opportunities and collaboration hooks to amplify reach organically`,
+        `Plan multi-touchpoint ${isCampaignStrategy ? 'campaign architecture' : 'content strategy'} with launch beats, creator partnerships, and audience participation moments`
       ],
       didYouKnow: hasLiveMetrics
         ? [ `Live trend data shows high engagement in ${platforms[0]} content`, 'Short-form video drives 2.5x more shares than static posts', 'Authentic creator partnerships outperform paid ads by 3-5x' ]
@@ -507,33 +521,67 @@ Return ONLY valid JSON with keys: narrative, content, platform, collab (arrays o
 function buildHeuristicRecs(concept?: string) {
   const lc = (concept || '').toLowerCase()
   const flags = {
-    dance: lc.includes('dance'), ai: lc.includes('ai'), retro: lc.includes('retro'), tutorial: lc.includes('tutorial')
+    dance: lc.includes('dance'),
+    ai: lc.includes('ai'),
+    retro: lc.includes('retro'),
+    tutorial: lc.includes('tutorial'),
+    brand: lc.includes('brand') || lc.includes('product'),
+    social: lc.includes('tiktok') || lc.includes('instagram') || lc.includes('social'),
+    campaign: lc.includes('campaign') || lc.includes('strategy'),
+    video: lc.includes('video') || lc.includes('content')
   }
+
+  // Concept-specific strategic hook suggestions
+  const conceptHook = concept ? `Open with compelling visual that immediately demonstrates the core value of "${concept.slice(0, 60)}"` : ''
+
   const narrative = [
-    flags.ai ? 'Lean into AI hook; make the benefit explicit in sentence one.' : 'Clarify the core hook in sentence one.',
-    flags.retro ? 'Tie nostalgia to a modern pattern with a named device.' : 'Add a cultural beat that resonates with target audience.',
-    'Close with a prompt that invites creator response (duet/stitch).',
+    flags.ai ? `Lead with AI-powered transformation moment showing before/after impact in first 5 seconds` :
+      flags.brand ? `Start with authentic brand story that connects emotional heritage to modern audience needs` :
+      flags.campaign ? `Hook audience with bold campaign promise that addresses current cultural moment` :
+      conceptHook || `Create attention-grabbing opening that showcases campaign's unique value proposition`,
+    flags.retro ? `Build narrative arc that bridges nostalgic elements with contemporary relevance and modern execution` :
+      flags.social ? `Structure story progression optimized for social platform algorithms and engagement patterns` :
+      `Develop clear story arc from setup through transformation to impactful resolution`,
+    flags.dance ? `Close with participatory dance challenge that invites audience duets and remixes` :
+      flags.tutorial ? `End with clear call-to-action encouraging viewers to try technique themselves` :
+      `Conclude with strong CTA that drives audience participation or next-step engagement`,
   ]
+
   const content = [
-    flags.tutorial ? 'Produce a 20–30s how‑to variant to boost saves.' : 'Plan a tutorial cut to improve saves and replays.',
-    flags.dance ? 'Design a loop‑friendly beat for the dance moment (7–10s).' : 'Identify a loopable moment to support replays.',
-    'Prepare 3–5 caption variants to test hook clarity.',
+    flags.tutorial ? `Create step-by-step tutorial series (20-30s each) optimized for saves and repeat views` :
+      flags.video ? `Develop episodic content series with cliffhangers driving continued viewership` :
+      `Plan multi-part content journey with clear narrative progression across installments`,
+    flags.dance ? `Design 7-10 second loopable dance moment with memorable choreography for viral potential` :
+      flags.social ? `Build engaging content beats timed to platform-optimal durations (TikTok 15-60s, Reels 30-90s)` :
+      `Create key replayable moments that encourage audience engagement and sharing`,
+    flags.brand ? `Develop authentic proof content including testimonials, case studies, and user-generated examples` :
+      `Prepare variant content formats to test messaging clarity and audience resonance`,
   ]
+
   const platform = [
-    'Ship trims for TikTok/Shorts/Reels; tailor the first 2s to each.',
-    flags.retro ? 'Use overlays to connect nostalgia with present relevance.' : 'Use overlays to state the promise in frame 1.',
-    'Schedule posts to match your audience’s peak windows.',
+    flags.social ? `Launch on TikTok/Instagram using trending formats and sounds for maximum algorithmic reach` :
+      `Adapt content for cross-platform distribution (TikTok/Shorts/Reels) with platform-specific optimizations`,
+    flags.retro ? `Use visual storytelling to connect nostalgic elements with modern platform aesthetics` :
+      flags.campaign ? `Deploy platform-specific campaign activations timed to audience engagement peaks` :
+      `Optimize first 3 seconds for each platform's specific viewer behavior patterns`,
+    `Schedule strategic posting windows aligned with target audience activity patterns and platform algorithms`,
   ]
+
   const collab = [
-    flags.dance ? 'Target dance creators with a duet prompt and a clear beat.' : 'Invite creator remixes with a simple prompt and stitch cue.',
-    'Line up 1 macro + 3 micro collaborators for coverage.',
-    'Offer a shared asset (beat/overlay) to ease adoption.',
+    flags.dance ? `Partner with dance creators and choreographers for authentic movement content and duet opportunities` :
+      flags.tutorial ? `Collaborate with educational creators in relevant verticals for credibility and reach` :
+      flags.brand ? `Work with brand-aligned micro and mid-tier influencers for authentic product storytelling` :
+      `Engage creator partnerships across audience segments for expanded reach and diverse perspectives`,
+    `Build collaboration framework: 1-2 macro creators for awareness + 5-8 micro creators for authenticity`,
+    flags.social ? `Provide remixable assets (sounds, effects, templates) to lower participation barriers and drive UGC` :
+      `Offer collaborative content packages that make creator participation effortless and appealing`,
   ]
+
   // Simple framework scores + rationales
   const framework = {
-    market: { score: clamp(50 + (platform.length + collab.length) * 8, 0, 100), why: 'Solid cross‑platform plan and collaboration hooks signal healthy market fit.' },
-    narrative: { score: clamp(50 + narrative.length * 10, 0, 100), why: 'Clear hook and cultural angle strengthen narrative potential.' },
-    commercial: { score: clamp(45 + (collab.length * 10), 0, 100), why: 'Collaboration and format planning open monetization and scalability pathways.' },
+    market: { score: clamp(55 + (platform.length + collab.length) * 8, 0, 100), why: 'Cross-platform strategy and creator collaboration framework demonstrates strong market approach.' },
+    narrative: { score: clamp(60 + narrative.length * 8, 0, 100), why: 'Structured narrative arc with clear hooks and progression supports audience engagement.' },
+    commercial: { score: clamp(50 + (collab.length * 9), 0, 100), why: 'Multi-creator strategy and platform optimization create scalable monetization pathways.' },
   }
   return { narrative, content, platform, collab, framework }
 }

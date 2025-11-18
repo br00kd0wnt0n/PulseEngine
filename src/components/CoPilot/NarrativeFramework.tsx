@@ -211,11 +211,19 @@ function autofillBlock(b: Omit<Block, 'id'>, concept?: string, keyDrivers?: stri
 
   switch (b.key) {
     case 'origin': {
-      // Campaign premise/setup - start with the concept, optionally enhanced by strategic insight
+      // Campaign premise/setup - strategic high-level vision, not tactical execution
+      if (concept && deb?.summary) {
+        // Use strategic summary insight
+        return `${concept} — ${deb.summary}`
+      }
       if (concept && deb?.brief) {
-        // Extract first sentence of brief for context
+        // Extract strategic context from brief (avoid tactical execution details)
         const briefFirstSentence = deb.brief.split('.')[0]
-        return `${concept} - ${briefFirstSentence}`
+        // If it's tactical (starts with "Create", "Build", "Design"), use concept only
+        if (/^(create|build|design|develop|produce|make)/i.test(briefFirstSentence)) {
+          return concept
+        }
+        return `${concept} — ${briefFirstSentence}`
       }
       return concept || 'Define the campaign premise and core story setup'
     }
