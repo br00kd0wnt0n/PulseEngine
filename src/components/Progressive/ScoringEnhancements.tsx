@@ -96,10 +96,10 @@ export default function ScoringEnhancements() {
       )}
       <div className="grid md:grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Metric label="Narrative Potential" value={score?.scores?.narrativeStrength} delta={diff(score?.scores?.narrativeStrength, lastExt?.narrative)} />
-          <Metric label="Time to Peak" value={score?.scores?.timeToPeakWeeks} unit="wks" delta={diff(ext?.timeToPeakScore, lastExt?.ttp)} />
-          <Metric label="Cross‑platform" value={score?.ralph?.crossPlatformPotential} delta={diff(ext?.crossPlatformPotential, lastExt?.cross)} />
-          <Metric label="Commercial" value={ext?.commercialPotential} delta={diff(ext?.commercialPotential, lastExt?.commercial)} />
+          <Metric label="Narrative Potential" value={score?.scores?.narrativeStrength} previousValue={lastExt?.narrative} delta={diff(score?.scores?.narrativeStrength, lastExt?.narrative)} />
+          <Metric label="Time to Peak" value={score?.scores?.timeToPeakWeeks} previousValue={lastExt?.ttp} unit="wks" delta={diff(ext?.timeToPeakScore, lastExt?.ttp)} />
+          <Metric label="Cross‑platform" value={score?.ralph?.crossPlatformPotential} previousValue={lastExt?.cross} delta={diff(ext?.crossPlatformPotential, lastExt?.cross)} />
+          <Metric label="Commercial" value={ext?.commercialPotential} previousValue={lastExt?.commercial} delta={diff(ext?.commercialPotential, lastExt?.commercial)} />
         </div>
         <div className="space-y-2">
           <div className="text-xs text-white/60 mb-1">Targeted Enhancements</div>
@@ -146,7 +146,7 @@ function diff(curr?: number, prev?: number) {
   return d === 0 ? undefined : d
 }
 
-function Metric({ label, value, unit, delta }: { label: string; value?: number; unit?: string; delta?: number }) {
+function Metric({ label, value, unit, delta, previousValue }: { label: string; value?: number; unit?: string; delta?: number; previousValue?: number }) {
   if (typeof value !== 'number') return (
     <div className="panel p-2">
       <div className="text-xs text-white/60">{label}</div>
@@ -154,6 +154,10 @@ function Metric({ label, value, unit, delta }: { label: string; value?: number; 
     </div>
   )
   const pct = unit === 'wks' ? Math.max(0, Math.min(100, 100 - (value - 1) * 12)) : Math.max(0, Math.min(100, value))
+  const prevPct = typeof previousValue === 'number'
+    ? (unit === 'wks' ? Math.max(0, Math.min(100, 100 - (previousValue - 1) * 12)) : Math.max(0, Math.min(100, previousValue)))
+    : null
+
   return (
     <div className="panel p-2">
       <div className="text-xs text-white/60 flex items-center justify-between">
@@ -165,8 +169,16 @@ function Metric({ label, value, unit, delta }: { label: string; value?: number; 
         </span>
         {unit ? <span className="text-white/70">{value} {unit}</span> : <span className="text-white/70">{Math.round(value)}</span>}
       </div>
-      <div className="mt-1 h-2 rounded bg-charcoal-700/50">
+      <div className="mt-1 h-2 rounded bg-charcoal-700/50 relative">
         <div className="h-2 rounded accent-gradient" style={{ width: `${pct}%` }} />
+        {prevPct !== null && (
+          <div
+            className="absolute top-0 flex flex-col items-center"
+            style={{ left: `${prevPct}%`, transform: 'translateX(-50%)' }}
+          >
+            <div className="text-white/40 text-[10px] leading-none" style={{ marginTop: '-12px' }}>▼</div>
+          </div>
+        )}
       </div>
     </div>
   )
