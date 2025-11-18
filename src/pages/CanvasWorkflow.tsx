@@ -19,7 +19,7 @@ export default function CanvasWorkflow() {
         x: 50,
         y: 50,
         width: 400,
-        height: 200,
+        height: 280,
         minimized: false,
         zIndex: 1,
         status: 'active'
@@ -29,7 +29,7 @@ export default function CanvasWorkflow() {
         type: 'upload',
         title: 'Context & Files',
         x: 50,
-        y: 280,
+        y: 350,
         width: 400,
         height: 180,
         minimized: false,
