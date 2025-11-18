@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Canvas from '../components/Canvas/Canvas'
 import { NodeData } from '../components/Canvas/Node'
+import FloatingAssistant from '../components/Canvas/FloatingAssistant'
 import { useDashboard } from '../context/DashboardContext'
 import { useUpload } from '../context/UploadContext'
 
@@ -36,18 +37,6 @@ export default function CanvasWorkflow() {
         zIndex: 1,
         status: 'idle',
         connectedTo: ['brief-input']
-      },
-      {
-        id: 'copilot',
-        type: 'copilot',
-        title: 'RalphBot',
-        x: 1000,
-        y: 100,
-        width: 350,
-        height: 500,
-        minimized: false,
-        zIndex: 10,
-        status: 'idle'
       }
     ]
 
@@ -79,10 +68,17 @@ export default function CanvasWorkflow() {
   const handleSubmit = () => {
     if (!concept) return
     setActivated(true)
-    // Mark brief as complete
-    setNodes(prev => prev.map(n =>
-      n.id === 'brief-input' ? { ...n, status: 'complete' as const } : n
-    ))
+
+    // Mark brief as complete and minimize previous nodes
+    setNodes(prev => prev.map(n => {
+      if (n.id === 'brief-input') {
+        return { ...n, status: 'complete' as const, minimized: true, x: 50, y: 100 }
+      }
+      if (n.id === 'context-upload') {
+        return { ...n, status: 'complete' as const, minimized: true, x: 50, y: 160 }
+      }
+      return n
+    }))
   }
 
   const renderNodeContent = (node: NodeData) => {
@@ -185,34 +181,6 @@ export default function CanvasWorkflow() {
       )
     }
 
-    if (node.id === 'copilot') {
-      return (
-        <div className="flex flex-col h-full">
-          <div className="flex-1 overflow-auto space-y-2 text-xs mb-2">
-            <div className="p-2 rounded bg-ralph-cyan/20 border border-ralph-cyan/30">
-              <div className="text-white/60 text-[10px] mb-1">RalphBot</div>
-              <div className="text-white/80">Welcome! I'm here to guide you through the campaign workflow. Start by entering your story brief above.</div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Ask RalphBot..."
-              onMouseDown={(e) => e.stopPropagation()}
-              className="flex-1 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-xs"
-            />
-            <button
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              className="px-3 py-1 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs"
-            >
-              Send
-            </button>
-          </div>
-        </div>
-      )
-    }
-
     return null
   }
 
@@ -231,6 +199,9 @@ export default function CanvasWorkflow() {
 
       {/* Canvas with Nodes */}
       <Canvas nodes={nodes} onNodesChange={setNodes} renderNodeContent={renderNodeContent} />
+
+      {/* Floating RalphBot Assistant */}
+      <FloatingAssistant />
     </div>
   )
 }
