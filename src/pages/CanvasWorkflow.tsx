@@ -52,8 +52,8 @@ export default function CanvasWorkflow() {
           id: 'debrief',
           type: 'debrief',
           title: 'AI Analysis',
-          x: 500,
-          y: 100,
+          x: 310, // Positioned next to minimized stack (50 + 240 + 20 padding)
+          y: 100, // Aligned with top of minimized stack
           width: 450,
           height: 400,
           minimized: false,
