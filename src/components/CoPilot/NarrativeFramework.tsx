@@ -229,7 +229,14 @@ function autofillBlock(b: Omit<Block, 'id'>, concept?: string, keyDrivers?: stri
       const hookOpp = opp?.opportunities?.find((x: any) => /hook|open|grab|attract/i.test(x.title))
       if (hookOpp) return hookOpp.title
 
-      return deb?.keyPoints?.[0] || suggestFromDrivers(b, kd, concept)
+      // Use first debrief key point as hook
+      if (deb?.keyPoints?.[0]) return `Hook: ${deb.keyPoints[0]}`
+
+      // Use key drivers for concept-specific hook
+      if (kd[0] && concept) return `Open with ${kd[0]}-driven hook that introduces "${concept}" in first 3-5 seconds`
+
+      // Ultimate fallback: concept-specific generic
+      return concept ? `Lead with visual hook that immediately showcases the value of "${concept}"` : 'Define campaign opening hook that grabs attention'
     }
 
     case 'arc': {
@@ -270,9 +277,15 @@ function autofillBlock(b: Omit<Block, 'id'>, concept?: string, keyDrivers?: stri
       if (contentPivot) return contentPivot
 
       // Use second debrief point as potential pivot
-      if (deb?.keyPoints?.[1]) return `Key turning point: ${deb.keyPoints[1]}`
+      if (deb?.keyPoints?.[1]) return `Pivotal moment: ${deb.keyPoints[1]}`
 
-      return 'Identify the pivotal moment where the story shifts (challenge revealed, solution discovered, or transformation happens)'
+      // Use any debrief point as pivot context
+      if (deb?.keyPoints?.[0]) return `Turn the story when ${deb.keyPoints[0]} is revealed or challenged`
+
+      // Concept-specific pivot suggestion
+      if (concept) return `Create turning point where "${concept}" shifts from introduction to transformation or payoff`
+
+      return 'Define the pivotal moment where campaign narrative shifts (challenge revealed, solution discovered, transformation happens)'
     }
 
     case 'evidence': {
