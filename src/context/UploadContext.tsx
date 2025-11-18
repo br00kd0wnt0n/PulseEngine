@@ -25,13 +25,37 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // Get active project ID for context association
-      const activeProjectId = localStorage.getItem('activeProjectId') || 'local'
+      let activeProjectId = localStorage.getItem('activeProjectId')
+
+      // Validate that projectId is a valid UUID (not 'local' string)
+      const isValidUUID = activeProjectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeProjectId)
+
+      // If no valid project ID, create a default project for this user
+      if (!isValidUUID) {
+        try {
+          const response = await fetch(`${API_BASE}/projects`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'Default Project', ownerId: USER_ID }),
+          })
+          if (response.ok) {
+            const project = await response.json()
+            activeProjectId = project.id
+            localStorage.setItem('activeProjectId', activeProjectId)
+            try { window.dispatchEvent(new CustomEvent('project-created', { detail: project })) } catch {}
+          }
+        } catch (e) {
+          console.error('Failed to create default project:', e)
+          // If we can't create a project, we shouldn't upload with projectId=NULL (that's RKB)
+          throw new Error('No valid project found. Please create a project first.')
+        }
+      }
 
       // Upload files to ingestion service
       const formData = new FormData()
       files.forEach(file => formData.append('files', file))
       formData.append('ownerId', USER_ID)
-      formData.append('projectId', activeProjectId)
+      formData.append('projectId', activeProjectId!) // activeProjectId is now guaranteed to be valid
 
       const response = await fetch(`${INGESTION_URL}/ingest/upload`, {
         method: 'POST',
@@ -77,7 +101,30 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // Get active project ID for context association
-      const activeProjectId = localStorage.getItem('activeProjectId') || 'local'
+      let activeProjectId = localStorage.getItem('activeProjectId')
+
+      // Validate that projectId is a valid UUID (not 'local' string)
+      const isValidUUID = activeProjectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeProjectId)
+
+      // If no valid project ID, create a default project for this user
+      if (!isValidUUID) {
+        try {
+          const response = await fetch(`${API_BASE}/projects`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'Default Project', ownerId: USER_ID }),
+          })
+          if (response.ok) {
+            const project = await response.json()
+            activeProjectId = project.id
+            localStorage.setItem('activeProjectId', activeProjectId)
+            try { window.dispatchEvent(new CustomEvent('project-created', { detail: project })) } catch {}
+          }
+        } catch (e) {
+          console.error('Failed to create default project:', e)
+          throw new Error('No valid project found. Please create a project first.')
+        }
+      }
 
       const response = await fetch(`${INGESTION_URL}/ingest/url`, {
         method: 'POST',
