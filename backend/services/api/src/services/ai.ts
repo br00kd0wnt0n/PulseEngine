@@ -69,7 +69,7 @@ export async function generateDebrief(concept: string, userId?: string | null, p
       // Fallback to empty context if retrieval fails
       ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
     }
-    const cacheKey = sha({ t: 'debrief', concept, s: summarySig(ctx) })
+    const cacheKey = sha({ t: 'debrief', concept, s: summarySig(ctx, projectId) })
     const cached = await cacheGet<any>(cacheKey)
     if (cached) return cached
     const apiKey = process.env.OPENAI_API_KEY
@@ -169,7 +169,7 @@ export async function generateOpportunities(concept: string, userId?: string | n
       // Fallback to empty context if retrieval fails
       ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
     }
-    const cacheKey = sha({ t: 'opps', concept, s: summarySig(ctx) })
+    const cacheKey = sha({ t: 'opps', concept, s: summarySig(ctx, projectId) })
     const cached = await cacheGet<any>(cacheKey)
     if (cached) return cached
     const apiKey = process.env.OPENAI_API_KEY
@@ -276,8 +276,16 @@ Return ONLY valid JSON: { opportunities: [{ title, why, impact }], rationale }`
   }
 }
 
-function summarySig(ctx: RetrievalContext) {
-  const m = [ctx.projectContent.length, ctx.coreKnowledge.length, ctx.liveMetrics.length, ctx.predictiveTrends.length]
+function summarySig(ctx: RetrievalContext, projectId?: string | null) {
+  const m = [
+    projectId || 'none',
+    ctx.projectContent.length,
+    ctx.coreKnowledge.length,
+    ctx.liveMetrics.length,
+    ctx.predictiveTrends.length,
+    // Include hash of first project content ID to detect changes
+    ctx.projectContent[0]?.slice(0, 8) || 'empty'
+  ]
   return m.join('-')
 }
 
