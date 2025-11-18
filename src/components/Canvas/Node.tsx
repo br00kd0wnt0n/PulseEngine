@@ -10,7 +10,7 @@ export type NodeData = {
   height: number
   minimized: boolean
   zIndex: number
-  status?: 'idle' | 'active' | 'complete'
+  status?: 'idle' | 'active' | 'complete' | 'processing'
   connectedTo?: string[]
 }
 
@@ -67,7 +67,8 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
   const statusColors = {
     idle: 'border-white/20 bg-charcoal-800/90',
     active: 'border-ralph-cyan/40 bg-charcoal-800/95 shadow-lg shadow-ralph-cyan/20',
-    complete: 'border-ralph-pink/40 bg-charcoal-800/90'
+    complete: 'border-ralph-pink/40 bg-charcoal-800/90',
+    processing: 'border-orange-400/50 bg-charcoal-800/95 shadow-lg shadow-orange-400/20'
   }
 
   // Special styling for RalphBot
@@ -93,8 +94,9 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
       <div className="flex items-center justify-between p-2 border-b border-white/10">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${
-            data.status === 'active' ? 'bg-ralph-cyan animate-pulse' :
+            data.status === 'active' ? 'bg-ralph-cyan' :
             data.status === 'complete' ? 'bg-ralph-pink' :
+            data.status === 'processing' ? 'bg-orange-400 animate-pulse' :
             'bg-white/40'
           }`} />
           <div className="text-sm font-medium">{data.title}</div>

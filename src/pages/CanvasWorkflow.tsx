@@ -22,7 +22,7 @@ export default function CanvasWorkflow() {
         height: 280,
         minimized: false,
         zIndex: 1,
-        status: 'idle'
+        status: 'active'
       },
       {
         id: 'context-upload',
@@ -69,7 +69,7 @@ export default function CanvasWorkflow() {
           height: 400,
           minimized: false,
           zIndex: 2,
-          status: 'active',
+          status: 'processing',
           connectedTo: ['brief-input', 'context-upload']
         }
       ])
