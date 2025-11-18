@@ -66,7 +66,7 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
 
   const statusColors = {
     idle: 'border-white/20 bg-charcoal-800/90',
-    active: 'border-ralph-cyan/60 bg-charcoal-800/95 shadow-2xl shadow-ralph-cyan/80 ring-1 ring-ralph-cyan/40',
+    active: 'border-ralph-cyan/40 bg-charcoal-800/95 shadow-lg shadow-ralph-cyan/20',
     complete: 'border-ralph-pink/40 bg-charcoal-800/90'
   }
 
