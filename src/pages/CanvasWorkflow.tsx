@@ -36,6 +36,18 @@ export default function CanvasWorkflow() {
         zIndex: 1,
         status: 'idle',
         connectedTo: ['brief-input']
+      },
+      {
+        id: 'copilot',
+        type: 'copilot',
+        title: 'RalphBot',
+        x: 1000,
+        y: 100,
+        width: 350,
+        height: 500,
+        minimized: false,
+        zIndex: 10,
+        status: 'idle'
       }
     ]
 
@@ -52,25 +64,13 @@ export default function CanvasWorkflow() {
           type: 'debrief',
           title: 'AI Analysis',
           x: 500,
-          y: 50,
+          y: 100,
           width: 450,
           height: 400,
           minimized: false,
           zIndex: 2,
           status: 'active',
           connectedTo: ['brief-input', 'context-upload']
-        },
-        {
-          id: 'copilot',
-          type: 'copilot',
-          title: 'Co-Pilot',
-          x: 1000,
-          y: 50,
-          width: 350,
-          height: 500,
-          minimized: false,
-          zIndex: 10, // Floating above everything
-          status: 'active'
         }
       ])
     }
@@ -189,22 +189,22 @@ export default function CanvasWorkflow() {
       return (
         <div className="flex flex-col h-full">
           <div className="flex-1 overflow-auto space-y-2 text-xs mb-2">
-            <div className="p-2 rounded bg-ralph-purple/20 border border-ralph-purple/30">
-              <div className="text-white/60 text-[10px] mb-1">Co-Pilot</div>
+            <div className="p-2 rounded bg-ralph-cyan/20 border border-ralph-cyan/30">
+              <div className="text-white/60 text-[10px] mb-1">RalphBot</div>
               <div className="text-white/80">Welcome! I'm here to guide you through the campaign workflow. Start by entering your story brief above.</div>
             </div>
           </div>
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="Ask Co-Pilot..."
+              placeholder="Ask RalphBot..."
               onMouseDown={(e) => e.stopPropagation()}
               className="flex-1 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-xs"
             />
             <button
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              className="px-3 py-1 rounded bg-ralph-pink/70 hover:bg-ralph-pink text-xs"
+              className="px-3 py-1 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs"
             >
               Send
             </button>

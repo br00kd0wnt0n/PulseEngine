@@ -70,7 +70,10 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
     complete: 'border-ralph-pink/40 bg-charcoal-800/90'
   }
 
-  const statusColor = statusColors[data.status || 'idle']
+  // Special styling for RalphBot
+  const isRalphBot = data.id === 'copilot' || data.id === 'ralphbot'
+  const ralphBotStyle = isRalphBot ? 'bg-ralph-cyan/10 border-ralph-cyan/30' : ''
+  const statusColor = isRalphBot ? ralphBotStyle : statusColors[data.status || 'idle']
 
   return (
     <div
@@ -112,10 +115,6 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
           {children}
         </div>
       )}
-
-      {/* Connection Points */}
-      <div className="absolute -right-2 top-1/2 w-4 h-4 rounded-full bg-ralph-cyan/50 border-2 border-ralph-cyan transform -translate-y-1/2" />
-      <div className="absolute -left-2 top-1/2 w-4 h-4 rounded-full bg-ralph-pink/50 border-2 border-ralph-pink transform -translate-y-1/2" />
     </div>
   )
 }
