@@ -40,15 +40,25 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           })
           if (response.ok) {
             const project = await response.json()
+            if (!project.id) {
+              throw new Error('Project created but no ID returned')
+            }
             activeProjectId = project.id
-            localStorage.setItem('activeProjectId', activeProjectId)
+            localStorage.setItem('activeProjectId', project.id) // Use project.id directly to satisfy TypeScript
             try { window.dispatchEvent(new CustomEvent('project-created', { detail: project })) } catch {}
+          } else {
+            throw new Error('Failed to create default project')
           }
         } catch (e) {
           console.error('Failed to create default project:', e)
           // If we can't create a project, we shouldn't upload with projectId=NULL (that's RKB)
           throw new Error('No valid project found. Please create a project first.')
         }
+      }
+
+      // At this point, activeProjectId must be a valid string
+      if (!activeProjectId) {
+        throw new Error('No valid project ID available')
       }
 
       // Upload files to ingestion service
@@ -116,14 +126,24 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
           })
           if (response.ok) {
             const project = await response.json()
+            if (!project.id) {
+              throw new Error('Project created but no ID returned')
+            }
             activeProjectId = project.id
-            localStorage.setItem('activeProjectId', activeProjectId)
+            localStorage.setItem('activeProjectId', project.id) // Use project.id directly to satisfy TypeScript
             try { window.dispatchEvent(new CustomEvent('project-created', { detail: project })) } catch {}
+          } else {
+            throw new Error('Failed to create default project')
           }
         } catch (e) {
           console.error('Failed to create default project:', e)
           throw new Error('No valid project found. Please create a project first.')
         }
+      }
+
+      // At this point, activeProjectId must be a valid string
+      if (!activeProjectId) {
+        throw new Error('No valid project ID available')
       }
 
       const response = await fetch(`${INGESTION_URL}/ingest/url`, {

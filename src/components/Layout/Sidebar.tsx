@@ -5,6 +5,7 @@ import LogoMark from '../LogoMark'
 
 const nav = [
   { to: '/', label: 'Project Dashboard' },
+  { to: '/canvas', label: 'Canvas (Beta)' },
   { to: '/creators', label: 'Creators' },
   { to: '/projects', label: 'Projects' },
   { to: '/trends-admin', label: 'Trends' },

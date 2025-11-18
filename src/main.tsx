@@ -5,6 +5,7 @@ import './index.css'
 import App from './App'
 import Dashboard from './pages/Dashboard'
 import DashboardProgressive from './pages/DashboardProgressive'
+import CanvasWorkflow from './pages/CanvasWorkflow'
 import Trends from './pages/Trends'
 import Upload from './pages/Upload'
 import Creators from './pages/Creators'
@@ -30,6 +31,7 @@ const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <DashboardProgressive /> },
+      { path: 'canvas', element: <CanvasWorkflow /> },
       { path: 'trends', element: <Trends /> },
       { path: 'upload', element: <Upload /> },
       { path: 'creators', element: <Creators /> },
