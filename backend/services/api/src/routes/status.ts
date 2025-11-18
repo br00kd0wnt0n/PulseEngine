@@ -6,10 +6,10 @@ const router = Router()
 router.get('/overview', async (_req, res) => {
   const db = AppDataSource
   // Counts
-  const [[users], [creators], [trends], [assets]] = await Promise.all([
+  const [[users], [creators], [platformMetrics], [assets]] = await Promise.all([
     db.query('SELECT count(*)::int AS c FROM users'),
     db.query('SELECT count(*)::int AS c FROM creators'),
-    db.query('SELECT count(*)::int AS c FROM trends'),
+    db.query('SELECT count(*)::int AS c FROM platform_metrics'),
     db.query('SELECT count(*)::int AS c FROM content_assets'),
   ])
 
@@ -25,14 +25,14 @@ router.get('/overview', async (_req, res) => {
     ORDER BY bytes DESC
   `)
 
-  // Trends job status: last run inferred from most recent trend row
+  // Platform metrics job status: last run inferred from most recent platform_metrics row
   let trendsJob: any = { ok: true, lastRun: null, count: 0, storageBytes: 0 }
   try {
-    const [row] = await db.query('SELECT MAX("createdAt") as last, COUNT(*)::int as cnt FROM trends')
+    const [row] = await db.query('SELECT MAX("createdAt") as last, COUNT(*)::int as cnt FROM platform_metrics')
     trendsJob.lastRun = row?.last || null
     trendsJob.count = row?.cnt || 0
-    const trendsTable = (tables || []).find((t: any) => t.name === 'trends')
-    trendsJob.storageBytes = trendsTable?.bytes || 0
+    const metricsTable = (tables || []).find((t: any) => t.name === 'platform_metrics')
+    trendsJob.storageBytes = metricsTable?.bytes || 0
   } catch (e) {
     // keep defaults
   }
@@ -108,7 +108,7 @@ router.get('/overview', async (_req, res) => {
     stats: {
       users: users?.c ?? 0,
       creators: creators?.c ?? 0,
-      trends: trends?.c ?? 0,
+      trends: platformMetrics?.c ?? 0,
       assets: assets?.c ?? 0,
     },
   })
