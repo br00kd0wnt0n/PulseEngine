@@ -65,8 +65,8 @@ export function CitationToken({ id, label, detail }: { id: number; label: string
       onClick={() => {
         try { window.dispatchEvent(new CustomEvent('open-citation', { detail: { id, label, detail } })) } catch {}
       }}
-      className="inline-flex items-center justify-center align-middle text-[10px] px-1.5 py-0.5 rounded border border-ralph-pink/50 bg-ralph-pink/10 text-ralph-pink"
-      title={label}
+      className="inline-flex items-center justify-center align-middle text-[10px] px-1.5 py-0.5 rounded border border-ralph-pink/50 bg-ralph-pink/10 text-ralph-pink hover:bg-ralph-pink/30 hover:border-ralph-pink hover:scale-110 transition-all cursor-pointer underline decoration-dotted shadow-sm hover:shadow-ralph-pink/20"
+      title={`Click to view: ${label}`}
     >
       [{id}]
     </button>

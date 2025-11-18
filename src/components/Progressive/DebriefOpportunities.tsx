@@ -79,11 +79,15 @@ export default function DebriefOpportunities() {
           <div className="panel p-3 bg-ralph-teal/15 border border-ralph-teal/30">
             <div className="text-xs text-white/70 mb-1">Did You Know</div>
             <div className="flex flex-wrap gap-2">
-              {debrief?.didYouKnow?.map((x,i)=>(
-                <span key={i} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-xs">
-                  {x} <span className="ml-1 align-middle text-ralph-pink">[{i+1}]</span>
-                </span>
-              ))}
+              {debrief?.didYouKnow?.map((x,i)=>{
+                // Register citation and get ID
+                const citationId = (window as any).__registerCitation ? (window as any).__registerCitation('Market Insight', x) : i+1
+                return (
+                  <span key={i} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-xs">
+                    {x} <span className="ml-1 align-middle"><CitationToken id={citationId} label="Market Insight" detail={x} /></span>
+                  </span>
+                )
+              })}
             </div>
           </div>
           <Attribution sources={debrief?.sources} />

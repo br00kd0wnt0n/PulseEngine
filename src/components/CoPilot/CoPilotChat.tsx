@@ -9,8 +9,11 @@ export default function CoPilotChat() {
   const [items, setItems] = useState<any[]>([])
   const [text, setText] = useState('')
   const [typing, setTyping] = useState(false)
+  const [typewriterText, setTypewriterText] = useState('')
+  const [currentTypingMsg, setCurrentTypingMsg] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement|null>(null)
   const fileRef = useRef<HTMLInputElement|null>(null)
+  const chatEndRef = useRef<HTMLDivElement|null>(null)
   const activeProjectId = useMemo(() => {
     try { return localStorage.getItem('activeProjectId') || 'local' } catch { return 'local' }
   }, [])
@@ -79,7 +82,7 @@ export default function CoPilotChat() {
     return () => window.removeEventListener('copilot-insert' as any, onInsert as any)
   }, [])
 
-  // Accept say events to append AI guidance messages
+  // Accept say events to append AI guidance messages with typewriter effect
   useEffect(() => {
     function onSay(e: any) {
       const content = (e?.detail?.text || '').trim()
@@ -87,22 +90,44 @@ export default function CoPilotChat() {
 
       // Show typing indicator
       setTyping(true)
+      setCurrentTypingMsg(content)
+      setTypewriterText('')
 
-      // Wait a moment then add message
+      // Start typing after a brief pause
       setTimeout(() => {
-        const key = `conv:${activeProjectId}`
-        const msg = { id: 'ai-'+Date.now(), role: 'ai', content, createdAt: new Date().toISOString() }
-        setItems((it) => {
-          const next = [...it, msg]
-          try { localStorage.setItem(key, JSON.stringify(next)) } catch {}
-          return next
-        })
         setTyping(false)
-      }, 800)
+        // Trigger typewriter effect
+        let index = 0
+        const interval = setInterval(() => {
+          if (index < content.length) {
+            setTypewriterText(content.substring(0, index + 1))
+            index++
+          } else {
+            clearInterval(interval)
+            // Once typing completes, add to permanent messages
+            setTimeout(() => {
+              const key = `conv:${activeProjectId}`
+              const msg = { id: 'ai-'+Date.now(), role: 'ai', content, createdAt: new Date().toISOString() }
+              setItems((it) => {
+                const next = [...it, msg]
+                try { localStorage.setItem(key, JSON.stringify(next)) } catch {}
+                return next
+              })
+              setCurrentTypingMsg(null)
+              setTypewriterText('')
+            }, 200)
+          }
+        }, 20) // 20ms per character for smooth typing
+      }, 500)
     }
     window.addEventListener('copilot-say' as any, onSay as any)
     return () => window.removeEventListener('copilot-say' as any, onSay as any)
   }, [activeProjectId])
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [items, typewriterText, typing])
 
   return (
     <div className="panel module p-4 bg-ralph-teal/10 animated-gradient-border" onDrop={onDrop} onDragOver={(e)=>e.preventDefault()}>
@@ -117,18 +142,39 @@ export default function CoPilotChat() {
         ))}
       </div>
       <div>
-          <div className="h-[28rem] md:h-[32rem] overflow-auto space-y-2 text-sm bg-charcoal-800/40 rounded p-2 border border-white/5">
+          <div className="h-[28rem] md:h-[32rem] overflow-auto space-y-3 text-sm bg-charcoal-800/40 rounded p-3 border border-white/5">
             {items.length === 0 && (
-              <div className="text-white/50 text-sm">Start the conversation — ask for hooks, beats, or creator approaches.</div>
+              <div className="text-white/50 text-sm text-center py-8">Start the conversation — ask for hooks, beats, or creator approaches.</div>
             )}
             {items.map((m, i) => (
-              <div key={m.id || i} className={`p-2 rounded ${m.role === 'user' ? 'bg-white/5' : 'bg-ralph-purple/10'}`}>{m.content}</div>
+              <div key={m.id || i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] p-3 rounded-2xl ${
+                  m.role === 'user'
+                    ? 'bg-ralph-pink/20 border border-ralph-pink/30 text-white rounded-tr-none ml-auto'
+                    : 'bg-ralph-purple/20 border border-ralph-purple/30 text-white rounded-tl-none'
+                }`}>
+                  <div className="text-xs text-white/60 mb-1">{m.role === 'user' ? 'You' : 'Co-Pilot'}</div>
+                  <div className="whitespace-pre-wrap">{m.content}</div>
+                </div>
+              </div>
             ))}
             {typing && (
-              <div className="p-2 rounded bg-ralph-purple/10 text-white/50 text-xs italic animate-pulse">
-                Co-pilot typing...
+              <div className="flex justify-start">
+                <div className="max-w-[85%] p-3 rounded-2xl bg-ralph-purple/20 border border-ralph-purple/30 rounded-tl-none">
+                  <div className="text-xs text-white/60 mb-1">Co-Pilot</div>
+                  <div className="text-white/50 text-xs italic animate-pulse">typing...</div>
+                </div>
               </div>
             )}
+            {currentTypingMsg && typewriterText && (
+              <div className="flex justify-start">
+                <div className="max-w-[85%] p-3 rounded-2xl bg-ralph-purple/20 border border-ralph-purple/30 rounded-tl-none">
+                  <div className="text-xs text-white/60 mb-1">Co-Pilot</div>
+                  <div className="whitespace-pre-wrap">{typewriterText}<span className="animate-pulse">|</span></div>
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
           </div>
           {/* Quick wins removed for now */}
           {/* Input */}

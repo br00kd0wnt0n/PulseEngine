@@ -47,8 +47,18 @@ export default function ScoringEnhancements() {
 
   async function applySuggestion(text: string) {
     try {
-      // capture current ext for delta display
-      if (score?.extended) setLastExt(score.extended)
+      // capture current snapshot for delta display (using same format as localStorage)
+      if (score) {
+        const ext = score?.extended || {}
+        const snap = {
+          narrative: score?.scores?.narrativeStrength,
+          ttpWeeks: score?.scores?.timeToPeakWeeks,
+          cross: ext?.crossPlatformPotential ?? score?.ralph?.crossPlatformPotential,
+          commercial: ext?.commercialPotential,
+          overall: ext?.overall,
+        }
+        setLastExt(snap)
+      }
       setUpdatedAfterApply(true)
       window.dispatchEvent(new CustomEvent('copilot-insert', { detail: { text } }))
       window.dispatchEvent(new CustomEvent('conversation-updated'))
@@ -97,7 +107,7 @@ export default function ScoringEnhancements() {
       <div className="grid md:grid-cols-2 gap-3">
         <div className="space-y-2">
           <Metric label="Narrative Potential" value={score?.scores?.narrativeStrength} previousValue={lastExt?.narrative} delta={diff(score?.scores?.narrativeStrength, lastExt?.narrative)} />
-          <Metric label="Time to Peak" value={score?.scores?.timeToPeakWeeks} previousValue={lastExt?.ttp} unit="wks" delta={diff(ext?.timeToPeakScore, lastExt?.ttp)} />
+          <Metric label="Time to Peak" value={score?.scores?.timeToPeakWeeks} previousValue={lastExt?.ttpWeeks} unit="wks" delta={diff(score?.scores?.timeToPeakWeeks, lastExt?.ttpWeeks)} />
           <Metric label="Cross‑platform" value={score?.ralph?.crossPlatformPotential} previousValue={lastExt?.cross} delta={diff(ext?.crossPlatformPotential, lastExt?.cross)} />
           <Metric label="Commercial" value={ext?.commercialPotential} previousValue={lastExt?.commercial} delta={diff(ext?.commercialPotential, lastExt?.commercial)} />
         </div>
