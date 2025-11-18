@@ -236,7 +236,12 @@ const ACTORS: ApifyActorConfig[] = [
  * Run a single Apify actor and store results
  */
 async function runActor(config: ApifyActorConfig, reportProgress: boolean = false): Promise<number> {
-  console.log(`[APIFY] Running actor: ${config.actorId} for platform: ${config.platform}`)
+  console.log(`\n========================================`)
+  console.log(`[APIFY] Starting actor: ${config.actorId}`)
+  console.log(`[APIFY] Platform: ${config.platform}`)
+  console.log(`[APIFY] Max items: ${config.maxItems}`)
+  console.log(`[APIFY] Input:`, JSON.stringify(config.input, null, 2))
+  console.log(`========================================\n`)
 
   if (reportProgress) {
     collectionStatus.updateActor(config.actorId, {
@@ -247,16 +252,19 @@ async function runActor(config: ApifyActorConfig, reportProgress: boolean = fals
 
   try {
     // Run the actor
+    console.log(`[APIFY] Calling actor ${config.actorId}...`)
     const run = await client.actor(config.actorId).call(config.input, {
       timeout: 300 // 5 minutes max
     })
+    console.log(`[APIFY] Actor run completed. Run ID: ${run.id}, Status: ${run.status}`)
 
     // Get results from dataset with explicit limit
+    console.log(`[APIFY] Fetching results from dataset ${run.defaultDatasetId} with limit ${config.maxItems}...`)
     const { items } = await client.dataset(run.defaultDatasetId).listItems({
       limit: config.maxItems
     })
 
-    console.log(`[APIFY] ${config.actorId} returned ${items.length} items (limit: ${config.maxItems})`)
+    console.log(`[APIFY] ✓ ${config.actorId} returned ${items.length} items (limit: ${config.maxItems})`)
 
     // Store each item in platform_metrics
     const repo = AppDataSource.getRepository(PlatformMetric)
@@ -282,7 +290,7 @@ async function runActor(config: ApifyActorConfig, reportProgress: boolean = fals
       }
     }
 
-    console.log(`[APIFY] Saved ${saved}/${items.length} items for ${config.platform}`)
+    console.log(`[APIFY] ✓ Saved ${saved}/${items.length} items for ${config.platform}\n`)
 
     if (reportProgress) {
       collectionStatus.updateActor(config.actorId, {
@@ -294,7 +302,12 @@ async function runActor(config: ApifyActorConfig, reportProgress: boolean = fals
 
     return saved
   } catch (error: any) {
-    console.error(`[APIFY] Error running ${config.actorId}:`, error)
+    console.error(`\n❌ [APIFY] ACTOR FAILED: ${config.actorId}`)
+    console.error(`[APIFY] Error type: ${error?.constructor?.name}`)
+    console.error(`[APIFY] Error message: ${error?.message}`)
+    console.error(`[APIFY] Error code: ${error?.code}`)
+    console.error(`[APIFY] Full error:`, error)
+    console.error(`========================================\n`)
 
     if (reportProgress) {
       collectionStatus.updateActor(config.actorId, {
@@ -338,24 +351,46 @@ export function collectAllMetricsAsync(): string {
     ACTORS.map(a => ({ actorId: a.actorId, platform: a.platform }))
   )
 
-  console.log(`[APIFY] Starting async collection job: ${jobId}`)
+  console.log(`\n╔════════════════════════════════════════════════════════════╗`)
+  console.log(`║  APIFY COLLECTION JOB STARTED                              ║`)
+  console.log(`╚════════════════════════════════════════════════════════════╝`)
+  console.log(`Job ID: ${jobId}`)
+  console.log(`Total actors: ${ACTORS.length}`)
+  console.log(`Actors to run:`)
+  ACTORS.forEach((a, i) => {
+    console.log(`  ${i + 1}. ${a.platform.toUpperCase()} (${a.actorId})`)
+  })
+  console.log(`\n`)
 
   // Run collection in background (don't await)
   ;(async () => {
     try {
-      for (const config of ACTORS) {
+      for (let i = 0; i < ACTORS.length; i++) {
+        const config = ACTORS[i]
+        console.log(`\n[APIFY] ►►► Processing actor ${i + 1}/${ACTORS.length}: ${config.platform} ◄◄◄`)
         try {
           await runActor(config, true) // reportProgress = true
+          console.log(`[APIFY] ✓ Actor ${i + 1}/${ACTORS.length} completed: ${config.platform}`)
         } catch (actorError: any) {
-          console.error(`[APIFY] Actor ${config.actorId} failed, continuing to next:`, actorError?.message || String(actorError))
+          console.error(`\n[APIFY] ❌ Actor ${i + 1}/${ACTORS.length} FAILED: ${config.platform}`)
+          console.error(`[APIFY] Error: ${actorError?.message || String(actorError)}`)
+          console.error(`[APIFY] Continuing to next actor...\n`)
           // Don't break the loop - continue to next actor
         }
       }
       collectionStatus.completeJob()
-      console.log(`[APIFY] Job ${jobId} completed successfully`)
+      console.log(`\n╔════════════════════════════════════════════════════════════╗`)
+      console.log(`║  APIFY COLLECTION JOB COMPLETED                            ║`)
+      console.log(`╚════════════════════════════════════════════════════════════╝`)
+      console.log(`Job ID: ${jobId}`)
+      console.log(`Status: SUCCESS\n`)
     } catch (error: any) {
       collectionStatus.failJob(error?.message || String(error))
-      console.error(`[APIFY] Job ${jobId} failed:`, error)
+      console.error(`\n╔════════════════════════════════════════════════════════════╗`)
+      console.error(`║  APIFY COLLECTION JOB FAILED                               ║`)
+      console.error(`╚════════════════════════════════════════════════════════════╝`)
+      console.error(`Job ID: ${jobId}`)
+      console.error(`Error: ${error?.message || String(error)}\n`)
     }
   })()
 
