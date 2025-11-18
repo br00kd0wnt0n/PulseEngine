@@ -221,10 +221,6 @@ export default function CanvasWorkflow() {
       {/* Floating Header */}
       <div className="absolute top-4 left-4 right-4 z-50">
         <div className="panel p-3 flex items-center justify-between backdrop-blur-lg bg-charcoal-900/80">
-          <div className="flex items-center gap-3">
-            <div className="font-semibold text-lg">Pulse</div>
-            <div className="text-xs text-white/60">Node-Based Workflow</div>
-          </div>
           <div className="flex items-center gap-2 text-xs">
             {concept && <div className="px-2 py-1 rounded bg-ralph-cyan/20 border border-ralph-cyan/40">{concept}</div>}
             {persona && <div className="px-2 py-1 rounded bg-white/10 border border-white/20">Persona: {persona}</div>}
