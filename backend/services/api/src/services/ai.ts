@@ -59,11 +59,11 @@ export async function narrativeFromTrends(graph: TrendGraph, focusId?: string | 
 }
 
 // Debrief: recap + key points + did-you-know insights
-export async function generateDebrief(concept: string, userId?: string | null, persona?: string | null) {
+export async function generateDebrief(concept: string, userId?: string | null, persona?: string | null, projectId?: string | null) {
   try {
     let ctx
     try {
-      ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
+      ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true, projectId: projectId || null })
     } catch (err) {
       console.error('[AI] retrieveContext failed for debrief:', err)
       // Fallback to empty context if retrieval fails
@@ -159,11 +159,11 @@ Return ONLY valid JSON. Make every field specific to "${concept}" and grounded i
 }
 
 // Opportunities: ranked with impact
-export async function generateOpportunities(concept: string, userId?: string | null, persona?: string | null) {
+export async function generateOpportunities(concept: string, userId?: string | null, persona?: string | null, projectId?: string | null) {
   try {
     let ctx
     try {
-      ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true })
+      ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true, projectId: projectId || null })
     } catch (err) {
       console.error('[AI] retrieveContext failed for opportunities:', err)
       // Fallback to empty context if retrieval fails

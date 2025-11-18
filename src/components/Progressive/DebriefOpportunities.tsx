@@ -19,14 +19,14 @@ export default function DebriefOpportunities() {
     setLoading(true)
     ;(async () => {
       try {
+        const pid = localStorage.getItem('activeProjectId') || 'local'
         const [d, o] = await Promise.all([
-          api.debrief(concept, { persona, region }),
-          api.opportunities(concept, { persona, region })
+          api.debrief(concept, { persona, region, projectId: pid }),
+          api.opportunities(concept, { persona, region, projectId: pid })
         ])
         if (!cancel) {
           setDebrief(d); setOpps(o); setAsOf(new Date().toLocaleString())
           try {
-            const pid = localStorage.getItem('activeProjectId') || 'local'
             localStorage.setItem(`debrief:${pid}`, JSON.stringify(d || {}))
             localStorage.setItem(`opps:${pid}`, JSON.stringify(o || {}))
           } catch {}

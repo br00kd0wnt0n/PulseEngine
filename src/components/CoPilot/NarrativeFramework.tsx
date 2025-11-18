@@ -107,10 +107,11 @@ export default function NarrativeFramework() {
       try {
         const region = (localStorage.getItem('region') || '').replace(/"/g,'')
         const persona = (localStorage.getItem('persona') || '').replace(/"/g,'')
+        const pid = localStorage.getItem('activeProjectId') || 'local'
         const [recs, deb, opp] = await Promise.all([
-          api.recommendations(concept, snapshot(), { persona, region }),
-          api.debrief(concept, { persona, region }).catch(()=>null),
-          api.opportunities(concept, { persona, region }).catch(()=>null)
+          api.recommendations(concept, snapshot(), { persona, region, projectId: pid }),
+          api.debrief(concept, { persona, region, projectId: pid }).catch(()=>null),
+          api.opportunities(concept, { persona, region, projectId: pid }).catch(()=>null)
         ])
         if (cancel || !recs) return
         setBlocks(bs => bs.map((b) => {

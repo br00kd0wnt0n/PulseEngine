@@ -24,10 +24,14 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setProcessed((p) => [...placeholders, ...p])
 
     try {
+      // Get active project ID for context association
+      const activeProjectId = localStorage.getItem('activeProjectId') || 'local'
+
       // Upload files to ingestion service
       const formData = new FormData()
       files.forEach(file => formData.append('files', file))
       formData.append('ownerId', USER_ID)
+      formData.append('projectId', activeProjectId)
 
       const response = await fetch(`${INGESTION_URL}/ingest/upload`, {
         method: 'POST',
@@ -72,10 +76,13 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setProcessed((p) => [placeholder, ...p])
 
     try {
+      // Get active project ID for context association
+      const activeProjectId = localStorage.getItem('activeProjectId') || 'local'
+
       const response = await fetch(`${INGESTION_URL}/ingest/url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, ownerId: USER_ID }),
+        body: JSON.stringify({ url, ownerId: USER_ID, projectId: activeProjectId }),
       })
 
       if (!response.ok) {

@@ -47,11 +47,11 @@ router.post('/recommendations', async (req, res) => {
 })
 
 router.post('/debrief', async (req, res) => {
-  const { concept, persona } = req.body || {}
+  const { concept, persona, projectId } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
     const userId = (req as any).user?.sub || null
-    const data = await generateDebrief(concept, userId, persona || null)
+    const data = await generateDebrief(concept, userId, persona || null, projectId || null)
     res.json(data)
   } catch (e: any) {
     res.status(500).json({ error: e?.message || 'failed' })
@@ -59,11 +59,11 @@ router.post('/debrief', async (req, res) => {
 })
 
 router.post('/opportunities', async (req, res) => {
-  const { concept, persona } = req.body || {}
+  const { concept, persona, projectId } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
     const userId = (req as any).user?.sub || null
-    const data = await generateOpportunities(concept, userId, persona || null)
+    const data = await generateOpportunities(concept, userId, persona || null, projectId || null)
     res.json(data)
   } catch (e: any) {
     res.status(500).json({ error: e?.message || 'failed' })
