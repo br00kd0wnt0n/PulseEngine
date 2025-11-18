@@ -115,6 +115,9 @@ export default function CanvasWorkflow() {
               className="bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-xs"
             >
               <option value="">Select Region</option>
+              <option value="Worldwide">Worldwide</option>
+              <option value="US">US</option>
+              <option value="EU">EU</option>
               <option value="North America">North America</option>
               <option value="Europe">Europe</option>
               <option value="Asia Pacific">Asia Pacific</option>
