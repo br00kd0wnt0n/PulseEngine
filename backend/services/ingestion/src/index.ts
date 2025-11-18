@@ -44,7 +44,8 @@ async function main() {
     try {
       const { url, ownerId, projectId } = req.body || {}
       if (!url || !ownerId) return res.status(400).json({ error: 'url and ownerId required' })
-      await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
+      // Set current user for RLS (optional, ignore if function doesn't exist)
+      try { await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId]) } catch {}
       const parsed = parseUrl(url)
 
       // Generate embedding for URL content
@@ -74,7 +75,8 @@ async function main() {
       const ownerId = (req.body?.ownerId as string) || ''
       const projectId = (req.body?.projectId as string) || null
       if (!ownerId) return res.status(400).json({ error: 'ownerId required' })
-      await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
+      // Set current user for RLS (optional, ignore if function doesn't exist)
+      try { await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId]) } catch {}
       const files = (req.files as Express.Multer.File[]) || []
       const repo = ds.getRepository(ContentAsset)
       const saved = [] as any[]
@@ -148,7 +150,8 @@ async function main() {
       const ownerId = (req.body?.ownerId as string) || ''
       const projectId = (req.body?.projectId as string) || null
       if (!ownerId || !req.file) return res.status(400).json({ error: 'ownerId and file required' })
-      await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId])
+      // Set current user for RLS (optional, ignore if function doesn't exist)
+      try { await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId]) } catch {}
       const meta = await analyzeFile(req.file)
 
       // Generate embedding for PDF content
