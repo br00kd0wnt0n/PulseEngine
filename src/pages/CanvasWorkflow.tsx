@@ -92,6 +92,7 @@ export default function CanvasWorkflow() {
           <textarea
             value={concept}
             onChange={(e) => setConcept(e.target.value)}
+            onMouseDown={(e) => e.stopPropagation()}
             placeholder="Describe your campaign story..."
             className="w-full h-24 bg-charcoal-800/70 border border-white/10 rounded px-3 py-2 text-sm resize-none"
           />
@@ -99,16 +100,18 @@ export default function CanvasWorkflow() {
             <select
               value={persona}
               onChange={(e) => setPersona(e.target.value)}
+              onMouseDown={(e) => e.stopPropagation()}
               className="bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-xs"
             >
               <option value="">Select Persona</option>
-              <option value="Gen Z">Gen Z</option>
-              <option value="Millennial">Millennial</option>
-              <option value="Professional">Professional</option>
+              <option value="Social strategist">Social strategist</option>
+              <option value="Creative Lead">Creative Lead</option>
+              <option value="Content Creator">Content Creator</option>
             </select>
             <select
               value={region}
               onChange={(e) => setRegion(e.target.value)}
+              onMouseDown={(e) => e.stopPropagation()}
               className="bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-xs"
             >
               <option value="">Select Region</option>
@@ -118,7 +121,8 @@ export default function CanvasWorkflow() {
             </select>
           </div>
           <button
-            onClick={handleSubmit}
+            onClick={(e) => { e.stopPropagation(); handleSubmit(); }}
+            onMouseDown={(e) => e.stopPropagation()}
             disabled={!concept}
             className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-sm font-medium disabled:opacity-50"
           >
@@ -146,10 +150,12 @@ export default function CanvasWorkflow() {
             multiple
             onChange={(e) => e.target.files && addFiles(Array.from(e.target.files))}
             className="hidden"
-            id="file-upload"
+            id="canvas-file-upload"
           />
           <label
-            htmlFor="file-upload"
+            htmlFor="canvas-file-upload"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
             className="block w-full px-3 py-2 rounded border border-dashed border-white/20 hover:border-ralph-cyan/40 text-xs text-center cursor-pointer transition-colors"
           >
             + Add Context Files
@@ -189,9 +195,14 @@ export default function CanvasWorkflow() {
             <input
               type="text"
               placeholder="Ask Co-Pilot..."
+              onMouseDown={(e) => e.stopPropagation()}
               className="flex-1 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-xs"
             />
-            <button className="px-3 py-1 rounded bg-ralph-pink/70 hover:bg-ralph-pink text-xs">
+            <button
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="px-3 py-1 rounded bg-ralph-pink/70 hover:bg-ralph-pink text-xs"
+            >
               Send
             </button>
           </div>

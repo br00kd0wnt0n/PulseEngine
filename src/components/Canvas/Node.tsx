@@ -28,15 +28,14 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.node-content')) return // Don't drag when clicking content
+    e.preventDefault() // Prevent text selection during drag
     setIsDragging(true)
     onFocus(data.id)
-    const rect = nodeRef.current?.getBoundingClientRect()
-    if (rect) {
-      setDragOffset({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      })
-    }
+    // Calculate offset from current node position to mouse position
+    setDragOffset({
+      x: e.clientX - data.x,
+      y: e.clientY - data.y
+    })
   }
 
   useEffect(() => {
