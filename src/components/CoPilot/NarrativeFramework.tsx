@@ -211,18 +211,107 @@ function countIntersections(text: string, drivers: string[]) {
 function autofillBlock(b: Omit<Block, 'id'>, concept?: string, keyDrivers?: string[], recs?: any, deb?: any, opp?: any): string {
   const kd = keyDrivers || []
   const first = (arr?: string[]) => (Array.isArray(arr) && arr[0]) || ''
-  const join2 = (arr?: string[]) => (Array.isArray(arr) ? arr.slice(0,2).join(' • ') : '')
+
   switch (b.key) {
-    case 'origin': return deb?.summary ? `Premise: ${deb.summary}` : (concept ? `Premise: ${concept}` : '')
-    case 'hook': return first(recs?.narrative) || deb?.keyPoints?.[0] || suggestFromDrivers(b, kd, concept)
-    case 'arc': return `Arc: ${join2(recs?.narrative)}`
-    case 'perspective': return kd.length ? `Perspectives: ${kd.slice(0,2).join(', ')}` : 'Perspectives: audience • creator'
-    case 'pivots': {
-      const fromOpp = (opp?.opportunities?.find((x:any)=>/pivot|moment|turn|beat/i.test(x.title))?.title) || first(recs?.content)
-      return fromOpp ? `Pivot: ${fromOpp}` : ''
+    case 'origin': {
+      // Campaign premise/setup - start with the concept, optionally enhanced by strategic insight
+      if (concept && deb?.brief) {
+        // Extract first sentence of brief for context
+        const briefFirstSentence = deb.brief.split('.')[0]
+        return `${concept} - ${briefFirstSentence}`
+      }
+      return concept || 'Define the campaign premise and core story setup'
     }
-    case 'evidence': return deb?.didYouKnow?.[0] ? `Evidence: ${deb.didYouKnow[0]}` : (first(recs?.platform) ? `Evidence: ${first(recs?.platform)}` : '')
-    case 'resolution': return deb?.keyPoints?.[1] ? `Outcome: ${deb.keyPoints[1]}` : (first(recs?.collab) ? `Outcome: ${first(recs?.collab)}` : 'Outcome: clear payoff + CTA')
+
+    case 'hook': {
+      // Opening hook - use narrative recommendations or debrief strategic points
+      const narrativeHook = first(recs?.narrative)
+      if (narrativeHook) return narrativeHook
+
+      // Look for hook-related opportunities
+      const hookOpp = opp?.opportunities?.find((x: any) => /hook|open|grab|attract/i.test(x.title))
+      if (hookOpp) return hookOpp.title
+
+      return deb?.keyPoints?.[0] || suggestFromDrivers(b, kd, concept)
+    }
+
+    case 'arc': {
+      // Full campaign narrative arc - combine multiple strategic elements
+      const narrativeElements = recs?.narrative || []
+      if (narrativeElements.length >= 2) {
+        return `Campaign unfolds through: ${narrativeElements.slice(0, 3).join(' → ')}`
+      }
+
+      // Fallback: use debrief key points as arc beats
+      if (deb?.keyPoints && deb.keyPoints.length >= 2) {
+        return `Story progression: Setup → ${deb.keyPoints[0]} → ${deb.keyPoints[1]}`
+      }
+
+      return concept ? `Build narrative arc for "${concept}" from introduction through climax to resolution` : 'Define campaign story arc'
+    }
+
+    case 'perspective': {
+      // How the story is framed/told (POV, framing, narrative voice)
+      const contentRecs = recs?.content || []
+      const perspectiveRec = contentRecs.find((r: string) => /perspective|pov|voice|frame|tell|story/i.test(r))
+      if (perspectiveRec) return perspectiveRec
+
+      // Use key drivers to suggest perspectives
+      if (kd.length >= 2) {
+        return `Tell the story from ${kd[0]} perspective, shifting to ${kd[1]} viewpoint for emotional impact`
+      }
+
+      return 'First-person POV from campaign protagonist, shifting to audience perspective in final act'
+    }
+
+    case 'pivots': {
+      // Key turning points in the campaign story
+      const pivotOpp = opp?.opportunities?.find((x: any) => /pivot|moment|turn|beat|shift/i.test(x.title))
+      if (pivotOpp) return pivotOpp.title
+
+      const contentPivot = recs?.content?.find((r: string) => /pivot|turn|shift|moment/i.test(r))
+      if (contentPivot) return contentPivot
+
+      // Use second debrief point as potential pivot
+      if (deb?.keyPoints?.[1]) return `Key turning point: ${deb.keyPoints[1]}`
+
+      return 'Identify the pivotal moment where the story shifts (challenge revealed, solution discovered, or transformation happens)'
+    }
+
+    case 'evidence': {
+      // Campaign supporting evidence - NOT stats, but campaign proof assets
+      const platformRecs = recs?.platform || []
+
+      // Look for content/evidence-related opportunities
+      const evidenceOpp = opp?.opportunities?.find((x: any) => /proof|evidence|show|demonstrate|visual/i.test(x.title))
+      if (evidenceOpp) return evidenceOpp.title
+
+      // Suggest platform-specific evidence types
+      if (platformRecs.length > 0) {
+        return `Capture supporting evidence through: ${platformRecs.slice(0, 2).join(', ')}`
+      }
+
+      return 'Include B-roll footage, user testimonials, before/after comparisons, or data visualizations that prove the campaign value'
+    }
+
+    case 'resolution': {
+      // Campaign wrap-up with CTA and payoff
+      const collabRecs = recs?.collab || []
+      const resolutionOpp = opp?.opportunities?.find((x: any) => /cta|outcome|payoff|resolution|conclude/i.test(x.title))
+
+      if (resolutionOpp) return resolutionOpp.title
+
+      if (collabRecs.length > 0) {
+        return `Conclude with ${first(collabRecs)} and clear call-to-action`
+      }
+
+      // Use last debrief point as resolution context
+      const lastPoint = deb?.keyPoints?.[deb.keyPoints.length - 1]
+      if (lastPoint) return `Wrap campaign with ${lastPoint}, delivering clear payoff and next-step CTA`
+
+      return 'End with emotional payoff, clear takeaway message, and strong call-to-action (follow, share, participate, purchase)'
+    }
+
     default: return ''
   }
 }

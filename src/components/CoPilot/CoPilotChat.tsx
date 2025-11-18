@@ -117,7 +117,7 @@ export default function CoPilotChat() {
         ))}
       </div>
       <div>
-          <div className="h-56 md:h-64 overflow-auto space-y-2 text-sm bg-charcoal-800/40 rounded p-2 border border-white/5">
+          <div className="h-[28rem] md:h-[32rem] overflow-auto space-y-2 text-sm bg-charcoal-800/40 rounded p-2 border border-white/5">
             {items.length === 0 && (
               <div className="text-white/50 text-sm">Start the conversation — ask for hooks, beats, or creator approaches.</div>
             )}

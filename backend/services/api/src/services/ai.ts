@@ -79,9 +79,29 @@ export async function generateDebrief(concept: string, userId?: string | null, p
         const client = new OpenAI({ apiKey })
         const model = process.env.MODEL_NAME || 'gpt-4o-mini'
         const contextStr = formatContextForPrompt(ctx)
-        const prompt = `Persona: ${persona || 'General'}\nConcept: "${concept}"\n\n`+
-          (contextStr?`Context (concise):\n${contextStr}\n\n`:'')+
-          `Return JSON with brief (2–3 sentences), summary (1 sentence), keyPoints (4 bullets), didYouKnow (3 items).`
+        const prompt = `You are a campaign strategist creating a strategic brief for persona: ${persona || 'General'}.
+
+CAMPAIGN CONCEPT: "${concept}"
+
+${contextStr ? `# RELEVANT CONTEXT (cite these specific trends and insights):
+${contextStr}
+
+` : ''}# YOUR TASK:
+Create a strategic campaign brief as JSON with these fields:
+
+1. "brief" (2-3 sentences): Explain WHY this concept is strategically valuable right now. Reference specific trending content, platforms, or cultural moments from the context above. Be concrete and actionable.
+
+2. "summary" (1 sentence): The core campaign insight or hook that makes this timely and engaging.
+
+3. "keyPoints" (4 strategic bullets): Actionable campaign strategy points. Each should:
+   - Be specific to THIS concept (not generic advice)
+   - Reference trends or insights from the context when possible
+   - Focus on execution strategy (platforms, formats, collaborations, content beats)
+   - Example: "Leverage TikTok's #fyp algorithm by creating 15s hooks that mirror trending dance formats"
+
+4. "didYouKnow" (3 contextual insights): Surprising facts or trend insights from the context that support this campaign. Cite specific platform data, trending topics, or cultural insights.
+
+Return ONLY valid JSON. Make every field specific to "${concept}" and grounded in the provided context.`
         const resp = await client.chat.completions.create({
           model,
           messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
@@ -97,11 +117,30 @@ export async function generateDebrief(concept: string, userId?: string | null, p
         } catch {}
       } catch {}
     }
+    // Context-aware heuristic fallback
+    const hasLiveMetrics = ctx.liveMetrics && ctx.liveMetrics.length > 0
+    const hasCoreKnowledge = ctx.coreKnowledge && ctx.coreKnowledge.length > 0
+    const conceptLower = concept.toLowerCase()
+
+    // Extract platform hints from concept
+    const platforms = []
+    if (conceptLower.includes('tiktok') || conceptLower.includes('short')) platforms.push('TikTok')
+    if (conceptLower.includes('instagram') || conceptLower.includes('reel')) platforms.push('Instagram')
+    if (conceptLower.includes('youtube')) platforms.push('YouTube')
+    if (platforms.length === 0) platforms.push('TikTok', 'Instagram')
+
     const heuristic = {
-      brief: `Recap for "${concept}": short‑form concept with collaborative hooks and platform‑native framing.`,
-      summary: 'Opportunity in native hooks + remixable beats.',
-      keyPoints: [ 'Clarify the promise in line one', 'Define a loopable moment', 'Map platform trims', 'Plan 1 macro + 3 micro collabs' ],
-      didYouKnow: [ 'Loops increase completion by 18–35%', 'Remix prompts lift creator adoption', 'Native captions boost recall' ],
+      brief: `"${concept}" aligns with current ${persona ? persona + ' ' : ''}audience interests${hasLiveMetrics ? ' and trending content patterns' : ''}. This campaign should focus on ${platforms.join(' and ')} with authentic storytelling that resonates with platform-native formats and engagement behaviors.`,
+      summary: `Create ${platforms[0]}-first content that turns "${concept}" into a shareable, participatory campaign.`,
+      keyPoints: [
+        `Lead with a strong hook in the first 3 seconds that showcases the core value of "${concept}"`,
+        `Design content for ${platforms.join(' and ')} native formats (9:16 vertical, 15-60s duration, text overlays)`,
+        `Build in remix opportunities and collaboration hooks to amplify reach organically`,
+        `Plan multi-touchpoint campaign with launch content, creator partnerships, and audience participation beats`
+      ],
+      didYouKnow: hasLiveMetrics
+        ? [ `Live trend data shows high engagement in ${platforms[0]} content`, 'Short-form video drives 2.5x more shares than static posts', 'Authentic creator partnerships outperform paid ads by 3-5x' ]
+        : [ 'Short-form video drives 60%+ of social engagement', 'Platform-native formats see 40% higher completion rates', 'Creator collaborations expand reach by 3-5x on average' ],
       sources: ctx.sources,
     }
     await cacheSet(cacheKey, heuristic)
@@ -300,14 +339,41 @@ export async function generateRecommendations(
       // Format context for prompt
       const contextStr = formatContextForPrompt(context)
 
-      const prompt = `You are a storytelling strategist for persona: ${persona || 'General'}. Given this story concept: "${concept}"\n\n` +
-        (contextStr ? `# RELEVANT CONTEXT:\n${contextStr}\n\n` : '') +
-        `# TASK:\n` +
-        `Provide 4 categories of recommendations with 3 concise, practical bullets each:\n` +
-        `- Narrative Development\n- Content Strategy\n- Platform Coverage\n- Collaboration\n` +
-        `Base your recommendations on the context provided above, especially user-uploaded knowledge and live trends.\n` +
-        `Also include a framework object with 3 dimensions (market, narrative, commercial), each with a numeric score (0-100) and a one-sentence why.\n` +
-        `Return strictly as JSON with keys narrative, content, platform, collab (arrays of strings), and framework { market: { score, why }, narrative: { score, why }, commercial: { score, why } }.`
+      const prompt = `You are a campaign strategist for persona: ${persona || 'General'}. You're creating an execution plan for this campaign concept: "${concept}"
+
+${contextStr ? `# RELEVANT CONTEXT (reference specific trends and insights):
+${contextStr}
+
+` : ''}# YOUR TASK:
+Create a tactical campaign execution plan with 4 categories of recommendations. Each recommendation should be:
+- Specific to THIS campaign concept (not generic advice)
+- Grounded in the context above (cite trending formats, platforms, or cultural moments when relevant)
+- Actionable and execution-ready
+
+**1. Narrative Development** (3 bullets):
+   - Story beats, hooks, arc progression, emotional journey
+   - Example: "Open with 3-second shock moment showcasing transformation, then reveal journey"
+
+**2. Content Strategy** (3 bullets):
+   - Content formats, posting cadence, content pillars, engagement loops
+   - Example: "Create 5-part episodic series with cliffhangers driving viewers to next installment"
+
+**3. Platform Coverage** (3 bullets):
+   - Platform-specific tactics, format adaptations, algorithmic optimization
+   - Reference trending formats from context (TikTok sounds, Instagram features, etc.)
+   - Example: "Launch on TikTok using trending #fyp dance format, then adapt for Instagram Reels with extended behind-the-scenes"
+
+**4. Collaboration** (3 bullets):
+   - Creator partnerships, audience participation, remix/duet opportunities
+   - Example: "Partner with 3 micro-influencers in gaming vertical for authentic reaction videos"
+
+**5. Framework Scoring**:
+   Include a framework object with 3 dimensions:
+   - market: { score: 0-100, why: "one-sentence explanation of market opportunity" }
+   - narrative: { score: 0-100, why: "one-sentence explanation of story strength" }
+   - commercial: { score: 0-100, why: "one-sentence explanation of monetization potential" }
+
+Return ONLY valid JSON with keys: narrative, content, platform, collab (arrays of strings), and framework object.`
 
       console.log('[RAG] Calling OpenAI with model:', model)
       console.log('[RAG] Prompt length:', prompt.length, 'characters')

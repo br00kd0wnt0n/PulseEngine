@@ -117,10 +117,17 @@ export default function DebriefOpportunities() {
               <div className="mt-2 flex items-center gap-2">
                 <button
                   onClick={() => { integrateOpportunity(o); setIntegrated(s => new Set(s).add(o.title)) }}
-                  className={`text-[11px] px-2 py-1 rounded border ${isIntegrated ? 'border-ralph-teal/40 bg-ralph-teal/20 text-white/90' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                  className={`text-[11px] px-2 py-1 rounded border transition-all ${isIntegrated ? 'border-ralph-teal/40 bg-ralph-teal/20 text-white/90' : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-ralph-pink/30'}`}
                   disabled={isIntegrated}
                 >
-                  {isIntegrated ? 'Added to Narrative' : 'Integrate'}
+                  {isIntegrated ? (
+                    <span className="flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      Added to Narrative
+                    </span>
+                  ) : 'Integrate into Campaign'}
                 </button>
               </div>
             </div>
@@ -156,17 +163,37 @@ function Attribution({ sources }: { sources?: any }) {
 function integrateOpportunity(o: { title: string; why: string; impact: number }) {
   try {
     const target = guessTarget(o.title)
-    const targetLabel = target ? ` to ${target.charAt(0).toUpperCase() + target.slice(1)}` : ''
 
     // Apply to narrative framework if target found
-    if (target) window.dispatchEvent(new CustomEvent('nf-apply', { detail: { target, text: o.title } }))
+    if (target) {
+      window.dispatchEvent(new CustomEvent('nf-apply', { detail: { target, text: o.title } }))
 
-    // Co-pilot confirmation message
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('copilot-say', {
-        detail: { text: `Added "${o.title}"${targetLabel}. ${o.why} This will update the narrative structure and concept proposal.` }
-      }))
-    }, 100)
+      // More specific co-pilot message based on target
+      const targetMessages: Record<string, string> = {
+        hook: `Added to Opening Hook: "${o.title}". This will be the first thing your audience sees - make it count!`,
+        arc: `Added to Narrative Arc: "${o.title}". This shapes how your campaign story unfolds from beginning to end.`,
+        evidence: `Added to Supporting Evidence: "${o.title}". This proof point will strengthen your campaign's credibility.`,
+        resolution: `Added to Resolution/CTA: "${o.title}". This defines how your campaign wraps up and drives action.`,
+        origin: `Added to Campaign Origin: "${o.title}". This sets up the premise and foundation of your story.`,
+        pivots: `Added to Pivotal Moments: "${o.title}". This key turning point will create dramatic tension in your narrative.`,
+        perspective: `Added to Perspective: "${o.title}". This defines the POV and framing of your campaign story.`
+      }
+
+      const specificMessage = targetMessages[target] || `Added "${o.title}" to ${target.charAt(0).toUpperCase() + target.slice(1)}.`
+
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('copilot-say', {
+          detail: { text: `✓ ${specificMessage}\n\n${o.why}\n\nImpact Score: ${o.impact}/10 - Check the Narrative Deconstruction above to see it in context.` }
+        }))
+      }, 100)
+    } else {
+      // No target found - inform user
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('copilot-say', {
+          detail: { text: `📝 Noted: "${o.title}"\n\n${o.why}\n\nConsider manually adding this to one of the narrative blocks above (Origin, Hook, Arc, Perspective, Pivots, Evidence, or Resolution).` }
+        }))
+      }, 100)
+    }
 
     window.dispatchEvent(new CustomEvent('conversation-updated'))
     window.dispatchEvent(new CustomEvent('debrief-interaction'))
