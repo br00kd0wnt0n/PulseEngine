@@ -109,8 +109,8 @@ const ACTORS: ApifyActorConfig[] = [
     })
   }, */
 
-  // 4. YouTube Scraper
-  {
+  // 4. YouTube Scraper - DISABLED: permissions issues
+  /* {
     actorId: 'streamers/youtube-scraper',
     platform: 'youtube',
     metricType: 'trending_video',
@@ -138,7 +138,7 @@ const ACTORS: ApifyActorConfig[] = [
         url: item.url || `https://www.youtube.com/watch?v=${item.id}`
       }
     })
-  },
+  }, */
 
   // 5. Google News Scraper
   {

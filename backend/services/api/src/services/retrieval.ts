@@ -466,29 +466,92 @@ async function retrieveLiveMetrics(
   concept: string,
   limit: number
 ): Promise<{ content: string[]; sources: string[] }> {
-  const repo = AppDataSource.getRepository(PlatformMetric)
+  console.log('[LIVE METRICS] Retrieving metrics for concept:', concept)
 
   // Query recent metrics (last 7 days)
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-  const metrics = await repo
-    .createQueryBuilder('metric')
-    .where('metric.createdAt > :cutoff', { cutoff: sevenDaysAgo })
-    .andWhere(
-      `metric.platform ILIKE :search`,
-      { search: `%${concept}%` }
-    )
-    .orderBy('metric.createdAt', 'DESC')
-    .limit(limit)
-    .getMany()
+  // Extract keywords from concept for better matching
+  const keywords = extractKeywords(concept)
+  console.log('[LIVE METRICS] Extracted keywords:', keywords)
 
-  const content = metrics.map(m => {
-    return `[${m.platform}] Engagement: ${m.engagement}, Velocity: ${m.velocity}`
-  })
+  if (keywords.length === 0) {
+    console.log('[LIVE METRICS] No keywords extracted, returning top trending items')
+    // Fallback: return top trending items by engagement
+    const topMetrics = await AppDataSource.query(`
+      SELECT platform, metric_type, value, engagement, velocity, metadata, "createdAt"
+      FROM platform_metrics
+      WHERE "createdAt" > $1
+      ORDER BY engagement DESC, velocity DESC
+      LIMIT $2
+    `, [sevenDaysAgo, limit])
 
-  const sources = metrics.map(m => `${m.platform}:live`)
+    const content = topMetrics.map((m: any) => formatMetricContent(m))
+    const sources = topMetrics.map((m: any) => `${m.platform}:live`)
+    console.log('[LIVE METRICS] Returning', content.length, 'top trending items')
+    return { content, sources }
+  }
+
+  // Build search condition for JSONB value field
+  // Search in the actual trend content (hashtags, titles, descriptions, etc.)
+  const searchConditions = keywords
+    .map((_, i) => `value::text ILIKE $${i + 3}`)
+    .join(' OR ')
+
+  const params = [
+    sevenDaysAgo,
+    limit,
+    ...keywords.map(kw => `%${kw}%`)
+  ]
+
+  const query = `
+    SELECT platform, metric_type, value, engagement, velocity, metadata, "createdAt"
+    FROM platform_metrics
+    WHERE "createdAt" > $1
+      AND (${searchConditions})
+    ORDER BY engagement DESC, velocity DESC, "createdAt" DESC
+    LIMIT $2
+  `
+
+  console.log('[LIVE METRICS] Running query with', keywords.length, 'keywords')
+  const metrics = await AppDataSource.query(query, params)
+
+  console.log('[LIVE METRICS] Found', metrics.length, 'matching metrics')
+
+  const content = metrics.map((m: any) => formatMetricContent(m))
+  const sources = metrics.map((m: any) => `${m.platform}:live`)
 
   return { content, sources }
+}
+
+/**
+ * Format a platform metric into human-readable content for the AI
+ */
+function formatMetricContent(metric: any): string {
+  const platform = metric.platform.toUpperCase()
+  const value = metric.value || {}
+  const engagement = metric.engagement || 0
+  const velocity = metric.velocity?.toFixed(2) || '0.00'
+
+  // Platform-specific formatting
+  switch (metric.platform) {
+    case 'tiktok':
+      return `[${platform}] ${value.description || 'No description'} (Engagement: ${engagement}, Velocity: ${velocity}/hr)`
+
+    case 'instagram':
+      // Extract first line of caption + hashtags
+      const caption = (value.caption || '').split('\n')[0].substring(0, 150)
+      return `[${platform}] ${caption}${caption.length >= 150 ? '...' : ''} (Likes: ${value.likesCount || 0}, Comments: ${value.commentsCount || 0})`
+
+    case 'news':
+      return `[${platform}] "${value.title || 'Untitled'}" - ${value.source || 'Unknown source'}`
+
+    case 'fandom':
+      return `[${platform}] ${value.title || 'Untitled'} (Entertainment trending)`
+
+    default:
+      return `[${platform}] ${JSON.stringify(value).substring(0, 100)}`
+  }
 }
 
 /**
