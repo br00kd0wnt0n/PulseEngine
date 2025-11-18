@@ -18,11 +18,10 @@ type NodeProps = {
   data: NodeData
   onUpdate: (id: string, updates: Partial<NodeData>) => void
   onFocus: (id: string) => void
-  isFocused: boolean
   children: React.ReactNode
 }
 
-export default function Node({ data, onUpdate, onFocus, isFocused, children }: NodeProps) {
+export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const nodeRef = useRef<HTMLDivElement>(null)
@@ -73,13 +72,10 @@ export default function Node({ data, onUpdate, onFocus, isFocused, children }: N
 
   const statusColor = statusColors[data.status || 'idle']
 
-  // Add extra glow when node is focused (being clicked/dragged)
-  const focusGlow = isFocused ? 'ring-2 ring-ralph-cyan/60 shadow-2xl shadow-ralph-cyan/50' : ''
-
   return (
     <div
       ref={nodeRef}
-      className={`absolute rounded-lg border-2 backdrop-blur-sm transition-all ${statusColor} ${focusGlow}`}
+      className={`absolute rounded-lg border-2 backdrop-blur-sm transition-all ${statusColor}`}
       style={{
         left: data.x,
         top: data.y,

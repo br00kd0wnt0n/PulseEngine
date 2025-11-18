@@ -17,19 +17,19 @@ export default function CanvasWorkflow() {
         type: 'input',
         title: 'Story Brief',
         x: 50,
-        y: 50,
+        y: 100,
         width: 400,
         height: 280,
         minimized: false,
         zIndex: 1,
-        status: 'active'
+        status: 'idle'
       },
       {
         id: 'context-upload',
         type: 'upload',
         title: 'Context & Files',
         x: 50,
-        y: 350,
+        y: 400,
         width: 400,
         height: 180,
         minimized: false,
