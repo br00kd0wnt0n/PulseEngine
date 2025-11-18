@@ -378,7 +378,7 @@ export default function StoryPromptHero() {
 
         <textarea
           className="w-full bg-charcoal-800/50 border border-white/10 rounded-lg p-4 text-base placeholder-white/40 resize-none focus:border-ralph-pink/50 focus:bg-charcoal-800/70 transition-all min-h-[120px]"
-          placeholder="Describe your story concept, creative idea, or project vision..."
+          placeholder="Describe your brief, story concept or proposal vision and drag/drop any useful files..."
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onPaste={handlePaste}

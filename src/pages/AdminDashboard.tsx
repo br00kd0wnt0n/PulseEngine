@@ -30,32 +30,7 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <div className="panel module p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="font-semibold">Service Status</div>
-          <div className="flex gap-2">
-            <button className="px-2 py-1 text-xs rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={async () => {
-              setLoading(true)
-              try {
-                const pf = await api.preflight()
-                if (pf.ok) show('Preflight OK ✅', 'success')
-                else show(`Preflight issues: ${(pf.issues||[]).length}`, 'error')
-              } catch (e:any) {
-                show('Preflight failed', 'error')
-              } finally { setLoading(false) }
-            }}>Run Preflight</button>
-            <button className="px-2 py-1 text-xs rounded border border-white/10 bg-ralph-pink/60 hover:bg-ralph-pink" onClick={async () => {
-              setLoading(true)
-              try {
-                const r = await api.adminSeed({ dry: false, withAI: true })
-                const res = (r.result || r)
-                const msg = res && res.trends != null ? `Seeded T${res.trends}/C${res.creators}/A${res.assets}` : 'Seed complete'
-                show(msg, 'success')
-              } catch (e:any) {
-                show('Seed failed', 'error')
-              } finally { setLoading(false) }
-            }}>Load Demo Data</button>
-          </div>
-        </div>
+        <div className="font-semibold mb-3">Service Status</div>
         {loading ? (<div className="text-white/60 text-sm">Loading…</div>) : error ? (
           <div className="text-red-400 text-sm">{error}</div>
         ) : data ? (
