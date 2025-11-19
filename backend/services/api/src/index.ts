@@ -43,7 +43,20 @@ async function main() {
   }
   const app = express()
   app.use(helmet())
-  app.use(cors())
+
+  // CORS configuration - allow production frontend and localhost
+  const corsOptions = {
+    origin: [
+      'https://pulseengine-production.up.railway.app',
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://localhost:5174'
+    ],
+    credentials: true,
+    optionsSuccessStatus: 200
+  }
+  app.use(cors(corsOptions))
+
   app.use(express.json({ limit: '2mb' }))
   app.use(pinoHttp({ logger }))
 
