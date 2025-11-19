@@ -64,22 +64,31 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
     onUpdate(data.id, { minimized: !data.minimized })
   }
 
-  const statusColors = {
-    idle: 'border-white/20 bg-charcoal-800/90',
-    active: 'border-ralph-cyan/40 bg-charcoal-800/95 shadow-lg shadow-ralph-cyan/20',
-    complete: 'border-ralph-pink/40 bg-charcoal-800/90',
-    processing: 'border-orange-400/50 bg-charcoal-800/95 shadow-lg shadow-orange-400/20'
+  // Type-based colors
+  const getNodeColor = () => {
+    // RKB only - orange
+    if (data.type === 'rkb') {
+      return 'border-orange-400/40 bg-orange-400/10'
+    }
+    // AI-generated content - pink (debrief, opportunities, etc.)
+    if (data.type === 'ai-content' || data.type === 'debrief') {
+      return 'border-ralph-pink/40 bg-ralph-pink/10'
+    }
+    // User input - blue
+    if (data.type === 'user-input' || data.type === 'input' || data.type === 'upload') {
+      return 'border-ralph-cyan/40 bg-ralph-cyan/10'
+    }
+    // Default
+    return 'border-white/20 bg-charcoal-800/90'
   }
 
-  // Special styling for RalphBot
-  const isRalphBot = data.id === 'copilot' || data.id === 'ralphbot'
-  const ralphBotStyle = isRalphBot ? 'bg-ralph-cyan/10 border-ralph-cyan/30' : ''
-  const statusColor = isRalphBot ? ralphBotStyle : statusColors[data.status || 'idle']
+  const nodeColor = getNodeColor()
+  const activeGlow = data.status === 'active' ? ' ring-2 ring-ralph-cyan/50 shadow-xl shadow-ralph-cyan/40' : ''
 
   return (
     <div
       ref={nodeRef}
-      className={`absolute rounded-lg border-2 backdrop-blur-sm transition-all ${statusColor}`}
+      className={`absolute rounded-lg border-2 backdrop-blur-sm transition-all ${nodeColor}${activeGlow}`}
       style={{
         left: data.x,
         top: data.y,

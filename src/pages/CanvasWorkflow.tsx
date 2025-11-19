@@ -193,8 +193,40 @@ export default function CanvasWorkflow() {
   const handleSubmit = () => {
     if (!concept) return
     setActivated(true)
-    // Nodes keep their colors, no minimizing - workflow stays visible
+
+    // Minimize Story Brief and Context nodes after submit
+    setNodes(prev => prev.map(n => {
+      if (n.id === 'brief-input' || n.id === 'context-upload') {
+        return { ...n, minimized: true, status: 'idle' as const }
+      }
+      return n
+    }))
   }
+
+  // Re-assessment trigger: If files are added after workflow is activated, re-trigger debrief
+  useEffect(() => {
+    if (activated && processed.length > 0) {
+      // Set debrief status back to processing when new files are added
+      setNodes(prev => prev.map(n => {
+        if (n.id === 'debrief-opportunities') {
+          return { ...n, status: 'processing' as const }
+        }
+        return n
+      }))
+
+      // Simulate re-processing after 2 seconds
+      const timer = setTimeout(() => {
+        setNodes(prev => prev.map(n => {
+          if (n.id === 'debrief-opportunities') {
+            return { ...n, status: 'complete' as const }
+          }
+          return n
+        }))
+      }, 2000)
+
+      return () => clearTimeout(timer)
+    }
+  }, [processed.length, activated])
 
   const renderNodeContent = (node: NodeData) => {
     if (node.id === 'brief-input') {
