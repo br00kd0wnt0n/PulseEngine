@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { api } from '../services/api'
 import { ProcessedContent } from '../types'
 import { logActivity } from '../utils/activity'
 
@@ -25,23 +26,31 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     console.log('[UploadContext] Added', files.length, 'file placeholders')
 
     try {
-      // Check for existing project from Canvas workflow or previous uploads
+      // Ensure a server project exists before uploading so assets associate correctly
       let activeProjectId = localStorage.getItem('activeProjectId')
-
-      // Validate that projectId is a valid UUID (not 'local' string)
-      const isValidUUID = activeProjectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeProjectId)
-
-      if (isValidUUID) {
-        console.log('[UploadContext] Using existing project:', activeProjectId)
+      let isValidUUID = activeProjectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeProjectId)
+      if (!isValidUUID) {
+        try {
+          const concept = (typeof localStorage !== 'undefined' && localStorage.getItem('concept')) || 'Untitled Project'
+          const created = await api.createPublicProject({ concept: concept || 'Untitled Project', graph: { nodes: [], links: [] }, focusId: null })
+          if (created && created.id && typeof created.id === 'string') {
+            activeProjectId = created.id
+            try { localStorage.setItem('activeProjectId', created.id) } catch {}
+            console.log('[UploadContext] Created project for uploads:', created.id)
+          }
+        } catch (e) {
+          console.warn('[UploadContext] Could not create server project before upload; continuing without association')
+        }
+        isValidUUID = !!(activeProjectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeProjectId))
       } else {
-        console.log('[UploadContext] No project found - files will be uploaded without project association')
-        activeProjectId = null
+        console.log('[UploadContext] Using existing project:', activeProjectId)
       }
 
       // Upload files to ingestion service
       const formData = new FormData()
       files.forEach(file => formData.append('files', file))
       formData.append('ownerId', USER_ID)
+      formData.append('scope', 'project') // explicit: treat as project-scoped context, not RKB
       // Only add projectId if we have a valid one
       if (activeProjectId) {
         formData.append('projectId', activeProjectId)
@@ -90,17 +99,24 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setProcessed((p) => [placeholder, ...p])
 
     try {
-      // Check for existing project from Canvas workflow or previous uploads
+      // Ensure a server project exists before URL ingestion
       let activeProjectId = localStorage.getItem('activeProjectId')
-
-      // Validate that projectId is a valid UUID (not 'local' string)
-      const isValidUUID = activeProjectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeProjectId)
-
-      if (isValidUUID) {
-        console.log('[UploadContext] Using existing project:', activeProjectId)
+      let isValidUUID = activeProjectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeProjectId)
+      if (!isValidUUID) {
+        try {
+          const concept = (typeof localStorage !== 'undefined' && localStorage.getItem('concept')) || 'Untitled Project'
+          const created = await api.createPublicProject({ concept: concept || 'Untitled Project', graph: { nodes: [], links: [] }, focusId: null })
+          if (created && created.id && typeof created.id === 'string') {
+            activeProjectId = created.id
+            try { localStorage.setItem('activeProjectId', created.id) } catch {}
+            console.log('[UploadContext] Created project for URL ingestion:', created.id)
+          }
+        } catch (e) {
+          console.warn('[UploadContext] Could not create server project before URL ingestion; continuing without association')
+        }
+        isValidUUID = !!(activeProjectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeProjectId))
       } else {
-        console.log('[UploadContext] No project found - URL will be ingested without project association')
-        activeProjectId = null
+        console.log('[UploadContext] Using existing project:', activeProjectId)
       }
 
       const response = await fetch(`${INGESTION_URL}/ingest/url`, {
@@ -109,7 +125,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({
           url,
           ownerId: USER_ID,
-          ...(activeProjectId && { projectId: activeProjectId })
+          scope: 'project',
+          ...(activeProjectId && isValidUUID ? { projectId: activeProjectId } : {})
         }),
       })
 

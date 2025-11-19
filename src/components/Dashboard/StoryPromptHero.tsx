@@ -62,6 +62,7 @@ export default function StoryPromptHero({ redirectToCanvas }: { redirectToCanvas
     const text = value.trim()
     if (!text) return
     setConcept(text)
+    try { localStorage.setItem('concept', text) } catch {}
     setActivated(true)
     try {
       localStorage.setItem('region', JSON.stringify(region))

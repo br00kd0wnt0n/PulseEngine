@@ -288,25 +288,24 @@ export default function CanvasWorkflow() {
     return () => { cancel = true }
   }, [activated, concept, persona, region, processed])
 
-  // Step 1: Add RKB and Debrief/Opportunities when workflow starts
+  // Step 1: Add RKB immediately; add Debrief only when uploads are assessed (or there are none)
   useEffect(() => {
-    if (activated && !nodes.find(n => n.id === 'rkb')) {
-      setNodes(prev => [
+    if (!activated) return
+    const hasUploads = (processed?.length || 0) > 0
+    const uploadsAssessed = !hasUploads || (hasUploads && !hasPlaceholders(processed))
+    const hasRkb = !!nodes.find(n => n.id === 'rkb')
+    const hasDebrief = !!nodes.find(n => n.id === 'debrief-opportunities')
+
+    if (!hasRkb) {
+      setNodes(prev => ([
         ...prev,
-        // RKB node (AI-content, orange)
-        {
-          id: 'rkb',
-          type: 'rkb',
-          title: 'Ralph Knowledge Base',
-          x: 50,
-          y: 620,
-          width: 300,
-          height: 150,
-          minimized: false,
-          zIndex: 2,
-          status: 'idle'
-        },
-        // Debrief & Opportunities node (AI-content, orange)
+        { id: 'rkb', type: 'rkb', title: 'Ralph Knowledge Base', x: 50, y: 620, width: 300, height: 150, minimized: false, zIndex: 2, status: 'idle' as const },
+      ]))
+    }
+
+    if (!hasDebrief && uploadsAssessed) {
+      setNodes(prev => ([
+        ...prev,
         {
           id: 'debrief-opportunities',
           type: 'ai-content',
@@ -317,12 +316,12 @@ export default function CanvasWorkflow() {
           height: 500,
           minimized: false,
           zIndex: 2,
-          status: 'processing',
+          status: 'processing' as const,
           connectedTo: ['brief-input', 'context-upload', 'rkb']
         }
-      ])
+      ]))
     }
-  }, [activated, nodes])
+  }, [activated, nodes, processed])
 
   // Stack and minimize left nodes when debrief opens
   useEffect(() => {
@@ -337,7 +336,7 @@ export default function CanvasWorkflow() {
           return { ...node, x: 50, y: 160, width: 280, minimized: true }
         }
         if (node.id === 'rkb') {
-          return { ...node, x: 50, y: 220, width: 280, minimized: true }
+          return { ...node, x: 50, y: 220, width: 300, minimized: false }
         }
         return node
       }))
@@ -632,7 +631,7 @@ export default function CanvasWorkflow() {
         <div className="space-y-2">
           <textarea
             value={concept}
-            onChange={(e) => setConcept(e.target.value)}
+            onChange={(e) => { setConcept(e.target.value); try { localStorage.setItem('concept', e.target.value) } catch {} }}
             onMouseDown={(e) => e.stopPropagation()}
             placeholder="Describe your campaign story..."
             className="w-full h-24 bg-charcoal-800/70 border border-white/10 rounded px-3 py-2 text-sm resize-none"
@@ -1005,7 +1004,7 @@ export default function CanvasWorkflow() {
                   setDebriefAccepted(true)
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
-                disabled={debriefAccepted}
+                disabled={debriefAccepted || node.status === 'processing' || ((processed?.length||0)>0 && hasPlaceholders(processed)) || !debrief}
                 className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {debriefAccepted ? 'Accepted ✓' : 'Accept & Continue to Narrative'}
@@ -1262,12 +1261,20 @@ export default function CanvasWorkflow() {
     <div className="relative w-full h-screen">
       {/* Fixed Header - stays under main header */}
       <div className="fixed top-16 left-4 right-4 z-50">
-        <div className="panel p-3 flex items-center justify-between backdrop-blur-lg bg-charcoal-900/80">
-          <div className="flex items-center gap-2 text-xs">
-            {concept && <div className="px-2 py-1 rounded bg-ralph-cyan/20 border border-ralph-cyan/40">{concept}</div>}
-            {persona && <div className="px-2 py-1 rounded bg-white/10 border border-white/20">Persona: {persona}</div>}
-            {region && <div className="px-2 py-1 rounded bg-white/10 border border-white/20">Region: {region}</div>}
+        <div className="panel p-3 backdrop-blur-lg bg-charcoal-900/80">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs">
+              {concept && <div className="px-2 py-1 rounded bg-ralph-cyan/20 border border-ralph-cyan/40">{concept}</div>}
+              {persona && <div className="px-2 py-1 rounded bg-white/10 border border-white/20">Persona: {persona}</div>}
+              {region && <div className="px-2 py-1 rounded bg-white/10 border border-white/20">Region: {region}</div>}
+            </div>
           </div>
+          {(processed.length > 0 && hasPlaceholders(processed)) && (
+            <div className="mt-2 text-[10px] text-white/80 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-ralph-cyan animate-pulse" />
+              <span>Indexing uploaded context… Debrief will appear once ready.</span>
+            </div>
+          )}
         </div>
       </div>
 
