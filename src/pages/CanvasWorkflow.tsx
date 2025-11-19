@@ -132,6 +132,25 @@ export default function CanvasWorkflow() {
     }
   }, [activated, nodes])
 
+  // Stack and minimize left nodes when debrief opens
+  useEffect(() => {
+    if (activated && nodes.find(n => n.id === 'debrief-opportunities')) {
+      setNodes(prev => prev.map(node => {
+        // Minimize and stack the three left nodes
+        if (node.id === 'brief-input') {
+          return { ...node, x: 50, y: 100, width: 280, minimized: true }
+        }
+        if (node.id === 'context-upload') {
+          return { ...node, x: 50, y: 160, width: 280, minimized: true }
+        }
+        if (node.id === 'rkb') {
+          return { ...node, x: 50, y: 220, width: 280, minimized: true }
+        }
+        return node
+      }))
+    }
+  }, [activated, nodes])
+
   // Step 2: Add Narrative Structure ONLY after user accepts Debrief
   useEffect(() => {
     if (!debriefAccepted || nodes.find(n => n.id === 'narrative')) return
