@@ -1,11 +1,17 @@
 import { useState } from 'react'
 
+type Message = {
+  id: number
+  text: string
+  type: 'info' | 'user'
+}
+
 export default function FloatingAssistant() {
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
       text: "Welcome! I'm here to guide you through the campaign workflow. Start by entering your story brief above.",
-      type: 'info' as const
+      type: 'info'
     }
   ])
   const [inputValue, setInputValue] = useState('')
@@ -17,7 +23,7 @@ export default function FloatingAssistant() {
     setMessages(prev => [...prev, {
       id: Date.now(),
       text: inputValue,
-      type: 'user' as const
+      type: 'user'
     }])
 
     setInputValue('')
