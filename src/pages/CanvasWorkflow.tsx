@@ -196,8 +196,27 @@ export default function CanvasWorkflow() {
   // Generate narrative with selected opportunities
   useEffect(() => {
     let cancel = false
-    if (!debriefAccepted || narrativeGenerated || !nodes.find(n => n.id === 'narrative') || narrative) return
+    const narrativeNode = nodes.find(n => n.id === 'narrative')
 
+    // Early return conditions with logging
+    if (!debriefAccepted) {
+      console.log('[Narrative] Waiting for debrief acceptance')
+      return
+    }
+    if (narrativeGenerated) {
+      console.log('[Narrative] Already generated')
+      return
+    }
+    if (!narrativeNode) {
+      console.log('[Narrative] Waiting for narrative node to be created')
+      return
+    }
+    if (narrative) {
+      console.log('[Narrative] Narrative already exists')
+      return
+    }
+
+    console.log('[Narrative] Starting narrative generation...')
     setNarrativeGenerated(true)
     setNarrativeLoading(true)
     ;(async () => {
@@ -213,7 +232,9 @@ export default function CanvasWorkflow() {
           selectedOpportunities: Array.from(selectedOpportunities)
         }
 
+        console.log('[Narrative] Calling API with graph:', graph)
         const narrativeResult = await api.narrative(graph)
+        console.log('[Narrative] API response received:', narrativeResult)
 
         if (!cancel) {
           setNarrative(narrativeResult)
@@ -222,15 +243,19 @@ export default function CanvasWorkflow() {
           setNodes(prev => prev.map(n =>
             n.id === 'narrative' ? { ...n, status: 'complete' as const } : n
           ))
+          console.log('[Narrative] Generation complete')
         }
       } catch (err) {
-        console.error('Failed to generate narrative:', err)
-        if (!cancel) setNarrativeLoading(false)
+        console.error('[Narrative] Failed to generate narrative:', err)
+        if (!cancel) {
+          setNarrativeLoading(false)
+          setNarrativeGenerated(false) // Reset so it can retry
+        }
       }
     })()
 
     return () => { cancel = true }
-  }, [debriefAccepted, narrativeGenerated])
+  }, [debriefAccepted, narrativeGenerated, nodes.length, narrative])
 
   // Step 3: Add Scoring & Enhancements ONLY after narrative is approved
   useEffect(() => {
