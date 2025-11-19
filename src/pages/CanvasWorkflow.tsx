@@ -81,33 +81,15 @@ export default function CanvasWorkflow() {
     setLoading(true)
     ;(async () => {
       try {
-        // Ensure we have a valid project for this workflow
+        // Check if there's an existing project from file uploads
         let projectId = localStorage.getItem('activeProjectId')
-
-        // Validate it's a valid UUID
         const isValidUUID = projectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)
 
-        // If no valid project, create one for this Canvas workflow
-        if (!isValidUUID) {
-          console.log('[Canvas] No existing project found, creating new project for concept:', concept)
-          const response = await fetch(`${API_BASE}/projects`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: concept.substring(0, 50) + (concept.length > 50 ? '...' : ''),
-              ownerId: USER_ID
-            })
-          })
-          if (response.ok) {
-            const project = await response.json()
-            projectId = project.id
-            localStorage.setItem('activeProjectId', project.id)
-            console.log('[Canvas] Created new project:', projectId)
-          } else {
-            console.error('[Canvas] Failed to create project:', response.status, response.statusText)
-          }
-        } else {
+        if (isValidUUID) {
           console.log('[Canvas] Using existing project:', projectId)
+        } else {
+          console.log('[Canvas] No project - will use Core RKB + Live Metrics only')
+          projectId = null
         }
 
         const [d, o] = await Promise.all([
