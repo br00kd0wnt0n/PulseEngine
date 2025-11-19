@@ -10,6 +10,7 @@ import { CitationToken } from '../components/shared/CitationOverlay'
 
 const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string | undefined) || ''
 const USER_ID = '087d78e9-4bbe-49f6-8981-1588ce4934a2'
+const ENABLE_REMOTE_SAVE = Boolean((import.meta as any).env?.VITE_ENABLE_REMOTE_SAVE)
 
 export default function CanvasWorkflow() {
   const { concept, setConcept, activated, setActivated, persona, setPersona, region, setRegion } = useDashboard() as any
@@ -21,6 +22,35 @@ export default function CanvasWorkflow() {
 
   const addActivity = (text: string, kind?: 'rkb'|'project'|'trends'|'ai') => {
     setRkbActivity(prev => [{ id: Date.now(), text, kind }, ...prev].slice(0, 20))
+  }
+
+  // Manual re-evaluation trigger (Debrief + Opps, then optionally Narrative)
+  const reEvaluateNow = async () => {
+    if (!concept) return
+    let projectId: string | null = null
+    try { projectId = localStorage.getItem('activeProjectId') } catch {}
+    setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'processing' as const } : n))
+    addActivity('Manual re-evaluation started…', 'ai')
+    try {
+      const [d, o] = await Promise.all([
+        api.debrief(concept, { persona, region, projectId: projectId || undefined }),
+        api.opportunities(concept, { persona, region, projectId: projectId || undefined })
+      ])
+      console.log('[Debrief] Sources:', d?.sources)
+      setDebrief(d)
+      setOpps(o)
+      try { if (projectId) localStorage.setItem(`debrief:${projectId}`, JSON.stringify(d)) } catch {}
+      try { if (projectId) localStorage.setItem(`opps:${projectId}`, JSON.stringify(o)) } catch {}
+      setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'complete' as const } : n))
+      addActivity('Debrief updated with project context', 'ai')
+      if (debriefAccepted) {
+        setNodes(prev => prev.map(n => n.id === 'narrative' ? { ...n, status: 'processing' as const } : n))
+        setNarrativeGenerated(false)
+      }
+    } catch (e) {
+      addActivity('Re-evaluation failed — check connection', 'ai')
+      setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'active' as const } : n))
+    }
   }
 
   // Ensure narrative node exists helper
@@ -229,6 +259,7 @@ export default function CanvasWorkflow() {
           api.opportunities(concept, { persona, region, projectId: projectId || undefined })
         ])
         if (!cancel) {
+          console.log('[Debrief] Sources:', d?.sources)
           setDebrief(d)
           setOpps(o)
           setLoading(false)
@@ -237,7 +268,7 @@ export default function CanvasWorkflow() {
           try { localStorage.setItem(`opps:${projectId}`, JSON.stringify(o)) } catch {}
           // Persist assessment to project DB as a version snapshot (does not touch RKB)
           try {
-            if (projectId && /^[0-9a-f\-]{36}$/i.test(projectId)) {
+            if (ENABLE_REMOTE_SAVE && projectId && /^[0-9a-f\-]{36}$/i.test(projectId)) {
               await api.saveVersion(projectId, { summary: concept, changeSummary: 'Debrief assessment', scores: { debrief: d, opportunities: o } })
             }
           } catch {}
@@ -255,7 +286,7 @@ export default function CanvasWorkflow() {
     })()
 
     return () => { cancel = true }
-  }, [activated, concept, persona, region])
+  }, [activated, concept, persona, region, processed])
 
   // Step 1: Add RKB and Debrief/Opportunities when workflow starts
   useEffect(() => {
@@ -354,7 +385,7 @@ export default function CanvasWorkflow() {
       console.log('[Narrative] Waiting for narrative node to be created')
       return
     }
-    if (narrative) {
+    if (narrative && !narrativeLoading) {
       console.log('[Narrative] Narrative already exists')
       return
     }
@@ -395,7 +426,7 @@ export default function CanvasWorkflow() {
           // Save narrative snapshot to project DB version history
           try {
             const pid = localStorage.getItem('activeProjectId')
-            if (pid && /^[0-9a-f\-]{36}$/i.test(pid)) {
+            if (ENABLE_REMOTE_SAVE && pid && /^[0-9a-f\-]{36}$/i.test(pid)) {
               await api.saveVersion(pid, { summary: concept, narrative: (narrativeResult as any).text || '', changeSummary: 'Narrative generated' })
             }
           } catch {}
@@ -560,18 +591,21 @@ export default function CanvasWorkflow() {
 
   // Re-evaluate Debrief/Opportunities (and Narrative if accepted) when context updates
   useEffect(() => {
+    let t: any = null
     const handler = () => {
       if (!activated || !concept) return
       let projectId: string | null = null
       try { projectId = localStorage.getItem('activeProjectId') } catch {}
       setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'processing' as const } : n))
       addActivity('Re-evaluating with new project context…', 'ai')
-      ;(async () => {
+      if (t) clearTimeout(t)
+      t = setTimeout(async () => {
         try {
           const [d, o] = await Promise.all([
             api.debrief(concept, { persona, region, projectId: projectId || undefined }),
             api.opportunities(concept, { persona, region, projectId: projectId || undefined })
           ])
+          console.log('[Debrief] Sources:', d?.sources)
           setDebrief(d)
           setOpps(o)
           try { if (projectId) localStorage.setItem(`debrief:${projectId}`, JSON.stringify(d)) } catch {}
@@ -580,16 +614,16 @@ export default function CanvasWorkflow() {
           addActivity('Debrief updated with project context', 'ai')
           // If narrative was accepted previously, refresh it as well
           setNodes(prev => prev.map(n => n.id === 'narrative' ? { ...n, status: 'processing' as const } : n))
-          setNarrative(null)
+          // Keep current narrative visible; request refresh
           setNarrativeGenerated(false)
         } catch {
           addActivity('Re-evaluation failed — check connection', 'ai')
           setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'active' as const } : n))
         }
-      })()
+      }, 700)
     }
     window.addEventListener('context-updated', handler as any)
-    return () => window.removeEventListener('context-updated', handler as any)
+    return () => { window.removeEventListener('context-updated', handler as any); if (t) clearTimeout(t) }
   }, [activated, concept, persona, region])
 
   const renderNodeContent = (node: NodeData) => {
@@ -899,6 +933,18 @@ export default function CanvasWorkflow() {
                 <div className="mt-2 text-[10px] text-ralph-cyan">
                   {selectedOpportunities.size} opportunit{selectedOpportunities.size !== 1 ? 'ies' : 'y'} selected
                 </div>
+              </div>
+
+              {/* Manual Re-evaluate */}
+              <div className="panel p-2 bg-white/5 flex items-center justify-between">
+                <div className="text-white/60 text-[10px]">If you added new context, re-run analysis now.</div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); reEvaluateNow() }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[10px] border border-white/15"
+                >
+                  Re-evaluate now
+                </button>
               </div>
 
               {/* Chatbot Field */}
