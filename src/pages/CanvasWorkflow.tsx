@@ -1,14 +1,26 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Canvas from '../components/Canvas/Canvas'
 import { NodeData } from '../components/Canvas/Node'
 import FloatingAssistant from '../components/Canvas/FloatingAssistant'
 import { useDashboard } from '../context/DashboardContext'
 import { useUpload } from '../context/UploadContext'
+import { api } from '../services/api'
+import { CitationToken } from '../components/shared/CitationOverlay'
 
 export default function CanvasWorkflow() {
   const { concept, setConcept, activated, setActivated, persona, setPersona, region, setRegion } = useDashboard() as any
   const { addFiles, addUrl, processed } = useUpload()
   const [nodes, setNodes] = useState<NodeData[]>([])
+
+  // Backend data state
+  const [debrief, setDebrief] = useState<{ brief: string; summary: string; keyPoints: string[]; didYouKnow: string[]; sources?: any } | null>(null)
+  const [opps, setOpps] = useState<{ opportunities: { title: string; why: string; impact: number }[]; rationale?: string; sources?: any } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [debriefAccepted, setDebriefAccepted] = useState(false)
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Initialize nodes with smart auto-layout
   useEffect(() => {
@@ -42,6 +54,37 @@ export default function CanvasWorkflow() {
 
     setNodes(initialNodes)
   }, [])
+
+  // Call real backend APIs when workflow is activated
+  useEffect(() => {
+    let cancel = false
+    if (!activated || !concept) return
+
+    setLoading(true)
+    ;(async () => {
+      try {
+        const pid = localStorage.getItem('activeProjectId') || 'local'
+        const [d, o] = await Promise.all([
+          api.debrief(concept, { persona, region, projectId: pid }),
+          api.opportunities(concept, { persona, region, projectId: pid })
+        ])
+        if (!cancel) {
+          setDebrief(d)
+          setOpps(o)
+          setLoading(false)
+          // Mark debrief node as complete after data loads
+          setNodes(prev => prev.map(n =>
+            n.id === 'debrief-opportunities' ? { ...n, status: 'complete' as const } : n
+          ))
+        }
+      } catch (err) {
+        console.error('Failed to load debrief/opportunities:', err)
+        if (!cancel) setLoading(false)
+      }
+    })()
+
+    return () => { cancel = true }
+  }, [activated, concept, persona, region])
 
   // Step 1: Add RKB and Debrief/Opportunities when workflow starts
   useEffect(() => {
@@ -79,42 +122,35 @@ export default function CanvasWorkflow() {
     }
   }, [activated, nodes])
 
-  // Step 2: Add Narrative Structure after user accepts opportunities (simulated after 5 seconds)
+  // Step 2: Add Narrative Structure ONLY after user accepts Debrief
   useEffect(() => {
-    if (!nodes.find(n => n.id === 'debrief-opportunities')) return
+    if (!debriefAccepted || nodes.find(n => n.id === 'narrative')) return
 
-    const debriefNode = nodes.find(n => n.id === 'debrief-opportunities')
-    if (debriefNode?.status === 'processing' && !nodes.find(n => n.id === 'narrative')) {
-      const timer = setTimeout(() => {
-        // Mark debrief as complete
-        setNodes(prev => prev.map(n =>
-          n.id === 'debrief-opportunities' ? { ...n, status: 'complete' as const } : n
-        ))
+    setNodes(prev => [
+      ...prev,
+      // Narrative Structure node
+      {
+        id: 'narrative',
+        type: 'ai-content',
+        title: 'Narrative Structure',
+        x: 1000,
+        y: 100,
+        width: 450,
+        height: 450,
+        minimized: false,
+        zIndex: 3,
+        status: 'processing',
+        connectedTo: ['debrief-opportunities']
+      }
+    ])
 
-        setTimeout(() => {
-          setNodes(prev => [
-            ...prev,
-            // Narrative Structure node
-            {
-              id: 'narrative',
-              type: 'ai-content',
-              title: 'Narrative Structure',
-              x: 1000,
-              y: 100,
-              width: 450,
-              height: 450,
-              minimized: false,
-              zIndex: 3,
-              status: 'processing',
-              connectedTo: ['debrief-opportunities']
-            }
-          ])
-        }, 500)
-      }, 5000)
-
-      return () => clearTimeout(timer)
-    }
-  }, [nodes])
+    // Mark as complete after 3 seconds
+    setTimeout(() => {
+      setNodes(prev => prev.map(n =>
+        n.id === 'narrative' ? { ...n, status: 'complete' as const } : n
+      ))
+    }, 3000)
+  }, [debriefAccepted, nodes])
 
   // Step 3: Add Scoring & Enhancements after narrative is reviewed (simulated after 5 seconds)
   useEffect(() => {
@@ -203,6 +239,43 @@ export default function CanvasWorkflow() {
     }))
   }
 
+  // File upload helper
+  const handleFileUpload = async (files: FileList | File[]) => {
+    try {
+      await addFiles(Array.from(files))
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    } catch (err) {
+      console.error('Upload failed:', err)
+    }
+  }
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = e.dataTransfer.files
+    if (files && files.length > 0) {
+      handleFileUpload(files)
+    }
+  }
+
   // Re-assessment trigger: If files are added after workflow is activated, re-trigger debrief
   useEffect(() => {
     if (activated && processed.length > 0) {
@@ -282,36 +355,68 @@ export default function CanvasWorkflow() {
       return (
         <div className="space-y-2">
           <div className="text-xs text-white/60 mb-1">
-            {processed.length} files uploaded {processed.length === 0 && '(optional)'}
+            {processed.length} file{processed.length !== 1 ? 's' : ''} uploaded {processed.length === 0 && '(optional)'}
           </div>
-          <div className="flex flex-wrap gap-1 mb-2 max-h-16 overflow-auto">
-            {processed.slice(0, 5).map((p, i) => (
-              <span key={i} className="px-2 py-0.5 rounded bg-white/10 text-[10px] border border-white/10">
-                {p.name}
-              </span>
-            ))}
-          </div>
+
+          {/* Show uploaded files */}
+          {processed.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2 max-h-20 overflow-auto">
+              {processed.map((p, i) => (
+                <span key={i} className="px-2 py-0.5 rounded bg-ralph-cyan/10 border border-ralph-cyan/30 text-[10px] flex items-center gap-1">
+                  {p.name}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // Could add removeContent(p.id) here if needed
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="text-white/60 hover:text-white/90"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Hidden file input */}
           <input
+            ref={fileInputRef}
             type="file"
             multiple
             onChange={(e) => {
-              if (e.target.files) {
-                addFiles(Array.from(e.target.files)).catch(err => {
-                  console.error('Upload failed:', err)
-                })
+              if (e.target.files && e.target.files.length > 0) {
+                handleFileUpload(e.target.files)
               }
             }}
+            onClick={(e) => e.stopPropagation()}
             className="hidden"
             id="canvas-file-upload"
           />
-          <label
-            htmlFor="canvas-file-upload"
+
+          {/* Drag-and-drop zone */}
+          <div
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
             onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            className="block w-full px-3 py-2 rounded border border-dashed border-white/20 hover:border-ralph-cyan/40 text-xs text-center cursor-pointer transition-colors"
+            onClick={(e) => {
+              e.stopPropagation()
+              fileInputRef.current?.click()
+            }}
+            className={`block w-full px-3 py-3 rounded border-2 border-dashed text-xs text-center cursor-pointer transition-all ${
+              isDragging
+                ? 'border-ralph-cyan bg-ralph-cyan/10 text-white/90'
+                : 'border-white/20 hover:border-ralph-cyan/40 text-white/60 hover:text-white/80'
+            }`}
           >
-            + Add Context Files (Optional)
-          </label>
+            {isDragging ? (
+              <span>Drop files here...</span>
+            ) : (
+              <span>+ Drag & Drop or Click to Add Files (Optional)</span>
+            )}
+          </div>
         </div>
       )
     }
@@ -332,54 +437,140 @@ export default function CanvasWorkflow() {
     if (node.id === 'debrief-opportunities') {
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
-          {node.status === 'processing' ? (
+          {loading || !debrief ? (
             <div className="text-white/80 leading-relaxed">
-              AI is analyzing your campaign with RKB semantic search...
+              AI is analyzing your campaign with RKB semantic search and trends data...
             </div>
           ) : (
             <>
+              {/* DEBRIEF Section */}
+              <div className="panel p-3 bg-white/5">
+                <div className="text-white/70 font-medium mb-2 text-[11px]">DEBRIEF</div>
+                <div className="text-white/80 text-[11px] leading-relaxed mb-2">{debrief.brief}</div>
+                <div className="text-white/60 text-[10px] leading-relaxed mb-2">{debrief.summary}</div>
+
+                {/* Key Points */}
+                {debrief.keyPoints && debrief.keyPoints.length > 0 && (
+                  <div className="mt-3">
+                    <div className="text-white/60 font-medium mb-1 text-[10px]">Key Points</div>
+                    <ul className="list-disc pl-4 space-y-1">
+                      {debrief.keyPoints.map((p, i) => {
+                        const core = (debrief.sources?.core || []) as string[]
+                        const trends = core.filter(x => x.startsWith('trend:')).map(x => x.replace('trend:', ''))
+                        const t = trends[i]
+                        return (
+                          <li key={i} className="text-white/70 text-[10px]">
+                            {p}
+                            {t && i < 2 && (
+                              <span className="ml-1 align-middle">
+                                <CitationToken id={i + 1} label={`Trend: ${t}`} detail={`Referenced trend: ${t}`} />
+                              </span>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Did You Know */}
+                {debrief.didYouKnow && debrief.didYouKnow.length > 0 && (
+                  <div className="mt-3 p-2 bg-ralph-teal/15 border border-ralph-teal/30 rounded">
+                    <div className="text-white/70 font-medium mb-1 text-[10px]">Did You Know</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {debrief.didYouKnow.map((x, i) => (
+                        <span key={i} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-[10px]">
+                          {x} <CitationToken id={100 + i} label="Market Insight" detail={x} />
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* OPPORTUNITIES Section */}
+              <div className="panel p-3 bg-white/5">
+                <div className="text-white/70 font-medium mb-2 text-[11px]">OPPORTUNITIES</div>
+                <div className="space-y-2">
+                  {opps?.opportunities?.map((o, i) => (
+                    <div key={i} className="p-2 bg-white/5 rounded border border-white/10">
+                      <div className="flex items-start justify-between mb-1">
+                        <div className="text-white/90 font-medium text-[10px]">{o.title}</div>
+                        <div className="text-xs px-1.5 py-0.5 rounded border border-ralph-cyan/40 bg-ralph-cyan/10 text-ralph-cyan">
+                          {o.impact}/10
+                        </div>
+                      </div>
+                      <div className="text-white/70 text-[10px] leading-relaxed">{o.why}</div>
+                    </div>
+                  ))}
+                </div>
+                {opps?.rationale && (
+                  <div className="mt-2 text-[10px] text-white/50">{opps.rationale}</div>
+                )}
+              </div>
+
+              {/* Chatbot Field */}
               <div className="panel p-2 bg-white/5">
-                <div className="text-white/70 font-medium mb-1 text-[11px]">DEBRIEF</div>
-                <div className="text-white/60 text-[10px] leading-relaxed">
-                  Strong cultural relevance detected. Campaign aligns with current music trends and has high engagement potential across TikTok and Instagram.
+                <div className="text-white/70 font-medium mb-2 text-[10px]">DISCUSS & REFINE</div>
+                <div className="space-y-2 max-h-32 overflow-auto mb-2">
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} className={`text-[10px] p-2 rounded ${msg.role === 'user' ? 'bg-ralph-cyan/10 border border-ralph-cyan/20 text-white/90' : 'bg-white/5 text-white/70'}`}>
+                      {msg.text}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.stopPropagation()
+                        if (chatInput.trim()) {
+                          setChatMessages(prev => [...prev, { role: 'user', text: chatInput }])
+                          setChatInput('')
+                          // Simulate AI response
+                          setTimeout(() => {
+                            setChatMessages(prev => [...prev, { role: 'ai', text: 'I understand your feedback. Let me help refine these opportunities based on your input.' }])
+                          }, 500)
+                        }
+                      }
+                    }}
+                    placeholder="Ask questions or refine opportunities..."
+                    className="flex-1 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-[10px] outline-none"
+                  />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (chatInput.trim()) {
+                        setChatMessages(prev => [...prev, { role: 'user', text: chatInput }])
+                        setChatInput('')
+                        setTimeout(() => {
+                          setChatMessages(prev => [...prev, { role: 'ai', text: 'I understand your feedback. Let me help refine these opportunities based on your input.' }])
+                        }, 500)
+                      }
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="px-2 py-1 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-[10px]"
+                  >
+                    Send
+                  </button>
                 </div>
               </div>
 
-              <div className="panel p-2 bg-white/5">
-                <div className="text-white/70 font-medium mb-1 text-[11px]">OPPORTUNITIES</div>
-                <div className="space-y-2 mt-2">
-                  <label className="flex items-start gap-2 cursor-pointer group">
-                    <input type="checkbox" className="mt-0.5" />
-                    <span className="text-white/70 text-[10px] group-hover:text-white/90">
-                      TikTok-first approach with Instagram Reels crossover
-                    </span>
-                  </label>
-                  <label className="flex items-start gap-2 cursor-pointer group">
-                    <input type="checkbox" className="mt-0.5" />
-                    <span className="text-white/70 text-[10px] group-hover:text-white/90">
-                      Partner with 3 micro-influencers + 1 mid-tier creator
-                    </span>
-                  </label>
-                  <label className="flex items-start gap-2 cursor-pointer group">
-                    <input type="checkbox" className="mt-0.5" />
-                    <span className="text-white/70 text-[10px] group-hover:text-white/90">
-                      Content mix: 60% native, 30% UGC, 10% branded
-                    </span>
-                  </label>
-                  <label className="flex items-start gap-2 cursor-pointer group">
-                    <input type="checkbox" className="mt-0.5" />
-                    <span className="text-white/70 text-[10px] group-hover:text-white/90">
-                      Launch timing: Q4 2024 for maximum impact
-                    </span>
-                  </label>
-                </div>
-              </div>
-
+              {/* Accept Button */}
               <button
-                onClick={(e) => e.stopPropagation()}
-                className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setDebriefAccepted(true)
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                disabled={debriefAccepted}
+                className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Accept & Continue
+                {debriefAccepted ? 'Accepted ✓' : 'Accept & Continue to Narrative'}
               </button>
             </>
           )}
