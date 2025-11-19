@@ -100,6 +100,8 @@ export default function CanvasWorkflow() {
   const [nodesStacked, setNodesStacked] = useState(false)
   // Track if narrative has been generated to avoid infinite loops
   const [narrativeGenerated, setNarrativeGenerated] = useState(false)
+  const [narrativeRefreshRequested, setNarrativeRefreshRequested] = useState(false)
+  const debriefRefreshInFlight = useRef(false)
 
   // Initialize nodes with smart auto-layout
   useEffect(() => {
@@ -272,9 +274,10 @@ export default function CanvasWorkflow() {
               await api.saveVersion(projectId, { summary: concept, changeSummary: 'Debrief assessment', scores: { debrief: d, opportunities: o } })
             }
           } catch {}
-          // Mark debrief node as complete after data loads
+          // Mark debrief node status depending on sufficiency
+          const insufficient = !d || (!(d.brief && String(d.brief).trim().length >= 8) && !(Array.isArray(d.keyPoints) && d.keyPoints.length > 0))
           setNodes(prev => prev.map(n =>
-            n.id === 'debrief-opportunities' ? { ...n, status: 'complete' as const } : n
+            n.id === 'debrief-opportunities' ? { ...n, status: (insufficient ? 'active' : 'complete') as const } : n
           ))
           addActivity('Debrief & Opportunities ready', 'ai')
         }
@@ -376,7 +379,7 @@ export default function CanvasWorkflow() {
       console.log('[Narrative] Waiting for debrief acceptance')
       return
     }
-    if (narrativeGenerated) {
+    if (narrativeGenerated && !narrativeRefreshRequested) {
       console.log('[Narrative] Already generated')
       return
     }
@@ -384,7 +387,7 @@ export default function CanvasWorkflow() {
       console.log('[Narrative] Waiting for narrative node to be created')
       return
     }
-    if (narrative && !narrativeLoading) {
+    if (narrative && !narrativeLoading && !narrativeRefreshRequested) {
       console.log('[Narrative] Narrative already exists')
       return
     }
@@ -414,6 +417,7 @@ export default function CanvasWorkflow() {
           ensureNarrativeNode()
           setNarrative(narrativeResult)
           setNarrativeLoading(false)
+          setNarrativeRefreshRequested(false)
           // Persist minimal narrative blocks for exports and other views
           try {
             const pid = (localStorage.getItem('activeProjectId') || 'local')
@@ -441,13 +445,14 @@ export default function CanvasWorkflow() {
         if (!cancel) {
           setNarrativeLoading(false)
           setNarrativeGenerated(false) // Reset so it can retry
+          setNarrativeRefreshRequested(false)
         }
         addActivity('Narrative generation failed — try again', 'ai')
       }
     })()
 
     return () => { cancel = true }
-  }, [debriefAccepted, narrativeGenerated, nodes.length, narrative])
+  }, [debriefAccepted, narrativeGenerated, nodes.length, narrative, narrativeRefreshRequested])
 
   // Step 3: Add Scoring & Enhancements ONLY after narrative is approved
   useEffect(() => {
@@ -593,6 +598,7 @@ export default function CanvasWorkflow() {
     let t: any = null
     const handler = () => {
       if (!activated || !concept) return
+      if (debriefRefreshInFlight.current) return
       let projectId: string | null = null
       try { projectId = localStorage.getItem('activeProjectId') } catch {}
       setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'processing' as const } : n))
@@ -600,6 +606,7 @@ export default function CanvasWorkflow() {
       if (t) clearTimeout(t)
       t = setTimeout(async () => {
         try {
+          debriefRefreshInFlight.current = true
           const [d, o] = await Promise.all([
             api.debrief(concept, { persona, region, projectId: projectId || undefined }),
             api.opportunities(concept, { persona, region, projectId: projectId || undefined })
@@ -609,15 +616,20 @@ export default function CanvasWorkflow() {
           setOpps(o)
           try { if (projectId) localStorage.setItem(`debrief:${projectId}`, JSON.stringify(d)) } catch {}
           try { if (projectId) localStorage.setItem(`opps:${projectId}`, JSON.stringify(o)) } catch {}
-          setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'complete' as const } : n))
+          const insufficient = !d || (!(d.brief && String(d.brief).trim().length >= 8) && !(Array.isArray(d.keyPoints) && d.keyPoints.length > 0))
+          setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: (insufficient ? 'active' : 'complete') as const } : n))
           addActivity('Debrief updated with project context', 'ai')
           // If narrative was accepted previously, refresh it as well
-          setNodes(prev => prev.map(n => n.id === 'narrative' ? { ...n, status: 'processing' as const } : n))
-          // Keep current narrative visible; request refresh
-          setNarrativeGenerated(false)
+          if (debriefAccepted) {
+            setNodes(prev => prev.map(n => n.id === 'narrative' ? { ...n, status: 'processing' as const } : n))
+            setNarrativeRefreshRequested(true)
+            setNarrativeGenerated(false)
+          }
         } catch {
           addActivity('Re-evaluation failed — check connection', 'ai')
           setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'active' as const } : n))
+        } finally {
+          debriefRefreshInFlight.current = false
         }
       }, 700)
     }
@@ -822,6 +834,34 @@ export default function CanvasWorkflow() {
             <div className="text-white/80 leading-relaxed">
               AI is analyzing your campaign with RKB semantic search and trends data...
             </div>
+          ) : (!debrief.brief && (!Array.isArray(debrief.keyPoints) || debrief.keyPoints.length === 0)) ? (
+            <>
+              <div className="panel p-3 bg-white/5 border border-white/10">
+                <div className="text-white/80 text-[11px] leading-relaxed">
+                  I need a bit more detail to produce a meaningful debrief.
+                </div>
+                <div className="mt-2 text-white/60 text-[10px]">
+                  - Add 1–2 sentences to your Story Brief describing the goal, audience, or format<br/>
+                  - Or upload 1–2 relevant documents for context
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); focusBrief() }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="px-2 py-1 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-[10px]"
+                  >
+                    Edit Brief
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[10px] border border-white/15"
+                  >
+                    Add Context
+                  </button>
+                </div>
+              </div>
+            </>
           ) : (
             <>
               {/* DEBRIEF Section */}
@@ -1004,7 +1044,7 @@ export default function CanvasWorkflow() {
                   setDebriefAccepted(true)
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
-                disabled={debriefAccepted || node.status === 'processing' || ((processed?.length||0)>0 && hasPlaceholders(processed)) || !debrief}
+                disabled={debriefAccepted || node.status === 'processing' || ((processed?.length||0)>0 && hasPlaceholders(processed)) || !debrief || (!debrief.brief && (!Array.isArray(debrief.keyPoints) || debrief.keyPoints.length === 0))}
                 className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {debriefAccepted ? 'Accepted ✓' : 'Accept & Continue to Narrative'}

@@ -35,6 +35,8 @@ async function callOpenAI(prompt: string): Promise<string> {
   return resp.choices?.[0]?.message?.content || ''
 }
 
+const STRICT_AI_ONLY = (process.env.STRICT_AI_ONLY === 'true') || (process.env.DISABLE_HEURISTIC_FALLBACK === 'true')
+
 export async function narrativeFromTrends(graph: TrendGraph, focusId?: string | null) {
   const focus = focusId ? graph.nodes.find(n => n.id === focusId)?.label : null
   const trends = graph.nodes.filter(n => n.kind === 'trend').map(n => n.label)
@@ -117,7 +119,20 @@ Return ONLY valid JSON. Make every field specific to "${concept}" and grounded i
         } catch {}
       } catch {}
     }
-    // Context-aware heuristic fallback
+    // If strict mode, avoid heuristic placeholders and return minimal output when insufficient signal
+    const noContextSignal = (!ctx.projectContent?.length && !ctx.coreKnowledge?.length && !ctx.liveMetrics?.length && !ctx.predictiveTrends?.length)
+    if (STRICT_AI_ONLY || (concept.trim().length < 8 && noContextSignal)) {
+      const minimal = {
+        brief: '',
+        summary: '',
+        keyPoints: [] as string[],
+        didYouKnow: [] as string[],
+        sources: ctx.sources,
+      }
+      await cacheSet(cacheKey, minimal)
+      return minimal
+    }
+    // Context-aware heuristic fallback (non-strict)
     const hasLiveMetrics = ctx.liveMetrics && ctx.liveMetrics.length > 0
     const hasCoreKnowledge = ctx.coreKnowledge && ctx.coreKnowledge.length > 0
     const conceptLower = concept.toLowerCase()
@@ -228,7 +243,14 @@ Return ONLY valid JSON: { opportunities: [{ title, why, impact }], rationale }`
         } catch {}
       } catch {}
     }
-    // Context-aware heuristic fallback
+    // If strict mode, avoid heuristic placeholders and return minimal output when insufficient signal
+    const noContextSignal = (!ctx.projectContent?.length && !ctx.coreKnowledge?.length && !ctx.liveMetrics?.length && !ctx.predictiveTrends?.length)
+    if (STRICT_AI_ONLY || (concept.trim().length < 8 && noContextSignal)) {
+      const minimal = { opportunities: [], rationale: '', sources: ctx.sources }
+      await cacheSet(cacheKey, minimal)
+      return minimal
+    }
+    // Context-aware heuristic fallback (non-strict)
     const hasLiveMetrics = ctx.liveMetrics && ctx.liveMetrics.length > 0
     const conceptLower = concept.toLowerCase()
 
