@@ -250,7 +250,7 @@ export default function CanvasWorkflow() {
       return (
         <div className="space-y-2">
           <div className="text-xs text-white/60 mb-1">
-            {processed.length} files uploaded
+            {processed.length} files uploaded {processed.length === 0 && '(optional)'}
           </div>
           <div className="flex flex-wrap gap-1 mb-2 max-h-16 overflow-auto">
             {processed.slice(0, 5).map((p, i) => (
@@ -262,7 +262,13 @@ export default function CanvasWorkflow() {
           <input
             type="file"
             multiple
-            onChange={(e) => e.target.files && addFiles(Array.from(e.target.files))}
+            onChange={(e) => {
+              if (e.target.files) {
+                addFiles(Array.from(e.target.files)).catch(err => {
+                  console.error('Upload failed:', err)
+                })
+              }
+            }}
             className="hidden"
             id="canvas-file-upload"
           />
@@ -272,7 +278,7 @@ export default function CanvasWorkflow() {
             onClick={(e) => e.stopPropagation()}
             className="block w-full px-3 py-2 rounded border border-dashed border-white/20 hover:border-ralph-cyan/40 text-xs text-center cursor-pointer transition-colors"
           >
-            + Add Context Files
+            + Add Context Files (Optional)
           </label>
         </div>
       )
