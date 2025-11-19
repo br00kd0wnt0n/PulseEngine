@@ -7,6 +7,9 @@ import { useUpload } from '../context/UploadContext'
 import { api } from '../services/api'
 import { CitationToken } from '../components/shared/CitationOverlay'
 
+const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string | undefined) || ''
+const USER_ID = '087d78e9-4bbe-49f6-8981-1588ce4934a2'
+
 export default function CanvasWorkflow() {
   const { concept, setConcept, activated, setActivated, persona, setPersona, region, setRegion } = useDashboard() as any
   const { addFiles, addUrl, processed } = useUpload()
@@ -78,10 +81,32 @@ export default function CanvasWorkflow() {
     setLoading(true)
     ;(async () => {
       try {
-        const pid = localStorage.getItem('activeProjectId') || null
+        // Ensure we have a valid project for this workflow
+        let projectId = localStorage.getItem('activeProjectId')
+
+        // Validate it's a valid UUID
+        const isValidUUID = projectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)
+
+        // If no valid project, create one for this Canvas workflow
+        if (!isValidUUID) {
+          const response = await fetch(`${API_BASE}/projects`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: concept.substring(0, 50) + (concept.length > 50 ? '...' : ''),
+              ownerId: USER_ID
+            })
+          })
+          if (response.ok) {
+            const project = await response.json()
+            projectId = project.id
+            localStorage.setItem('activeProjectId', project.id)
+          }
+        }
+
         const [d, o] = await Promise.all([
-          api.debrief(concept, { persona, region, projectId: pid }),
-          api.opportunities(concept, { persona, region, projectId: pid })
+          api.debrief(concept, { persona, region, projectId }),
+          api.opportunities(concept, { persona, region, projectId })
         ])
         if (!cancel) {
           setDebrief(d)
