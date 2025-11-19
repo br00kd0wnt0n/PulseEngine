@@ -89,6 +89,7 @@ export default function CanvasWorkflow() {
 
         // If no valid project, create one for this Canvas workflow
         if (!isValidUUID) {
+          console.log('[Canvas] No existing project found, creating new project for concept:', concept)
           const response = await fetch(`${API_BASE}/projects`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -101,12 +102,17 @@ export default function CanvasWorkflow() {
             const project = await response.json()
             projectId = project.id
             localStorage.setItem('activeProjectId', project.id)
+            console.log('[Canvas] Created new project:', projectId)
+          } else {
+            console.error('[Canvas] Failed to create project:', response.status, response.statusText)
           }
+        } else {
+          console.log('[Canvas] Using existing project:', projectId)
         }
 
         const [d, o] = await Promise.all([
-          api.debrief(concept, { persona, region, projectId }),
-          api.opportunities(concept, { persona, region, projectId })
+          api.debrief(concept, { persona, region, projectId: projectId || undefined }),
+          api.opportunities(concept, { persona, region, projectId: projectId || undefined })
         ])
         if (!cancel) {
           setDebrief(d)
@@ -327,13 +333,16 @@ export default function CanvasWorkflow() {
   // File upload helper
   const handleFileUpload = async (files: FileList | File[]) => {
     try {
+      console.log('[CanvasWorkflow] Starting file upload:', files.length, 'files')
       await addFiles(Array.from(files))
+      console.log('[CanvasWorkflow] File upload successful')
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
     } catch (err) {
-      console.error('Upload failed:', err)
+      console.error('[CanvasWorkflow] Upload failed:', err)
+      alert(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
   }
 

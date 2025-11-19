@@ -22,6 +22,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     // Add placeholder items immediately for UI feedback
     const placeholders = files.map((f, i) => createPlaceholder(f, processed.length + i))
     setProcessed((p) => [...placeholders, ...p])
+    console.log('[UploadContext] Added', files.length, 'file placeholders')
 
     try {
       // Get active project ID for context association
@@ -32,6 +33,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
       // If no valid project ID, create a default project for this user
       if (!isValidUUID) {
+        console.log('[UploadContext] No valid project found, creating default project')
         try {
           const response = await fetch(`${API_BASE}/projects`, {
             method: 'POST',
@@ -45,15 +47,19 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
             }
             activeProjectId = project.id
             localStorage.setItem('activeProjectId', project.id) // Use project.id directly to satisfy TypeScript
+            console.log('[UploadContext] Created default project:', activeProjectId)
             try { window.dispatchEvent(new CustomEvent('project-created', { detail: project })) } catch {}
           } else {
-            throw new Error('Failed to create default project')
+            console.error('[UploadContext] Project creation failed:', response.status, response.statusText)
+            throw new Error(`Failed to create default project: ${response.status}`)
           }
         } catch (e) {
-          console.error('Failed to create default project:', e)
+          console.error('[UploadContext] Failed to create default project:', e)
           // If we can't create a project, we shouldn't upload with projectId=NULL (that's RKB)
           throw new Error('No valid project found. Please create a project first.')
         }
+      } else {
+        console.log('[UploadContext] Using existing project:', activeProjectId)
       }
 
       // At this point, activeProjectId must be a valid string
