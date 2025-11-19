@@ -16,9 +16,32 @@ export default function CanvasWorkflow() {
   const { addFiles, addUrl, processed } = useUpload()
   const { snapshot, nodes: trendNodes } = useTrends()
   const [rkbActivity, setRkbActivity] = useState<{ id: number; text: string; kind?: 'rkb'|'project'|'trends'|'ai' }[]>([])
+  const [stats, setStats] = useState<{ trends?: number; creators?: number; assets?: number } | null>(null)
 
   const addActivity = (text: string, kind?: 'rkb'|'project'|'trends'|'ai') => {
     setRkbActivity(prev => [{ id: Date.now(), text, kind }, ...prev].slice(0, 20))
+  }
+
+  // Ensure narrative node exists helper
+  const ensureNarrativeNode = () => {
+    if (!nodes.find(n => n.id === 'narrative')) {
+      setNodes(prev => ([
+        ...prev,
+        {
+          id: 'narrative',
+          type: 'ai-content',
+          title: 'Narrative Structure',
+          x: 1000,
+          y: 100,
+          width: 450,
+          height: 500,
+          minimized: false,
+          zIndex: 3,
+          status: 'processing' as const,
+          connectedTo: ['debrief-opportunities']
+        }
+      ]))
+    }
   }
   const [nodes, setNodes] = useState<NodeData[]>([])
 
@@ -119,6 +142,19 @@ export default function CanvasWorkflow() {
     })()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Fetch global stats for accurate counts (trends/creators/assets)
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const ov = await api.statusOverview().catch(() => null)
+        if (cancelled || !ov) return
+        setStats({ trends: ov.stats?.trends, creators: ov.stats?.creators, assets: ov.stats?.assets })
+      } catch {}
+    })()
+    return () => { cancelled = true }
   }, [])
 
   // Record context ingestion activity from uploads/URL adds
@@ -337,6 +373,7 @@ export default function CanvasWorkflow() {
         console.log('[Narrative] API response received:', narrativeResult)
 
         if (!cancel) {
+          ensureNarrativeNode()
           setNarrative(narrativeResult)
           setNarrativeLoading(false)
           // Persist minimal narrative blocks for exports and other views
@@ -513,30 +550,35 @@ export default function CanvasWorkflow() {
     }
   }
 
-  // Re-assessment trigger: If files are added after workflow is activated, re-trigger debrief
+  // Re-evaluate Debrief/Opportunities when context updates (real API refresh)
   useEffect(() => {
-    if (activated && processed.length > 0) {
-      // Set debrief status back to processing when new files are added
-      setNodes(prev => prev.map(n => {
-        if (n.id === 'debrief-opportunities') {
-          return { ...n, status: 'processing' as const }
+    const handler = () => {
+      if (!activated || !concept) return
+      let projectId: string | null = null
+      try { projectId = localStorage.getItem('activeProjectId') } catch {}
+      setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'processing' as const } : n))
+      addActivity('Re-evaluating with new project context…', 'ai')
+      ;(async () => {
+        try {
+          const [d, o] = await Promise.all([
+            api.debrief(concept, { persona, region, projectId: projectId || undefined }),
+            api.opportunities(concept, { persona, region, projectId: projectId || undefined })
+          ])
+          setDebrief(d)
+          setOpps(o)
+          try { if (projectId) localStorage.setItem(`debrief:${projectId}`, JSON.stringify(d)) } catch {}
+          try { if (projectId) localStorage.setItem(`opps:${projectId}`, JSON.stringify(o)) } catch {}
+          setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'complete' as const } : n))
+          addActivity('Debrief updated with project context', 'ai')
+        } catch {
+          addActivity('Re-evaluation failed — check connection', 'ai')
+          setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'active' as const } : n))
         }
-        return n
-      }))
-
-      // Simulate re-processing after 2 seconds
-      const timer = setTimeout(() => {
-        setNodes(prev => prev.map(n => {
-          if (n.id === 'debrief-opportunities') {
-            return { ...n, status: 'complete' as const }
-          }
-          return n
-        }))
-      }, 2000)
-
-      return () => clearTimeout(timer)
+      })()
     }
-  }, [processed.length, activated])
+    window.addEventListener('context-updated', handler as any)
+    return () => window.removeEventListener('context-updated', handler as any)
+  }, [activated, concept, persona, region])
 
   const renderNodeContent = (node: NodeData) => {
     if (node.id === 'brief-input') {
@@ -658,16 +700,17 @@ export default function CanvasWorkflow() {
     }
 
     if (node.id === 'rkb') {
-      const trendsCount = (trendNodes || []).filter((n: any) => n.kind === 'trend').length
-      const creatorsCount = (trendNodes || []).filter((n: any) => n.kind === 'creator').length
+      const trendsCount = (stats?.trends ?? (trendNodes || []).filter((n: any) => n.kind === 'trend').length)
+      const creatorsCount = (stats?.creators ?? (trendNodes || []).filter((n: any) => n.kind === 'creator').length)
       const projectCount = processed.length
+      const isProcessing = !!nodes.find(n => (n.id === 'debrief-opportunities' || n.id === 'narrative') && n.status === 'processing')
       return (
         <div className="space-y-2 text-xs">
           <div className="text-white/70 leading-relaxed text-[11px]">Ralph Knowledge Base connected</div>
           <div className="text-white/50 text-[10px]">
             Project context: {projectCount} item{projectCount === 1 ? '' : 's'} • Live Trends: {trendsCount} trends • {creatorsCount} creators
           </div>
-          {(loading || narrativeLoading) && (
+          {isProcessing && (
             <div className="text-white/60 text-[10px] animate-pulse">Evaluating context and composing insights…</div>
           )}
           <div className="panel p-2 bg-white/5 border border-white/10 max-h-28 overflow-auto space-y-1">
@@ -743,10 +786,13 @@ export default function CanvasWorkflow() {
                 <div className="text-white/60 text-[10px] leading-relaxed mb-2">{debrief.summary}</div>
 
                 {/* Used Sources Summary */}
-                <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
-                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">RKB: {(debrief?.sources?.core || []).length}</span>
-                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Project: {(debrief?.sources?.project || []).length}</span>
-                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Live Trends: {(debrief?.sources?.live || []).length}</span>
+                <div className="mt-2">
+                  <div className="text-white/50 text-[10px] mb-1">Used sources in this pass</div>
+                  <div className="flex flex-wrap gap-2 text-[10px]">
+                    <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Used RKB: {(debrief?.sources?.core || []).length}</span>
+                    <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Used Project: {(debrief?.sources?.project || []).length}</span>
+                    <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Used Live Trends: {(debrief?.sources?.live || []).length}</span>
+                  </div>
                 </div>
 
                 {/* Key Points */}
