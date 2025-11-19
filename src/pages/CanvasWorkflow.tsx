@@ -53,7 +53,7 @@ export default function CanvasWorkflow() {
         height: 280,
         minimized: false,
         zIndex: 1,
-        status: 'active'
+        status: 'idle'
       },
       {
         id: 'context-upload',
@@ -413,7 +413,7 @@ export default function CanvasWorkflow() {
               onMouseDown={(e) => e.stopPropagation()}
               className="bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-xs"
             >
-              <option value="">Select Persona</option>
+              <option value="" disabled>Select Persona</option>
               <option value="Social strategist">Social strategist</option>
               <option value="Creative Lead">Creative Lead</option>
               <option value="Content Creator">Content Creator</option>
@@ -424,19 +424,18 @@ export default function CanvasWorkflow() {
               onMouseDown={(e) => e.stopPropagation()}
               className="bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-xs"
             >
-              <option value="">Select Region</option>
+              <option value="" disabled>Select Region</option>
               <option value="Worldwide">Worldwide</option>
               <option value="US">US</option>
+              <option value="UK">UK</option>
               <option value="EU">EU</option>
-              <option value="North America">North America</option>
-              <option value="Europe">Europe</option>
               <option value="Asia Pacific">Asia Pacific</option>
             </select>
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); handleSubmit(); }}
             onMouseDown={(e) => e.stopPropagation()}
-            disabled={!concept}
+            disabled={!concept || !persona || !region}
             className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-sm font-medium disabled:opacity-50"
           >
             Analyze Story
@@ -985,8 +984,8 @@ export default function CanvasWorkflow() {
 
   return (
     <div className="relative w-full h-screen">
-      {/* Floating Header */}
-      <div className="absolute top-4 left-4 right-4 z-50">
+      {/* Fixed Header - stays under main header */}
+      <div className="fixed top-16 left-4 right-4 z-50">
         <div className="panel p-3 flex items-center justify-between backdrop-blur-lg bg-charcoal-900/80">
           <div className="flex items-center gap-2 text-xs">
             {concept && <div className="px-2 py-1 rounded bg-ralph-cyan/20 border border-ralph-cyan/40">{concept}</div>}
