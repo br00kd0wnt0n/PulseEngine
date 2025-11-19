@@ -24,6 +24,16 @@ export default function CanvasWorkflow() {
     setRkbActivity(prev => [{ id: Date.now(), text, kind }, ...prev].slice(0, 20))
   }
 
+  function focusBrief() {
+    setNodes(prev => {
+      const maxZ = prev.reduce((m, p) => Math.max(m, p.zIndex), 0)
+      return prev.map(n => n.id === 'brief-input'
+        ? { ...n, minimized: false, status: 'active' as NodeData['status'], zIndex: maxZ + 1 }
+        : n)
+    })
+    try { document.getElementById('dashboard-main')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch {}
+  }
+
   // Manual re-evaluation trigger (Debrief + Opps, then optionally Narrative)
   const reEvaluateNow = async () => {
     if (!concept) return
@@ -277,7 +287,7 @@ export default function CanvasWorkflow() {
           // Mark debrief node status depending on sufficiency
           const insufficient = !d || (!(d.brief && String(d.brief).trim().length >= 8) && !(Array.isArray(d.keyPoints) && d.keyPoints.length > 0))
           setNodes(prev => prev.map(n =>
-            n.id === 'debrief-opportunities' ? { ...n, status: (insufficient ? 'active' : 'complete') as const } : n
+            n.id === 'debrief-opportunities' ? { ...n, status: (insufficient ? 'active' : 'complete') as NodeData['status'] } : n
           ))
           addActivity('Debrief & Opportunities ready', 'ai')
         }
@@ -617,7 +627,7 @@ export default function CanvasWorkflow() {
           try { if (projectId) localStorage.setItem(`debrief:${projectId}`, JSON.stringify(d)) } catch {}
           try { if (projectId) localStorage.setItem(`opps:${projectId}`, JSON.stringify(o)) } catch {}
           const insufficient = !d || (!(d.brief && String(d.brief).trim().length >= 8) && !(Array.isArray(d.keyPoints) && d.keyPoints.length > 0))
-          setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: (insufficient ? 'active' : 'complete') as const } : n))
+          setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: (insufficient ? 'active' : 'complete') as NodeData['status'] } : n))
           addActivity('Debrief updated with project context', 'ai')
           // If narrative was accepted previously, refresh it as well
           if (debriefAccepted) {
