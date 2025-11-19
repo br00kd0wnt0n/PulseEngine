@@ -43,7 +43,7 @@ export default function CanvasWorkflow() {
     setNodes(initialNodes)
   }, [])
 
-  // Progressive reveal: Add RKB and Debrief nodes when workflow progresses
+  // Step 1: Add RKB and Debrief/Opportunities when workflow starts
   useEffect(() => {
     if (activated && !nodes.find(n => n.id === 'rkb')) {
       setNodes(prev => [
@@ -61,15 +61,15 @@ export default function CanvasWorkflow() {
           zIndex: 2,
           status: 'idle'
         },
-        // Debrief node (AI-content, orange) - connects from Brief, Context, and RKB
+        // Debrief & Opportunities node (AI-content, orange)
         {
-          id: 'debrief',
-          type: 'debrief',
-          title: 'AI Analysis',
+          id: 'debrief-opportunities',
+          type: 'ai-content',
+          title: 'Debrief & Opportunities',
           x: 500,
           y: 100,
           width: 450,
-          height: 400,
+          height: 500,
           minimized: false,
           zIndex: 2,
           status: 'processing',
@@ -79,87 +79,111 @@ export default function CanvasWorkflow() {
     }
   }, [activated, nodes])
 
-  // Add Opportunities node after Debrief completes (simulated after 3 seconds)
+  // Step 2: Add Narrative Structure after user accepts opportunities (simulated after 5 seconds)
   useEffect(() => {
-    if (!nodes.find(n => n.id === 'debrief')) return
+    if (!nodes.find(n => n.id === 'debrief-opportunities')) return
 
-    const debriefNode = nodes.find(n => n.id === 'debrief')
-    if (debriefNode?.status === 'processing' && !nodes.find(n => n.id === 'opportunities')) {
-      // Simulate debrief completion and add Opportunities
+    const debriefNode = nodes.find(n => n.id === 'debrief-opportunities')
+    if (debriefNode?.status === 'processing' && !nodes.find(n => n.id === 'narrative')) {
       const timer = setTimeout(() => {
+        // Mark debrief as complete
         setNodes(prev => prev.map(n =>
-          n.id === 'debrief' ? { ...n, status: 'complete' as const } : n
+          n.id === 'debrief-opportunities' ? { ...n, status: 'complete' as const } : n
         ))
 
         setTimeout(() => {
           setNodes(prev => [
             ...prev,
-            // Opportunities node (AI-content, orange)
+            // Narrative Structure node
             {
-              id: 'opportunities',
+              id: 'narrative',
               type: 'ai-content',
-              title: 'Opportunities',
+              title: 'Narrative Structure',
               x: 1000,
               y: 100,
-              width: 400,
-              height: 350,
+              width: 450,
+              height: 450,
               minimized: false,
               zIndex: 3,
               status: 'processing',
-              connectedTo: ['debrief']
-            },
-            // RalphBot interaction node (pink)
-            {
-              id: 'ralphbot-opportunities',
-              type: 'ralphbot',
-              title: 'RalphBot Guidance',
-              x: 1000,
-              y: 480,
-              width: 400,
-              height: 180,
-              minimized: false,
-              zIndex: 3,
-              status: 'active',
-              connectedTo: ['opportunities']
+              connectedTo: ['debrief-opportunities']
             }
           ])
         }, 500)
-      }, 3000)
+      }, 5000)
 
       return () => clearTimeout(timer)
     }
   }, [nodes])
 
-  // Add Creator node after RalphBot interaction
+  // Step 3: Add Scoring & Enhancements after narrative is reviewed (simulated after 5 seconds)
   useEffect(() => {
-    const ralphbotNode = nodes.find(n => n.id === 'ralphbot-opportunities')
-    if (ralphbotNode && !nodes.find(n => n.id === 'creator')) {
-      // Simulate user interaction with RalphBot, then add Creator
-      const timer = setTimeout(() => {
-        setNodes(prev => [
-          ...prev,
-          // Creator node (AI-content, orange)
-          {
-            id: 'creator',
-            type: 'ai-content',
-            title: 'Content Creator',
-            x: 1450,
-            y: 100,
-            width: 400,
-            height: 500,
-            minimized: false,
-            zIndex: 4,
-            status: 'processing',
-            connectedTo: ['opportunities', 'ralphbot-opportunities']
-          }
-        ])
+    if (!nodes.find(n => n.id === 'narrative')) return
 
-        // Mark Opportunities as complete
+    const narrativeNode = nodes.find(n => n.id === 'narrative')
+    if (narrativeNode?.status === 'processing' && !nodes.find(n => n.id === 'scoring')) {
+      const timer = setTimeout(() => {
+        // Mark narrative as complete
+        setNodes(prev => prev.map(n =>
+          n.id === 'narrative' ? { ...n, status: 'complete' as const } : n
+        ))
+
         setTimeout(() => {
-          setNodes(prev => prev.map(n =>
-            n.id === 'opportunities' ? { ...n, status: 'complete' as const } : n
-          ))
-        }, 1000)
+          setNodes(prev => [
+            ...prev,
+            // Scoring & Enhancements node
+            {
+              id: 'scoring',
+              type: 'ai-content',
+              title: 'Scoring & Enhancements',
+              x: 1500,
+              y: 100,
+              width: 450,
+              height: 550,
+              minimized: false,
+              zIndex: 4,
+              status: 'processing',
+              connectedTo: ['narrative', 'rkb']
+            }
+          ])
+        }, 500)
+      }, 5000)
+
+      return () => clearTimeout(timer)
+    }
+  }, [nodes])
+
+  // Step 4: Add Creative Partner node after enhancements selected (simulated after 5 seconds)
+  useEffect(() => {
+    if (!nodes.find(n => n.id === 'scoring')) return
+
+    const scoringNode = nodes.find(n => n.id === 'scoring')
+    if (scoringNode?.status === 'processing' && !nodes.find(n => n.id === 'creative-partner')) {
+      const timer = setTimeout(() => {
+        // Mark scoring as complete
+        setNodes(prev => prev.map(n =>
+          n.id === 'scoring' ? { ...n, status: 'complete' as const } : n
+        ))
+
+        setTimeout(() => {
+          setNodes(prev => [
+            ...prev,
+            // Creative Partner node
+            {
+              id: 'creative-partner',
+              type: 'ai-content',
+              title: 'Need a Creative Partner?',
+              x: 2000,
+              y: 100,
+              width: 400,
+              height: 500,
+              minimized: false,
+              zIndex: 5,
+              status: 'active',
+              connectedTo: ['scoring']
+            }
+          ])
+        }, 500)
       }, 5000)
 
       return () => clearTimeout(timer)
@@ -267,100 +291,241 @@ export default function CanvasWorkflow() {
       )
     }
 
-    if (node.id === 'debrief') {
+    if (node.id === 'debrief-opportunities') {
       return (
-        <div className="space-y-3 text-xs">
-          <div className="text-white/80 leading-relaxed">
-            {node.status === 'processing'
-              ? 'AI is analyzing your campaign concept with uploaded context and RKB insights...'
-              : 'Analysis complete. Your campaign has strong narrative potential with cross-platform opportunities.'}
-          </div>
-          <div className="panel p-2 bg-white/5">
-            <div className="text-white/60 mb-1">Key Insights</div>
-            <ul className="space-y-1 text-white/70 text-[11px]">
-              <li>• Strong cultural relevance detected</li>
-              <li>• High engagement potential across TikTok, Instagram</li>
-              <li>• Optimal launch timing: Q4 2024</li>
-              <li>• Synergy with current music trends</li>
-            </ul>
-          </div>
+        <div className="space-y-3 text-xs max-h-full overflow-auto">
+          {node.status === 'processing' ? (
+            <div className="text-white/80 leading-relaxed">
+              AI is analyzing your campaign with RKB semantic search...
+            </div>
+          ) : (
+            <>
+              <div className="panel p-2 bg-white/5">
+                <div className="text-white/70 font-medium mb-1 text-[11px]">DEBRIEF</div>
+                <div className="text-white/60 text-[10px] leading-relaxed">
+                  Strong cultural relevance detected. Campaign aligns with current music trends and has high engagement potential across TikTok and Instagram.
+                </div>
+              </div>
+
+              <div className="panel p-2 bg-white/5">
+                <div className="text-white/70 font-medium mb-1 text-[11px]">OPPORTUNITIES</div>
+                <div className="space-y-2 mt-2">
+                  <label className="flex items-start gap-2 cursor-pointer group">
+                    <input type="checkbox" className="mt-0.5" />
+                    <span className="text-white/70 text-[10px] group-hover:text-white/90">
+                      TikTok-first approach with Instagram Reels crossover
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer group">
+                    <input type="checkbox" className="mt-0.5" />
+                    <span className="text-white/70 text-[10px] group-hover:text-white/90">
+                      Partner with 3 micro-influencers + 1 mid-tier creator
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer group">
+                    <input type="checkbox" className="mt-0.5" />
+                    <span className="text-white/70 text-[10px] group-hover:text-white/90">
+                      Content mix: 60% native, 30% UGC, 10% branded
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer group">
+                    <input type="checkbox" className="mt-0.5" />
+                    <span className="text-white/70 text-[10px] group-hover:text-white/90">
+                      Launch timing: Q4 2024 for maximum impact
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium"
+              >
+                Accept & Continue
+              </button>
+            </>
+          )}
         </div>
       )
     }
 
-    if (node.id === 'opportunities') {
+    if (node.id === 'narrative') {
       return (
-        <div className="space-y-3 text-xs">
+        <div className="space-y-3 text-xs max-h-full overflow-auto">
+          {node.status === 'processing' ? (
+            <div className="text-white/80 leading-relaxed">
+              Composing end-to-end narrative structure...
+            </div>
+          ) : (
+            <>
+              <div className="panel p-2 bg-white/5">
+                <div className="text-white/70 font-medium mb-2 text-[11px]">CAMPAIGN OVERVIEW</div>
+                <div className="text-white/60 text-[10px] leading-relaxed mb-3">
+                  A TikTok-first music discovery campaign that leverages algorithmic trends and micro-influencer authenticity to drive organic engagement across Gen Z audiences.
+                </div>
+              </div>
+
+              <div className="panel p-2 bg-white/5">
+                <div className="text-white/70 font-medium mb-1 text-[11px]">NARRATIVE ARC</div>
+                <div className="space-y-1.5 text-[10px] text-white/60">
+                  <div><span className="text-ralph-cyan">Phase 1:</span> Discovery (Weeks 1-2)</div>
+                  <div><span className="text-ralph-cyan">Phase 2:</span> Amplification (Weeks 3-4)</div>
+                  <div><span className="text-ralph-cyan">Phase 3:</span> Conversion (Weeks 5-6)</div>
+                </div>
+              </div>
+
+              <div className="panel p-2 bg-white/5">
+                <div className="text-white/70 font-medium mb-1 text-[11px]">KEY TOUCHPOINTS</div>
+                <ul className="space-y-1 text-white/60 text-[10px]">
+                  <li>• Influencer seed content on TikTok</li>
+                  <li>• Cross-platform amplification</li>
+                  <li>• UGC activation & hashtag challenge</li>
+                  <li>• Conversion funnel optimization</li>
+                </ul>
+              </div>
+
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium"
+              >
+                Approve Narrative
+              </button>
+            </>
+          )}
+        </div>
+      )
+    }
+
+    if (node.id === 'scoring') {
+      return (
+        <div className="space-y-3 text-xs max-h-full overflow-auto">
+          {node.status === 'processing' ? (
+            <div className="text-white/80 leading-relaxed">
+              Calculating metrics and analyzing enhancements...
+            </div>
+          ) : (
+            <>
+              <div className="panel p-2 bg-white/5">
+                <div className="text-white/70 font-medium mb-2 text-[11px]">CAMPAIGN SCORING</div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/60 text-[10px]">Cultural Relevance</span>
+                    <span className="text-ralph-cyan text-[11px] font-medium">8.7/10</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/60 text-[10px]">Engagement Potential</span>
+                    <span className="text-ralph-cyan text-[11px] font-medium">9.2/10</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/60 text-[10px]">Platform Fit</span>
+                    <span className="text-ralph-cyan text-[11px] font-medium">8.9/10</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/60 text-[10px]">ROI Projection</span>
+                    <span className="text-ralph-cyan text-[11px] font-medium">7.8/10</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel p-2 bg-white/5">
+                <div className="text-white/70 font-medium mb-2 text-[11px]">RECOMMENDED ENHANCEMENTS</div>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-2 cursor-pointer group">
+                    <input type="checkbox" className="mt-0.5" defaultChecked />
+                    <div>
+                      <div className="text-white/70 text-[10px] group-hover:text-white/90">
+                        Add YouTube Shorts component
+                      </div>
+                      <div className="text-white/50 text-[9px]">+1.2 reach score</div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer group">
+                    <input type="checkbox" className="mt-0.5" />
+                    <div>
+                      <div className="text-white/70 text-[10px] group-hover:text-white/90">
+                        Integrate trending audio library
+                      </div>
+                      <div className="text-white/50 text-[9px]">+0.8 cultural relevance</div>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer group">
+                    <input type="checkbox" className="mt-0.5" />
+                    <div>
+                      <div className="text-white/70 text-[10px] group-hover:text-white/90">
+                        Extend to Snapchat Spotlight
+                      </div>
+                      <div className="text-white/50 text-[9px]">+0.6 platform diversity</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium"
+              >
+                Apply Enhancements
+              </button>
+            </>
+          )}
+        </div>
+      )
+    }
+
+    if (node.id === 'creative-partner') {
+      return (
+        <div className="space-y-3 text-xs max-h-full overflow-auto">
           <div className="text-white/80 leading-relaxed mb-2">
-            {node.status === 'processing'
-              ? 'Identifying strategic opportunities...'
-              : 'Strategic opportunities identified'}
+            Based on your campaign, here are recommended creators:
           </div>
+
           <div className="space-y-2">
-            <div className="panel p-2 bg-white/5">
-              <div className="text-ralph-cyan text-[11px] font-medium mb-1">Platform Strategy</div>
-              <div className="text-white/70 text-[10px]">TikTok-first approach with Instagram Reels crossover</div>
-            </div>
-            <div className="panel p-2 bg-white/5">
-              <div className="text-ralph-cyan text-[11px] font-medium mb-1">Influencer Partnerships</div>
-              <div className="text-white/70 text-[10px]">3 micro-influencers + 1 mid-tier creator</div>
-            </div>
-            <div className="panel p-2 bg-white/5">
-              <div className="text-ralph-cyan text-[11px] font-medium mb-1">Content Mix</div>
-              <div className="text-white/70 text-[10px]">60% native, 30% UGC, 10% branded</div>
-            </div>
-          </div>
-        </div>
-      )
-    }
-
-    if (node.id === 'ralphbot-opportunities') {
-      return (
-        <div className="space-y-2 text-xs">
-          <div className="text-white/80 leading-relaxed text-[11px]">
-            💬 Ready to refine your strategy? I can help you:
-          </div>
-          <div className="space-y-1 text-white/70 text-[10px]">
-            <div className="p-1.5 rounded bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
-              → Adjust platform priorities</div>
-            <div className="p-1.5 rounded bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
-              → Explore alternative influencers</div>
-            <div className="p-1.5 rounded bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
-              → Generate content variants</div>
-          </div>
-        </div>
-      )
-    }
-
-    if (node.id === 'creator') {
-      return (
-        <div className="space-y-3 text-xs">
-          <div className="text-white/80 leading-relaxed mb-2">
-            {node.status === 'processing'
-              ? 'Generating content assets...'
-              : 'Content ready for review'}
-          </div>
-          <div className="space-y-2 max-h-80 overflow-auto">
-            <div className="panel p-2 bg-white/5">
-              <div className="text-ralph-pink text-[11px] font-medium mb-1">Video Script #1</div>
-              <div className="text-white/70 text-[10px] mb-2">15s TikTok hook + main narrative</div>
-              <div className="text-white/50 text-[9px] italic line-clamp-2">
-                "POV: When the algorithm finally gets you..."
+            <div className="panel p-2 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-full bg-ralph-pink/20 border border-ralph-pink/40" />
+                <div>
+                  <div className="text-white/80 text-[11px] font-medium">@musicdiscovery</div>
+                  <div className="text-white/50 text-[9px]">1.2M followers • Music curator</div>
+                </div>
+              </div>
+              <div className="text-white/60 text-[10px]">
+                Specializes in emerging artists, 8.7% avg engagement
               </div>
             </div>
-            <div className="panel p-2 bg-white/5">
-              <div className="text-ralph-pink text-[11px] font-medium mb-1">Caption Set</div>
-              <div className="text-white/70 text-[10px]">5 platform-optimized variants</div>
+
+            <div className="panel p-2 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-full bg-ralph-pink/20 border border-ralph-pink/40" />
+                <div>
+                  <div className="text-white/80 text-[11px] font-medium">@trendsettervibes</div>
+                  <div className="text-white/50 text-[9px]">850K followers • Dance trends</div>
+                </div>
+              </div>
+              <div className="text-white/60 text-[10px]">
+                Creates viral dance content, strong Gen Z audience
+              </div>
             </div>
-            <div className="panel p-2 bg-white/5">
-              <div className="text-ralph-pink text-[11px] font-medium mb-1">Hashtag Strategy</div>
-              <div className="text-white/70 text-[10px]">#trending mix + branded tags</div>
-            </div>
-            <div className="panel p-2 bg-white/5">
-              <div className="text-ralph-pink text-[11px] font-medium mb-1">Visual Moodboard</div>
-              <div className="text-white/70 text-[10px]">12 reference images compiled</div>
+
+            <div className="panel p-2 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-full bg-ralph-pink/20 border border-ralph-pink/40" />
+                <div>
+                  <div className="text-white/80 text-[11px] font-medium">@culturecollective</div>
+                  <div className="text-white/50 text-[9px]">450K followers • Micro-influencer</div>
+                </div>
+              </div>
+              <div className="text-white/60 text-[10px]">
+                Authentic voice, high trust factor with followers
+              </div>
             </div>
           </div>
+
+          <button
+            onClick={(e) => e.stopPropagation()}
+            className="w-full px-3 py-2 rounded bg-ralph-pink/70 hover:bg-ralph-pink text-xs font-medium"
+          >
+            Connect with Creators
+          </button>
         </div>
       )
     }
