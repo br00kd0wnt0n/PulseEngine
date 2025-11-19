@@ -32,6 +32,11 @@ export default function CanvasWorkflow() {
   const [narrativeChatMessages, setNarrativeChatMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([])
   const [narrativeChatInput, setNarrativeChatInput] = useState('')
 
+  // Track if nodes have been stacked to avoid infinite loops
+  const [nodesStacked, setNodesStacked] = useState(false)
+  // Track if narrative has been generated to avoid infinite loops
+  const [narrativeGenerated, setNarrativeGenerated] = useState(false)
+
   // Initialize nodes with smart auto-layout
   useEffect(() => {
     const initialNodes: NodeData[] = [
@@ -134,7 +139,8 @@ export default function CanvasWorkflow() {
 
   // Stack and minimize left nodes when debrief opens
   useEffect(() => {
-    if (activated && nodes.find(n => n.id === 'debrief-opportunities')) {
+    if (activated && !nodesStacked && nodes.find(n => n.id === 'debrief-opportunities')) {
+      setNodesStacked(true)
       setNodes(prev => prev.map(node => {
         // Minimize and stack the three left nodes
         if (node.id === 'brief-input') {
@@ -149,7 +155,7 @@ export default function CanvasWorkflow() {
         return node
       }))
     }
-  }, [activated, nodes])
+  }, [activated, nodesStacked, nodes.length])
 
   // Step 2: Add Narrative Structure ONLY after user accepts Debrief
   useEffect(() => {
@@ -177,8 +183,9 @@ export default function CanvasWorkflow() {
   // Generate narrative with selected opportunities
   useEffect(() => {
     let cancel = false
-    if (!debriefAccepted || !nodes.find(n => n.id === 'narrative') || narrative) return
+    if (!debriefAccepted || narrativeGenerated || !nodes.find(n => n.id === 'narrative') || narrative) return
 
+    setNarrativeGenerated(true)
     setNarrativeLoading(true)
     ;(async () => {
       try {
@@ -210,7 +217,7 @@ export default function CanvasWorkflow() {
     })()
 
     return () => { cancel = true }
-  }, [debriefAccepted, nodes, narrative, concept, persona, region, debrief, opps, selectedOpportunities])
+  }, [debriefAccepted, narrativeGenerated])
 
   // Step 3: Add Scoring & Enhancements ONLY after narrative is approved
   useEffect(() => {
@@ -488,6 +495,47 @@ export default function CanvasWorkflow() {
     }
 
     if (node.id === 'debrief-opportunities') {
+      // Build citation map from sources
+      const allSources = [
+        ...(debrief?.sources?.core || []),
+        ...(debrief?.sources?.project || []),
+        ...(debrief?.sources?.live || [])
+      ]
+
+      // Create citation lookup
+      const getCitationInfo = (index: number) => {
+        const source = allSources[index]
+        if (!source) return null
+
+        // Parse source format: "type:name" or "filename"
+        if (typeof source === 'string') {
+          if (source.startsWith('trend:')) {
+            const name = source.replace('trend:', '')
+            return { label: `Trend`, detail: name }
+          } else if (source.startsWith('creator:')) {
+            const name = source.replace('creator:', '')
+            return { label: `Creator`, detail: name }
+          } else if (source.includes('.pdf') || source.includes('.docx')) {
+            // RKB file
+            const filename = source.split('/').pop() || source
+            return { label: `RKB Document`, detail: filename }
+          } else {
+            return { label: `Source`, detail: source }
+          }
+        }
+        // Handle object sources
+        if (typeof source === 'object' && source !== null) {
+          const src = source as any
+          return {
+            label: src.type || src.platform || 'Source',
+            detail: src.title || src.filename || src.name || JSON.stringify(source).substring(0, 200)
+          }
+        }
+        return null
+      }
+
+      let citationIndex = 1
+
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
           {loading || !debrief ? (
@@ -508,15 +556,18 @@ export default function CanvasWorkflow() {
                     <div className="text-white/60 font-medium mb-1 text-[10px]">Key Points</div>
                     <ul className="list-disc pl-4 space-y-1">
                       {debrief.keyPoints.map((p, i) => {
-                        const core = (debrief.sources?.core || []) as string[]
-                        const trends = core.filter(x => x.startsWith('trend:')).map(x => x.replace('trend:', ''))
-                        const t = trends[i]
+                        const citInfo = getCitationInfo(i)
+                        const currentIndex = citationIndex++
                         return (
                           <li key={i} className="text-white/70 text-[10px]">
                             {p}
-                            {t && i < 2 && (
+                            {citInfo && (
                               <span className="ml-1 align-middle">
-                                <CitationToken id={i + 1} label={`Trend: ${t}`} detail={`Referenced trend: ${t}`} />
+                                <CitationToken
+                                  id={currentIndex}
+                                  label={citInfo.label}
+                                  detail={citInfo.detail}
+                                />
                               </span>
                             )}
                           </li>
@@ -531,11 +582,23 @@ export default function CanvasWorkflow() {
                   <div className="mt-3 p-2 bg-ralph-teal/15 border border-ralph-teal/30 rounded">
                     <div className="text-white/70 font-medium mb-1 text-[10px]">Did You Know</div>
                     <div className="flex flex-wrap gap-1.5">
-                      {debrief.didYouKnow.map((x, i) => (
-                        <span key={i} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-[10px]">
-                          {x} <CitationToken id={100 + i} label="Market Insight" detail={x} />
-                        </span>
-                      ))}
+                      {debrief.didYouKnow.map((x, i) => {
+                        const sourceIndex = debrief.keyPoints.length + i
+                        const citInfo = getCitationInfo(sourceIndex)
+                        const currentIndex = citationIndex++
+                        return (
+                          <span key={i} className="px-2 py-1 rounded bg-white/10 border border-white/20 text-[10px]">
+                            {x}
+                            {citInfo && (
+                              <CitationToken
+                                id={currentIndex}
+                                label={citInfo.label}
+                                detail={citInfo.detail}
+                              />
+                            )}
+                          </span>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
