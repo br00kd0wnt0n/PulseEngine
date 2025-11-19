@@ -108,10 +108,10 @@ export default function CanvasWorkflow() {
 
   // Track if nodes have been stacked to avoid infinite loops
   const [nodesStacked, setNodesStacked] = useState(false)
-  // Track if narrative has been generated to avoid infinite loops
-  const [narrativeGenerated, setNarrativeGenerated] = useState(false)
+  // Narrative refresh + in-flight tracking
   const [narrativeRefreshRequested, setNarrativeRefreshRequested] = useState(false)
   const debriefRefreshInFlight = useRef(false)
+  const narrativeInFlight = useRef(false)
 
   // Initialize nodes with smart auto-layout
   useEffect(() => {
@@ -379,31 +379,29 @@ export default function CanvasWorkflow() {
     ])
   }, [debriefAccepted, nodes])
 
+  const hasNarrativeNode = nodes.some(n => n.id === 'narrative')
+
   // Generate narrative with selected opportunities
   useEffect(() => {
     let cancel = false
-    const narrativeNode = nodes.find(n => n.id === 'narrative')
 
     // Early return conditions with logging
     if (!debriefAccepted) {
       console.log('[Narrative] Waiting for debrief acceptance')
       return
     }
-    if (narrativeGenerated && !narrativeRefreshRequested) {
-      console.log('[Narrative] Already generated')
-      return
-    }
-    if (!narrativeNode) {
+    if (!hasNarrativeNode) {
       console.log('[Narrative] Waiting for narrative node to be created')
       return
     }
+    if (narrativeInFlight.current) return
     if (narrative && !narrativeLoading && !narrativeRefreshRequested) {
       console.log('[Narrative] Narrative already exists')
       return
     }
 
     console.log('[Narrative] Starting narrative generation...')
-    setNarrativeGenerated(true)
+    narrativeInFlight.current = true
     setNarrativeLoading(true)
     addActivity('Generating Narrative structure…', 'ai')
     ;(async () => {
@@ -444,9 +442,7 @@ export default function CanvasWorkflow() {
             }
           } catch {}
           // Mark narrative node as complete
-          setNodes(prev => prev.map(n =>
-            n.id === 'narrative' ? { ...n, status: 'complete' as const } : n
-          ))
+          setNodes(prev => prev.map(n => n.id === 'narrative' ? { ...n, status: 'complete' as NodeData['status'] } : n))
           console.log('[Narrative] Generation complete')
           addActivity('Narrative structure ready', 'ai')
         }
@@ -454,15 +450,16 @@ export default function CanvasWorkflow() {
         console.error('[Narrative] Failed to generate narrative:', err)
         if (!cancel) {
           setNarrativeLoading(false)
-          setNarrativeGenerated(false) // Reset so it can retry
           setNarrativeRefreshRequested(false)
         }
         addActivity('Narrative generation failed — try again', 'ai')
+      } finally {
+        narrativeInFlight.current = false
       }
     })()
 
     return () => { cancel = true }
-  }, [debriefAccepted, narrativeGenerated, nodes.length, narrative, narrativeRefreshRequested])
+  }, [debriefAccepted, hasNarrativeNode, narrativeRefreshRequested])
 
   // Step 3: Add Scoring & Enhancements ONLY after narrative is approved
   useEffect(() => {
