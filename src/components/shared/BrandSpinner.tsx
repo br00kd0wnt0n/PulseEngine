@@ -1,3 +1,5 @@
+import React from 'react'
+
 export default function BrandSpinner({ text }: { text?: string }) {
   return (
     <div className="flex items-center gap-2 text-white/70 text-[11px]">
