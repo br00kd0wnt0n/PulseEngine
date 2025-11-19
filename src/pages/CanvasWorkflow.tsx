@@ -120,6 +120,10 @@ export default function CanvasWorkflow() {
   const [narrativeApproved, setNarrativeApproved] = useState(false)
   const [narrativeChatMessages, setNarrativeChatMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([])
   const [narrativeChatInput, setNarrativeChatInput] = useState('')
+  // Scores and enhancements
+  const [scores, setScores] = useState<{ narrative?: number; ttpWeeks?: number; cross?: number; commercial?: number; overall?: number } | null>(null)
+  const [enhancements, setEnhancements] = useState<{ text: string; target?: string; deltas?: { narrative?: number; ttp?: number; cross?: number; commercial?: number } }[]>([])
+  const [selectedEnhancements, setSelectedEnhancements] = useState<Set<number>>(new Set())
 
   // Track if nodes have been stacked to avoid infinite loops
   const [nodesStacked, setNodesStacked] = useState(false)
@@ -1388,7 +1392,3 @@ export default function CanvasWorkflow() {
     </div>
   )
 }
-  // Scores and enhancements
-  const [scores, setScores] = useState<{ narrative?: number; ttpWeeks?: number; cross?: number; commercial?: number; overall?: number } | null>(null)
-  const [enhancements, setEnhancements] = useState<{ text: string; target?: string; deltas?: { narrative?: number; ttp?: number; cross?: number; commercial?: number } }[]>([])
-  const [selectedEnhancements, setSelectedEnhancements] = useState<Set<number>>(new Set())
