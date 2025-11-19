@@ -5,6 +5,52 @@ const router = Router()
 
 router.post('/narrative', async (req, res) => {
   const { graph, focusId } = req.body || {}
+
+  // Handle Canvas workflow structure (with concept, debrief, opportunities)
+  if (graph && typeof graph === 'object' && graph.concept && !graph.nodes) {
+    const { concept, persona, region, debrief, opportunities, selectedOpportunities } = graph
+
+    // Build context from selected opportunities
+    const oppText = opportunities && opportunities.length > 0
+      ? opportunities.map((o: any) => `${o.title}: ${o.why}`).join('\n')
+      : 'No opportunities selected'
+
+    const prompt = `Given this campaign concept: "${concept}"\n` +
+      `Persona: ${persona || 'General audience'}\n` +
+      `Region: ${region || 'Worldwide'}\n` +
+      `\nDebrief: ${debrief || 'N/A'}\n` +
+      `\nSelected Opportunities:\n${oppText}\n\n` +
+      `Create a comprehensive end-to-end narrative structure for this campaign. Include:\n` +
+      `1. Opening hook and why now\n` +
+      `2. Content pillars and story arc\n` +
+      `3. How each opportunity integrates\n` +
+      `4. Platform strategy and timeline\n` +
+      `5. Success metrics\n\n` +
+      `Keep it strategic and actionable, 8-12 sentences.`
+
+    try {
+      const apiKey = process.env.OPENAI_API_KEY
+      if (apiKey) {
+        const { OpenAI } = await import('openai')
+        const client = new OpenAI({ apiKey })
+        const resp = await client.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.7,
+          max_tokens: 500
+        })
+        const text = resp.choices?.[0]?.message?.content || 'Unable to generate narrative'
+        return res.json({ text })
+      }
+    } catch (err) {
+      console.error('[AI] Failed to generate narrative:', err)
+    }
+
+    // Fallback response
+    return res.json({ text: `Narrative Structure\n\nOpening Hook: ${concept}\n\nThis campaign leverages ${selectedOpportunities?.length || 0} key opportunities to create a multi-platform narrative that resonates with ${persona || 'the target audience'} in ${region || 'key markets'}. By integrating user-generated content, influencer partnerships, and platform-native formats, the campaign builds momentum across touchpoints while maintaining a cohesive story arc.\n\nSuccess will be measured through viewership growth, engagement metrics, and brand sentiment over a 6-month period.` })
+  }
+
+  // Handle traditional TrendGraph structure
   const text = await narrativeFromTrends(graph, focusId)
   res.json({ text })
 })

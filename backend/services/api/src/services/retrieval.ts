@@ -531,7 +531,13 @@ function formatMetricContent(metric: any): string {
   const platform = metric.platform.toUpperCase()
   const value = metric.value || {}
   const engagement = metric.engagement || 0
-  const velocity = metric.velocity?.toFixed(2) || '0.00'
+  // Handle velocity - convert to number if string, handle null/undefined
+  const velocityNum = typeof metric.velocity === 'number'
+    ? metric.velocity
+    : typeof metric.velocity === 'string'
+      ? parseFloat(metric.velocity)
+      : 0
+  const velocity = !isNaN(velocityNum) ? velocityNum.toFixed(2) : '0.00'
 
   // Platform-specific formatting
   switch (metric.platform) {
