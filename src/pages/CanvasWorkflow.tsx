@@ -1238,65 +1238,60 @@ export default function CanvasWorkflow() {
             <>
               <div className="panel p-2 bg-white/5">
                 <div className="text-white/70 font-medium mb-2 text-[11px]">CAMPAIGN SCORING</div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-white/60 text-[10px]">Cultural Relevance</span>
-                    <span className="text-ralph-cyan text-[11px] font-medium">8.7/10</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-white/60 text-[10px]">Engagement Potential</span>
-                    <span className="text-ralph-cyan text-[11px] font-medium">9.2/10</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-white/60 text-[10px]">Platform Fit</span>
-                    <span className="text-ralph-cyan text-[11px] font-medium">8.9/10</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-white/60 text-[10px]">ROI Projection</span>
-                    <span className="text-ralph-cyan text-[11px] font-medium">7.8/10</span>
-                  </div>
-                </div>
+                <ScoreBar label="Cultural Relevance" value={scores?.narrative ?? 0} />
+                <ScoreBar label="Engagement Potential" value={scores?.cross ?? 0} />
+                <ScoreBar label="Platform Fit" value={scores?.ttpWeeks ? Math.max(0, 100 - (scores.ttpWeeks-1)*12) : 0} />
+                <ScoreBar label="Commercial Viability" value={scores?.commercial ?? 0} />
               </div>
 
               <div className="panel p-2 bg-white/5">
                 <div className="text-white/70 font-medium mb-2 text-[11px]">RECOMMENDED ENHANCEMENTS</div>
                 <div className="space-y-2">
-                  <label className="flex items-start gap-2 cursor-pointer group">
-                    <input type="checkbox" className="mt-0.5" defaultChecked />
-                    <div>
-                      <div className="text-white/70 text-[10px] group-hover:text-white/90">
-                        Add YouTube Shorts component
-                      </div>
-                      <div className="text-white/50 text-[9px]">+1.2 reach score</div>
-                    </div>
-                  </label>
-                  <label className="flex items-start gap-2 cursor-pointer group">
-                    <input type="checkbox" className="mt-0.5" />
-                    <div>
-                      <div className="text-white/70 text-[10px] group-hover:text-white/90">
-                        Integrate trending audio library
-                      </div>
-                      <div className="text-white/50 text-[9px]">+0.8 cultural relevance</div>
-                    </div>
-                  </label>
-                  <label className="flex items-start gap-2 cursor-pointer group">
-                    <input type="checkbox" className="mt-0.5" />
-                    <div>
-                      <div className="text-white/70 text-[10px] group-hover:text-white/90">
-                        Extend to Snapchat Spotlight
-                      </div>
-                      <div className="text-white/50 text-[9px]">+0.6 platform diversity</div>
-                    </div>
-                  </label>
+                  {enhancements.map((e, idx) => {
+                    const checked = selectedEnhancements.has(idx)
+                    return (
+                      <label key={idx} className="flex items-start gap-2 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={checked}
+                          onChange={(ev) => {
+                            const set = new Set(selectedEnhancements)
+                            if (ev.target.checked) set.add(idx); else set.delete(idx)
+                            setSelectedEnhancements(set)
+                          }}
+                        />
+                        <div>
+                          <div className="text-white/70 text-[10px] group-hover:text-white/90">{e.text}</div>
+                          {e.deltas && (
+                            <div className="text-white/50 text-[9px]">Δ narrative {e.deltas.narrative ?? 0} · Δ ttp {e.deltas.ttp ?? 0} · Δ cross {e.deltas.cross ?? 0} · Δ commercial {e.deltas.commercial ?? 0}</div>
+                          )}
+                        </div>
+                      </label>
+                    )
+                  })}
                 </div>
+                <button
+                  className="mt-3 w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium"
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    if (!narrative) return
+                    const applied = enhancements.filter((_, i) => selectedEnhancements.has(i))
+                    if (applied.length === 0) return
+                    const extra = '\n\n---\n\nApplied Enhancements:\n' + applied.map(a => '- ' + a.text).join('\n')
+                    setNarrative({ text: narrative.text + extra })
+                    setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'processing' as NodeData['status'] } : n))
+                    try {
+                      const graph: any = { concept, persona, region, debrief: debrief?.brief }
+                      const sc = await api.score(concept, graph, { persona, region })
+                      setScores(sc || null)
+                    } catch {}
+                    setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
+                  }}
+                >
+                  Apply Enhancements
+                </button>
               </div>
-
-              <button
-                onClick={(e) => e.stopPropagation()}
-                className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium"
-              >
-                Apply Enhancements
-              </button>
             </>
           )}
         </div>
