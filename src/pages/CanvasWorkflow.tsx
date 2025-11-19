@@ -43,42 +43,133 @@ export default function CanvasWorkflow() {
     setNodes(initialNodes)
   }, [])
 
-  // Progressive reveal: Add nodes as workflow progresses
+  // Progressive reveal: Add RKB and Debrief nodes when workflow progresses
   useEffect(() => {
-    if (activated && !nodes.find(n => n.id === 'debrief')) {
+    if (activated && !nodes.find(n => n.id === 'rkb')) {
       setNodes(prev => [
         ...prev,
+        // RKB node (AI-content, orange)
+        {
+          id: 'rkb',
+          type: 'rkb',
+          title: 'Ralph Knowledge Base',
+          x: 50,
+          y: 620,
+          width: 300,
+          height: 150,
+          minimized: false,
+          zIndex: 2,
+          status: 'idle'
+        },
+        // Debrief node (AI-content, orange) - connects from Brief, Context, and RKB
         {
           id: 'debrief',
           type: 'debrief',
           title: 'AI Analysis',
-          x: 310, // Positioned next to minimized stack (50 + 240 + 20 padding)
-          y: 100, // Aligned with top of minimized stack
+          x: 500,
+          y: 100,
           width: 450,
           height: 400,
           minimized: false,
           zIndex: 2,
           status: 'processing',
-          connectedTo: ['brief-input', 'context-upload']
+          connectedTo: ['brief-input', 'context-upload', 'rkb']
         }
       ])
     }
   }, [activated, nodes])
 
+  // Add Opportunities node after Debrief completes (simulated after 3 seconds)
+  useEffect(() => {
+    if (!nodes.find(n => n.id === 'debrief')) return
+
+    const debriefNode = nodes.find(n => n.id === 'debrief')
+    if (debriefNode?.status === 'processing' && !nodes.find(n => n.id === 'opportunities')) {
+      // Simulate debrief completion and add Opportunities
+      const timer = setTimeout(() => {
+        setNodes(prev => prev.map(n =>
+          n.id === 'debrief' ? { ...n, status: 'complete' as const } : n
+        ))
+
+        setTimeout(() => {
+          setNodes(prev => [
+            ...prev,
+            // Opportunities node (AI-content, orange)
+            {
+              id: 'opportunities',
+              type: 'ai-content',
+              title: 'Opportunities',
+              x: 1000,
+              y: 100,
+              width: 400,
+              height: 350,
+              minimized: false,
+              zIndex: 3,
+              status: 'processing',
+              connectedTo: ['debrief']
+            },
+            // RalphBot interaction node (pink)
+            {
+              id: 'ralphbot-opportunities',
+              type: 'ralphbot',
+              title: 'RalphBot Guidance',
+              x: 1000,
+              y: 480,
+              width: 400,
+              height: 180,
+              minimized: false,
+              zIndex: 3,
+              status: 'active',
+              connectedTo: ['opportunities']
+            }
+          ])
+        }, 500)
+      }, 3000)
+
+      return () => clearTimeout(timer)
+    }
+  }, [nodes])
+
+  // Add Creator node after RalphBot interaction
+  useEffect(() => {
+    const ralphbotNode = nodes.find(n => n.id === 'ralphbot-opportunities')
+    if (ralphbotNode && !nodes.find(n => n.id === 'creator')) {
+      // Simulate user interaction with RalphBot, then add Creator
+      const timer = setTimeout(() => {
+        setNodes(prev => [
+          ...prev,
+          // Creator node (AI-content, orange)
+          {
+            id: 'creator',
+            type: 'ai-content',
+            title: 'Content Creator',
+            x: 1450,
+            y: 100,
+            width: 400,
+            height: 500,
+            minimized: false,
+            zIndex: 4,
+            status: 'processing',
+            connectedTo: ['opportunities', 'ralphbot-opportunities']
+          }
+        ])
+
+        // Mark Opportunities as complete
+        setTimeout(() => {
+          setNodes(prev => prev.map(n =>
+            n.id === 'opportunities' ? { ...n, status: 'complete' as const } : n
+          ))
+        }, 1000)
+      }, 5000)
+
+      return () => clearTimeout(timer)
+    }
+  }, [nodes])
+
   const handleSubmit = () => {
     if (!concept) return
     setActivated(true)
-
-    // Mark brief as complete and minimize previous nodes
-    setNodes(prev => prev.map(n => {
-      if (n.id === 'brief-input') {
-        return { ...n, status: 'complete' as const, minimized: true, x: 50, y: 100 }
-      }
-      if (n.id === 'context-upload') {
-        return { ...n, status: 'complete' as const, minimized: true, x: 50, y: 160 }
-      }
-      return n
-    }))
+    // Nodes keep their colors, no minimizing - workflow stays visible
   }
 
   const renderNodeContent = (node: NodeData) => {
@@ -163,19 +254,112 @@ export default function CanvasWorkflow() {
       )
     }
 
+    if (node.id === 'rkb') {
+      return (
+        <div className="space-y-2 text-xs">
+          <div className="text-white/70 leading-relaxed text-[11px]">
+            Ralph Knowledge Base connected
+          </div>
+          <div className="text-white/50 text-[10px]">
+            186 assets • Cultural insights • Trend data
+          </div>
+        </div>
+      )
+    }
+
     if (node.id === 'debrief') {
       return (
         <div className="space-y-3 text-xs">
           <div className="text-white/80 leading-relaxed">
-            AI is analyzing your campaign concept and uploaded context...
+            {node.status === 'processing'
+              ? 'AI is analyzing your campaign concept with uploaded context and RKB insights...'
+              : 'Analysis complete. Your campaign has strong narrative potential with cross-platform opportunities.'}
           </div>
           <div className="panel p-2 bg-white/5">
             <div className="text-white/60 mb-1">Key Insights</div>
             <ul className="space-y-1 text-white/70 text-[11px]">
-              <li>• Analyzing narrative strength...</li>
-              <li>• Identifying cross-platform potential...</li>
-              <li>• Computing optimal timing...</li>
+              <li>• Strong cultural relevance detected</li>
+              <li>• High engagement potential across TikTok, Instagram</li>
+              <li>• Optimal launch timing: Q4 2024</li>
+              <li>• Synergy with current music trends</li>
             </ul>
+          </div>
+        </div>
+      )
+    }
+
+    if (node.id === 'opportunities') {
+      return (
+        <div className="space-y-3 text-xs">
+          <div className="text-white/80 leading-relaxed mb-2">
+            {node.status === 'processing'
+              ? 'Identifying strategic opportunities...'
+              : 'Strategic opportunities identified'}
+          </div>
+          <div className="space-y-2">
+            <div className="panel p-2 bg-white/5">
+              <div className="text-ralph-cyan text-[11px] font-medium mb-1">Platform Strategy</div>
+              <div className="text-white/70 text-[10px]">TikTok-first approach with Instagram Reels crossover</div>
+            </div>
+            <div className="panel p-2 bg-white/5">
+              <div className="text-ralph-cyan text-[11px] font-medium mb-1">Influencer Partnerships</div>
+              <div className="text-white/70 text-[10px]">3 micro-influencers + 1 mid-tier creator</div>
+            </div>
+            <div className="panel p-2 bg-white/5">
+              <div className="text-ralph-cyan text-[11px] font-medium mb-1">Content Mix</div>
+              <div className="text-white/70 text-[10px]">60% native, 30% UGC, 10% branded</div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    if (node.id === 'ralphbot-opportunities') {
+      return (
+        <div className="space-y-2 text-xs">
+          <div className="text-white/80 leading-relaxed text-[11px]">
+            💬 Ready to refine your strategy? I can help you:
+          </div>
+          <div className="space-y-1 text-white/70 text-[10px]">
+            <div className="p-1.5 rounded bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
+              → Adjust platform priorities</div>
+            <div className="p-1.5 rounded bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
+              → Explore alternative influencers</div>
+            <div className="p-1.5 rounded bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
+              → Generate content variants</div>
+          </div>
+        </div>
+      )
+    }
+
+    if (node.id === 'creator') {
+      return (
+        <div className="space-y-3 text-xs">
+          <div className="text-white/80 leading-relaxed mb-2">
+            {node.status === 'processing'
+              ? 'Generating content assets...'
+              : 'Content ready for review'}
+          </div>
+          <div className="space-y-2 max-h-80 overflow-auto">
+            <div className="panel p-2 bg-white/5">
+              <div className="text-ralph-pink text-[11px] font-medium mb-1">Video Script #1</div>
+              <div className="text-white/70 text-[10px] mb-2">15s TikTok hook + main narrative</div>
+              <div className="text-white/50 text-[9px] italic line-clamp-2">
+                "POV: When the algorithm finally gets you..."
+              </div>
+            </div>
+            <div className="panel p-2 bg-white/5">
+              <div className="text-ralph-pink text-[11px] font-medium mb-1">Caption Set</div>
+              <div className="text-white/70 text-[10px]">5 platform-optimized variants</div>
+            </div>
+            <div className="panel p-2 bg-white/5">
+              <div className="text-ralph-pink text-[11px] font-medium mb-1">Hashtag Strategy</div>
+              <div className="text-white/70 text-[10px]">#trending mix + branded tags</div>
+            </div>
+            <div className="panel p-2 bg-white/5">
+              <div className="text-ralph-pink text-[11px] font-medium mb-1">Visual Moodboard</div>
+              <div className="text-white/70 text-[10px]">12 reference images compiled</div>
+            </div>
           </div>
         </div>
       )

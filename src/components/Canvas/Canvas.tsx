@@ -91,7 +91,6 @@ export default function Canvas({ nodes, onNodesChange, renderNodeContent }: Canv
           data={node}
           onUpdate={handleNodeUpdate}
           onFocus={handleNodeFocus}
-          isFocused={focusedNodeId === node.id}
         >
           {renderNodeContent?.(node)}
         </Node>
