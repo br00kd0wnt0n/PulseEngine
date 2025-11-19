@@ -25,53 +25,27 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     console.log('[UploadContext] Added', files.length, 'file placeholders')
 
     try {
-      // Get active project ID for context association
+      // Check for existing project from Canvas workflow or previous uploads
       let activeProjectId = localStorage.getItem('activeProjectId')
 
       // Validate that projectId is a valid UUID (not 'local' string)
       const isValidUUID = activeProjectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeProjectId)
 
-      // If no valid project ID, create a default project for this user
-      if (!isValidUUID) {
-        console.log('[UploadContext] No valid project found, creating default project')
-        try {
-          const response = await fetch(`${API_BASE}/projects`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Default Project', ownerId: USER_ID }),
-          })
-          if (response.ok) {
-            const project = await response.json()
-            if (!project.id) {
-              throw new Error('Project created but no ID returned')
-            }
-            activeProjectId = project.id
-            localStorage.setItem('activeProjectId', project.id) // Use project.id directly to satisfy TypeScript
-            console.log('[UploadContext] Created default project:', activeProjectId)
-            try { window.dispatchEvent(new CustomEvent('project-created', { detail: project })) } catch {}
-          } else {
-            console.error('[UploadContext] Project creation failed:', response.status, response.statusText)
-            throw new Error(`Failed to create default project: ${response.status}`)
-          }
-        } catch (e) {
-          console.error('[UploadContext] Failed to create default project:', e)
-          // If we can't create a project, we shouldn't upload with projectId=NULL (that's RKB)
-          throw new Error('No valid project found. Please create a project first.')
-        }
-      } else {
+      if (isValidUUID) {
         console.log('[UploadContext] Using existing project:', activeProjectId)
-      }
-
-      // At this point, activeProjectId must be a valid string
-      if (!activeProjectId) {
-        throw new Error('No valid project ID available')
+      } else {
+        console.log('[UploadContext] No project found - files will be uploaded without project association')
+        activeProjectId = null
       }
 
       // Upload files to ingestion service
       const formData = new FormData()
       files.forEach(file => formData.append('files', file))
       formData.append('ownerId', USER_ID)
-      formData.append('projectId', activeProjectId!) // activeProjectId is now guaranteed to be valid
+      // Only add projectId if we have a valid one
+      if (activeProjectId) {
+        formData.append('projectId', activeProjectId)
+      }
 
       const response = await fetch(`${INGESTION_URL}/ingest/upload`, {
         method: 'POST',
@@ -116,46 +90,27 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setProcessed((p) => [placeholder, ...p])
 
     try {
-      // Get active project ID for context association
+      // Check for existing project from Canvas workflow or previous uploads
       let activeProjectId = localStorage.getItem('activeProjectId')
 
       // Validate that projectId is a valid UUID (not 'local' string)
       const isValidUUID = activeProjectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeProjectId)
 
-      // If no valid project ID, create a default project for this user
-      if (!isValidUUID) {
-        try {
-          const response = await fetch(`${API_BASE}/projects`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Default Project', ownerId: USER_ID }),
-          })
-          if (response.ok) {
-            const project = await response.json()
-            if (!project.id) {
-              throw new Error('Project created but no ID returned')
-            }
-            activeProjectId = project.id
-            localStorage.setItem('activeProjectId', project.id) // Use project.id directly to satisfy TypeScript
-            try { window.dispatchEvent(new CustomEvent('project-created', { detail: project })) } catch {}
-          } else {
-            throw new Error('Failed to create default project')
-          }
-        } catch (e) {
-          console.error('Failed to create default project:', e)
-          throw new Error('No valid project found. Please create a project first.')
-        }
-      }
-
-      // At this point, activeProjectId must be a valid string
-      if (!activeProjectId) {
-        throw new Error('No valid project ID available')
+      if (isValidUUID) {
+        console.log('[UploadContext] Using existing project:', activeProjectId)
+      } else {
+        console.log('[UploadContext] No project found - URL will be ingested without project association')
+        activeProjectId = null
       }
 
       const response = await fetch(`${INGESTION_URL}/ingest/url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, ownerId: USER_ID, projectId: activeProjectId }),
+        body: JSON.stringify({
+          url,
+          ownerId: USER_ID,
+          ...(activeProjectId && { projectId: activeProjectId })
+        }),
       })
 
       if (!response.ok) {
