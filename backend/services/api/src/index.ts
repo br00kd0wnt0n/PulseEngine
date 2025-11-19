@@ -42,20 +42,32 @@ async function main() {
     throw new Error(`Migration failed: ${e instanceof Error ? e.message : String(e)}`)
   }
   const app = express()
-  app.use(helmet())
 
-  // CORS configuration - allow production frontend and localhost
+  // Helmet with relaxed cross-origin policy for CORS
+  app.use(helmet({ crossOriginResourcePolicy: false }))
+
+  // Robust CORS configuration - must be before routes
+  const allowed = [
+    'https://pulseengine-production.up.railway.app',
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:3000'
+  ]
+
   const corsOptions = {
-    origin: [
-      'https://pulseengine-production.up.railway.app',
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'http://localhost:5174'
-    ],
+    origin(origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) {
+      if (!origin) return cb(null, true) // allow curl/postman
+      const ok = allowed.includes(origin) || /\.up\.railway\.app$/i.test(origin)
+      cb(ok ? null : new Error('Not allowed by CORS'), ok)
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-seed-token'],
     credentials: true,
-    optionsSuccessStatus: 200
+    maxAge: 86400 // 24 hours
   }
+
   app.use(cors(corsOptions))
+  app.options('*', cors(corsOptions)) // handle preflight for all routes
 
   app.use(express.json({ limit: '2mb' }))
   app.use(pinoHttp({ logger }))
