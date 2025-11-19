@@ -7,6 +7,21 @@ import { useTrends } from '../context/TrendContext'
 import { useUpload } from '../context/UploadContext'
 import { api } from '../services/api'
 import { CitationToken } from '../components/shared/CitationOverlay'
+import BrandSpinner from '../components/shared/BrandSpinner'
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  const v = Math.max(0, Math.min(100, Math.round(value)))
+  return (
+    <div className="mb-2">
+      <div className="flex items-center justify-between text-[11px] mb-1">
+        <span className="text-white/70">{label}</span>
+        <span className="text-ralph-cyan">{(v/10).toFixed(1)}/10</span>
+      </div>
+      <div className="h-2 rounded bg-white/10 overflow-hidden">
+        <div className="h-2 bg-gradient-to-r from-ralph-cyan to-ralph-pink" style={{ width: `${v}%` }} />
+      </div>
+    </div>
+  )
+}
 
 const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string | undefined) || ''
 const USER_ID = '087d78e9-4bbe-49f6-8981-1588ce4934a2'
@@ -509,6 +524,39 @@ export default function CanvasWorkflow() {
       ))
     }, 3000)
   }, [narrativeApproved, nodes])
+
+  // Auto‑tidy when scoring appears and load data
+  useEffect(() => {
+    const scoring = nodes.find(n => n.id === 'scoring')
+    const narr = nodes.find(n => n.id === 'narrative')
+    if (!scoring || !narr) return
+    // Ensure on screen placement
+    setNodes(prev => prev.map(n => {
+      if (n.id === 'narrative') return { ...n, x: 900, y: 100 }
+      if (n.id === 'scoring') return { ...n, x: 1400, y: 100 }
+      return n
+    }))
+    if (scoring.status === 'processing') {
+      let cancel = false
+      ;(async () => {
+        try {
+          const graph: any = { concept, persona, region, debrief: debrief?.brief }
+          const [sc, eh] = await Promise.all([
+            api.score(concept, graph, { persona, region }),
+            api.enhancements(concept, graph, { persona, region })
+          ])
+          if (cancel) return
+          setScores(sc || null)
+          const list = Array.isArray(eh?.suggestions) ? eh.suggestions : []
+          setEnhancements(list)
+          setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
+        } catch {
+          if (!cancel) setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
+        }
+      })()
+      return () => { cancel = true }
+    }
+  }, [nodes.find(n => n.id === 'scoring')?.status])
 
   // Step 4: Add Creative Partner node after enhancements selected (simulated after 5 seconds)
   useEffect(() => {
@@ -1084,9 +1132,7 @@ export default function CanvasWorkflow() {
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
           {narrativeLoading || !narrative ? (
-            <div className="text-white/80 leading-relaxed">
-              Composing end-to-end narrative structure with selected opportunities...
-            </div>
+            <BrandSpinner text="Composing narrative structure with selected opportunities…" />
           ) : (
             <>
               {/* Narrative Content */}
@@ -1098,9 +1144,7 @@ export default function CanvasWorkflow() {
                   <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Project: {(debrief?.sources?.project || []).length}</span>
                   <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Live Trends: {(debrief?.sources?.live || []).length}</span>
                 </div>
-                <div className="text-white/80 text-[10px] leading-relaxed whitespace-pre-wrap">
-                  {narrative.text}
-                </div>
+                <div className="prose prose-invert max-w-none"><div className="text-white/80 text-[10px] leading-relaxed whitespace-pre-wrap">{narrative.text}</div></div>
               </div>
 
               {/* Show selected opportunities that were integrated */}
@@ -1189,9 +1233,7 @@ export default function CanvasWorkflow() {
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
           {node.status === 'processing' ? (
-            <div className="text-white/80 leading-relaxed">
-              Calculating metrics and analyzing enhancements...
-            </div>
+            <BrandSpinner text="Calculating metrics and analyzing enhancements…" />
           ) : (
             <>
               <div className="panel p-2 bg-white/5">
@@ -1324,8 +1366,8 @@ export default function CanvasWorkflow() {
 
   return (
     <div className="relative w-full h-screen">
-      {/* Fixed Header - stays under main header */}
-      <div className="fixed top-16 left-4 right-4 z-50">
+      {/* Fixed Header - locked to top, always above main header */}
+      <div className="fixed top-16 left-4 right-4 z-[100]">
         <div className="panel p-3 backdrop-blur-lg bg-charcoal-900/80">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs">
@@ -1351,3 +1393,7 @@ export default function CanvasWorkflow() {
     </div>
   )
 }
+  // Scores and enhancements
+  const [scores, setScores] = useState<{ narrative?: number; ttpWeeks?: number; cross?: number; commercial?: number; overall?: number } | null>(null)
+  const [enhancements, setEnhancements] = useState<{ text: string; target?: string; deltas?: { narrative?: number; ttp?: number; cross?: number; commercial?: number } }[]>([])
+  const [selectedEnhancements, setSelectedEnhancements] = useState<Set<number>>(new Set())
