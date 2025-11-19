@@ -22,6 +22,16 @@ export default function CanvasWorkflow() {
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Opportunity selection
+  const [selectedOpportunities, setSelectedOpportunities] = useState<Set<string>>(new Set())
+
+  // Narrative state
+  const [narrative, setNarrative] = useState<{ text: string } | null>(null)
+  const [narrativeLoading, setNarrativeLoading] = useState(false)
+  const [narrativeApproved, setNarrativeApproved] = useState(false)
+  const [narrativeChatMessages, setNarrativeChatMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([])
+  const [narrativeChatInput, setNarrativeChatInput] = useState('')
+
   // Initialize nodes with smart auto-layout
   useEffect(() => {
     const initialNodes: NodeData[] = [
@@ -136,58 +146,82 @@ export default function CanvasWorkflow() {
         x: 1000,
         y: 100,
         width: 450,
-        height: 450,
+        height: 500,
         minimized: false,
         zIndex: 3,
         status: 'processing',
         connectedTo: ['debrief-opportunities']
       }
     ])
-
-    // Mark as complete after 3 seconds
-    setTimeout(() => {
-      setNodes(prev => prev.map(n =>
-        n.id === 'narrative' ? { ...n, status: 'complete' as const } : n
-      ))
-    }, 3000)
   }, [debriefAccepted, nodes])
 
-  // Step 3: Add Scoring & Enhancements after narrative is reviewed (simulated after 5 seconds)
+  // Generate narrative with selected opportunities
   useEffect(() => {
-    if (!nodes.find(n => n.id === 'narrative')) return
+    let cancel = false
+    if (!debriefAccepted || !nodes.find(n => n.id === 'narrative') || narrative) return
 
-    const narrativeNode = nodes.find(n => n.id === 'narrative')
-    if (narrativeNode?.status === 'processing' && !nodes.find(n => n.id === 'scoring')) {
-      const timer = setTimeout(() => {
-        // Mark narrative as complete
-        setNodes(prev => prev.map(n =>
-          n.id === 'narrative' ? { ...n, status: 'complete' as const } : n
-        ))
+    setNarrativeLoading(true)
+    ;(async () => {
+      try {
+        // Build graph with selected opportunities
+        const selectedOppsList = opps?.opportunities?.filter(o => selectedOpportunities.has(o.title)) || []
+        const graph = {
+          concept,
+          persona,
+          region,
+          debrief: debrief?.brief,
+          opportunities: selectedOppsList,
+          selectedOpportunities: Array.from(selectedOpportunities)
+        }
 
-        setTimeout(() => {
-          setNodes(prev => [
-            ...prev,
-            // Scoring & Enhancements node
-            {
-              id: 'scoring',
-              type: 'ai-content',
-              title: 'Scoring & Enhancements',
-              x: 1500,
-              y: 100,
-              width: 450,
-              height: 550,
-              minimized: false,
-              zIndex: 4,
-              status: 'processing',
-              connectedTo: ['narrative', 'rkb']
-            }
-          ])
-        }, 500)
-      }, 5000)
+        const narrativeResult = await api.narrative(graph)
 
-      return () => clearTimeout(timer)
-    }
-  }, [nodes])
+        if (!cancel) {
+          setNarrative(narrativeResult)
+          setNarrativeLoading(false)
+          // Mark narrative node as complete
+          setNodes(prev => prev.map(n =>
+            n.id === 'narrative' ? { ...n, status: 'complete' as const } : n
+          ))
+        }
+      } catch (err) {
+        console.error('Failed to generate narrative:', err)
+        if (!cancel) setNarrativeLoading(false)
+      }
+    })()
+
+    return () => { cancel = true }
+  }, [debriefAccepted, nodes, narrative, concept, persona, region, debrief, opps, selectedOpportunities])
+
+  // Step 3: Add Scoring & Enhancements ONLY after narrative is approved
+  useEffect(() => {
+    if (!narrativeApproved || nodes.find(n => n.id === 'scoring')) return
+
+    setNodes(prev => [
+      ...prev,
+      // Scoring & Enhancements node
+      {
+        id: 'scoring',
+        type: 'ai-content',
+        title: 'Scoring & Enhancements',
+        x: 1500,
+        y: 100,
+        width: 450,
+        height: 550,
+        minimized: false,
+        zIndex: 4,
+        status: 'processing',
+        connectedTo: ['narrative', 'rkb']
+      }
+    ])
+
+    // Mark as complete after 3 seconds (TODO: integrate real API)
+    setTimeout(() => {
+      setNodes(prev => prev.map(n =>
+        n.id === 'scoring' ? { ...n, status: 'complete' as const } : n
+      ))
+    }, 3000)
+  }, [narrativeApproved, nodes])
 
   // Step 4: Add Creative Partner node after enhancements selected (simulated after 5 seconds)
   useEffect(() => {
@@ -492,21 +526,40 @@ export default function CanvasWorkflow() {
               <div className="panel p-3 bg-white/5">
                 <div className="text-white/70 font-medium mb-2 text-[11px]">OPPORTUNITIES</div>
                 <div className="space-y-2">
-                  {opps?.opportunities?.map((o, i) => (
-                    <div key={i} className="p-2 bg-white/5 rounded border border-white/10">
-                      <div className="flex items-start justify-between mb-1">
-                        <div className="text-white/90 font-medium text-[10px]">{o.title}</div>
-                        <div className="text-xs px-1.5 py-0.5 rounded border border-ralph-cyan/40 bg-ralph-cyan/10 text-ralph-cyan">
-                          {o.impact}/10
+                  {opps?.opportunities?.map((o, i) => {
+                    const isSelected = selectedOpportunities.has(o.title)
+                    return (
+                      <label key={i} className="flex items-start gap-2 p-2 bg-white/5 rounded border border-white/10 cursor-pointer hover:border-ralph-cyan/30 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            const newSelected = new Set(selectedOpportunities)
+                            if (e.target.checked) {
+                              newSelected.add(o.title)
+                            } else {
+                              newSelected.delete(o.title)
+                            }
+                            setSelectedOpportunities(newSelected)
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          className="mt-0.5 shrink-0"
+                        />
+                        <div className="flex-1">
+                          <div className="text-white/90 font-medium text-[10px] mb-1">{o.title}</div>
+                          <div className="text-white/70 text-[10px] leading-relaxed">{o.why}</div>
                         </div>
-                      </div>
-                      <div className="text-white/70 text-[10px] leading-relaxed">{o.why}</div>
-                    </div>
-                  ))}
+                      </label>
+                    )
+                  })}
                 </div>
                 {opps?.rationale && (
                   <div className="mt-2 text-[10px] text-white/50">{opps.rationale}</div>
                 )}
+                <div className="mt-2 text-[10px] text-ralph-cyan">
+                  {selectedOpportunities.size} opportunit{selectedOpportunities.size !== 1 ? 'ies' : 'y'} selected
+                </div>
               </div>
 
               {/* Chatbot Field */}
@@ -581,43 +634,95 @@ export default function CanvasWorkflow() {
     if (node.id === 'narrative') {
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
-          {node.status === 'processing' ? (
+          {narrativeLoading || !narrative ? (
             <div className="text-white/80 leading-relaxed">
-              Composing end-to-end narrative structure...
+              Composing end-to-end narrative structure with selected opportunities...
             </div>
           ) : (
             <>
-              <div className="panel p-2 bg-white/5">
-                <div className="text-white/70 font-medium mb-2 text-[11px]">CAMPAIGN OVERVIEW</div>
-                <div className="text-white/60 text-[10px] leading-relaxed mb-3">
-                  A TikTok-first music discovery campaign that leverages algorithmic trends and micro-influencer authenticity to drive organic engagement across Gen Z audiences.
+              {/* Narrative Content */}
+              <div className="panel p-3 bg-white/5">
+                <div className="text-white/70 font-medium mb-2 text-[11px]">NARRATIVE STRUCTURE</div>
+                <div className="text-white/80 text-[10px] leading-relaxed whitespace-pre-wrap">
+                  {narrative.text}
                 </div>
               </div>
 
+              {/* Show selected opportunities that were integrated */}
+              {selectedOpportunities.size > 0 && (
+                <div className="panel p-2 bg-ralph-cyan/10 border border-ralph-cyan/30">
+                  <div className="text-white/70 font-medium mb-1 text-[10px]">INTEGRATED OPPORTUNITIES</div>
+                  <div className="flex flex-wrap gap-1">
+                    {Array.from(selectedOpportunities).map((opp, i) => (
+                      <span key={i} className="px-2 py-0.5 rounded bg-white/10 border border-white/20 text-[9px]">
+                        {opp}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Chatbot Field */}
               <div className="panel p-2 bg-white/5">
-                <div className="text-white/70 font-medium mb-1 text-[11px]">NARRATIVE ARC</div>
-                <div className="space-y-1.5 text-[10px] text-white/60">
-                  <div><span className="text-ralph-cyan">Phase 1:</span> Discovery (Weeks 1-2)</div>
-                  <div><span className="text-ralph-cyan">Phase 2:</span> Amplification (Weeks 3-4)</div>
-                  <div><span className="text-ralph-cyan">Phase 3:</span> Conversion (Weeks 5-6)</div>
+                <div className="text-white/70 font-medium mb-2 text-[10px]">DISCUSS & REFINE</div>
+                <div className="space-y-2 max-h-32 overflow-auto mb-2">
+                  {narrativeChatMessages.map((msg, i) => (
+                    <div key={i} className={`text-[10px] p-2 rounded ${msg.role === 'user' ? 'bg-ralph-cyan/10 border border-ralph-cyan/20 text-white/90' : 'bg-white/5 text-white/70'}`}>
+                      {msg.text}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={narrativeChatInput}
+                    onChange={(e) => setNarrativeChatInput(e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.stopPropagation()
+                        if (narrativeChatInput.trim()) {
+                          setNarrativeChatMessages(prev => [...prev, { role: 'user', text: narrativeChatInput }])
+                          setNarrativeChatInput('')
+                          setTimeout(() => {
+                            setNarrativeChatMessages(prev => [...prev, { role: 'ai', text: 'I can help you refine the narrative structure. What aspects would you like to adjust?' }])
+                          }, 500)
+                        }
+                      }
+                    }}
+                    placeholder="Ask questions or request changes..."
+                    className="flex-1 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-[10px] outline-none"
+                  />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (narrativeChatInput.trim()) {
+                        setNarrativeChatMessages(prev => [...prev, { role: 'user', text: narrativeChatInput }])
+                        setNarrativeChatInput('')
+                        setTimeout(() => {
+                          setNarrativeChatMessages(prev => [...prev, { role: 'ai', text: 'I can help you refine the narrative structure. What aspects would you like to adjust?' }])
+                        }, 500)
+                      }
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="px-2 py-1 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-[10px]"
+                  >
+                    Send
+                  </button>
                 </div>
               </div>
 
-              <div className="panel p-2 bg-white/5">
-                <div className="text-white/70 font-medium mb-1 text-[11px]">KEY TOUCHPOINTS</div>
-                <ul className="space-y-1 text-white/60 text-[10px]">
-                  <li>• Influencer seed content on TikTok</li>
-                  <li>• Cross-platform amplification</li>
-                  <li>• UGC activation & hashtag challenge</li>
-                  <li>• Conversion funnel optimization</li>
-                </ul>
-              </div>
-
+              {/* Approve Button */}
               <button
-                onClick={(e) => e.stopPropagation()}
-                className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setNarrativeApproved(true)
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                disabled={narrativeApproved}
+                className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Approve Narrative
+                {narrativeApproved ? 'Approved ✓' : 'Approve & Continue to Scoring'}
               </button>
             </>
           )}
