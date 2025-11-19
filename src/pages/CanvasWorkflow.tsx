@@ -17,6 +17,7 @@ export default function CanvasWorkflow() {
   const { snapshot, nodes: trendNodes } = useTrends()
   const [rkbActivity, setRkbActivity] = useState<{ id: number; text: string; kind?: 'rkb'|'project'|'trends'|'ai' }[]>([])
   const [stats, setStats] = useState<{ trends?: number; creators?: number; assets?: number } | null>(null)
+  const hasPlaceholders = (items: any[]) => items.some(it => typeof it?.id === 'string' && (it.id.startsWith('placeholder-') || it.id.startsWith('url-placeholder-')))
 
   const addActivity = (text: string, kind?: 'rkb'|'project'|'trends'|'ai') => {
     setRkbActivity(prev => [{ id: Date.now(), text, kind }, ...prev].slice(0, 20))
@@ -167,10 +168,17 @@ export default function CanvasWorkflow() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Call real backend APIs when workflow is activated
+  // Call real backend APIs when workflow is activated (wait for assessed context if any uploads exist)
   useEffect(() => {
     let cancel = false
     if (!activated || !concept) return
+    // If there are uploads, wait until they are assessed (placeholders replaced)
+    const hasUploads = (processed?.length || 0) > 0
+    const uploadsAssessed = !hasUploads || (hasUploads && !hasPlaceholders(processed))
+    if (!uploadsAssessed) {
+      addActivity('Waiting for project context to be assessed…', 'project')
+      return
+    }
 
     setLoading(true)
     ;(async () => {
@@ -550,7 +558,7 @@ export default function CanvasWorkflow() {
     }
   }
 
-  // Re-evaluate Debrief/Opportunities when context updates (real API refresh)
+  // Re-evaluate Debrief/Opportunities (and Narrative if accepted) when context updates
   useEffect(() => {
     const handler = () => {
       if (!activated || !concept) return
@@ -570,6 +578,10 @@ export default function CanvasWorkflow() {
           try { if (projectId) localStorage.setItem(`opps:${projectId}`, JSON.stringify(o)) } catch {}
           setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'complete' as const } : n))
           addActivity('Debrief updated with project context', 'ai')
+          // If narrative was accepted previously, refresh it as well
+          setNodes(prev => prev.map(n => n.id === 'narrative' ? { ...n, status: 'processing' as const } : n))
+          setNarrative(null)
+          setNarrativeGenerated(false)
         } catch {
           addActivity('Re-evaluation failed — check connection', 'ai')
           setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'active' as const } : n))
