@@ -78,7 +78,7 @@ export default function CanvasWorkflow() {
     setLoading(true)
     ;(async () => {
       try {
-        const pid = localStorage.getItem('activeProjectId') || 'local'
+        const pid = localStorage.getItem('activeProjectId') || null
         const [d, o] = await Promise.all([
           api.debrief(concept, { persona, region, projectId: pid }),
           api.opportunities(concept, { persona, region, projectId: pid })
