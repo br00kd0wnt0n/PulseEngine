@@ -55,7 +55,7 @@ export default function CanvasWorkflow() {
       addActivity('Debrief updated with project context', 'ai')
       if (debriefAccepted) {
         setNodes(prev => prev.map(n => n.id === 'narrative' ? { ...n, status: 'processing' as const } : n))
-        setNarrativeGenerated(false)
+        setNarrativeRefreshRequested(true)
       }
     } catch (e) {
       addActivity('Re-evaluation failed — check connection', 'ai')
@@ -649,7 +649,6 @@ export default function CanvasWorkflow() {
           if (debriefAccepted) {
             setNodes(prev => prev.map(n => n.id === 'narrative' ? { ...n, status: 'processing' as const } : n))
             setNarrativeRefreshRequested(true)
-            setNarrativeGenerated(false)
           }
         } catch {
           addActivity('Re-evaluation failed — check connection', 'ai')
