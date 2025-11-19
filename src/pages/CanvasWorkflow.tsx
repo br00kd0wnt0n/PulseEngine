@@ -181,6 +181,7 @@ export default function CanvasWorkflow() {
   const [enhancements, setEnhancements] = useState<{ text: string; target?: string; deltas?: { narrative?: number; ttp?: number; cross?: number; commercial?: number } }[]>([])
   const [selectedEnhancements, setSelectedEnhancements] = useState<Set<number>>(new Set())
   const [scoringError, setScoringError] = useState<string | null>(null)
+  const [conceptCreators, setConceptCreators] = useState<any[]>([])
 
   // Track if nodes have been stacked to avoid infinite loops
   const [nodesStacked, setNodesStacked] = useState(false)
