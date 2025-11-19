@@ -458,8 +458,27 @@ export default function CanvasWorkflow() {
       }
     })()
 
-    return () => { cancel = true }
+    return () => { cancel = true; console.log('[Narrative] Effect cleanup (cancelled in-flight:', narrativeInFlight.current, ')') }
   }, [debriefAccepted, hasNarrativeNode, narrativeRefreshRequested])
+
+  // Rehydrate narrative from cache as a failsafe (if API succeeded but UI missed state set)
+  useEffect(() => {
+    if (!debriefAccepted) return
+    const pid = (() => { try { return localStorage.getItem('activeProjectId') || 'local' } catch { return 'local' } })()
+    if (narrativeLoading) return
+    if (narrative) return
+    try {
+      const blocks = JSON.parse(localStorage.getItem(`nf:${pid}`) || 'null') as any[] | null
+      if (blocks && Array.isArray(blocks) && blocks.length) {
+        const text = blocks.map(b => (b && (b.content || b.text) || '')).filter(Boolean).join('\n\n')
+        if (text && text.length > 0) {
+          console.log('[Narrative] Rehydrating from cache for pid', pid)
+          setNarrative({ text })
+          setNodes(prev => prev.map(n => n.id === 'narrative' ? { ...n, status: 'complete' as NodeData['status'] } : n))
+        }
+      }
+    } catch {}
+  }, [debriefAccepted, narrativeLoading, narrative, nodes.some(n => n.id === 'narrative')])
 
   // Step 3: Add Scoring & Enhancements ONLY after narrative is approved
   useEffect(() => {
