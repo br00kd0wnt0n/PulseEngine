@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useDashboard } from '../../context/DashboardContext'
 import { api } from '../../services/api'
 import { useTrends } from '../../context/TrendContext'
@@ -25,8 +26,9 @@ const examples = [
   },
 ]
 
-export default function StoryPromptHero() {
+export default function StoryPromptHero({ redirectToCanvas }: { redirectToCanvas?: boolean }) {
   const { concept, setConcept, activated, setActivated, frameworkScores, keyDrivers, recsDensity, region, setRegion, persona, setPersona } = useDashboard()
+  const navigate = useNavigate()
   const [projectId, setProjectId] = useState<string | null>(null)
   const [versions, setVersions] = useState<any[]>([])
   const [cursor, setCursor] = useState(0)
@@ -95,8 +97,13 @@ export default function StoryPromptHero() {
       setVersions([]); setCursor(0)
       try { logActivity('Local project initialized') } catch {}
     }
-    const el = document.getElementById('dashboard-main')
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // Route to Canvas when requested; otherwise keep legacy behavior
+    if (redirectToCanvas) {
+      try { navigate('/canvas') } catch {}
+    } else {
+      const el = document.getElementById('dashboard-main')
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
   }
 
   // Mark unsaved when inputs change

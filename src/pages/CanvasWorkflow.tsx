@@ -3,6 +3,7 @@ import Canvas from '../components/Canvas/Canvas'
 import { NodeData } from '../components/Canvas/Node'
 import FloatingAssistant from '../components/Canvas/FloatingAssistant'
 import { useDashboard } from '../context/DashboardContext'
+import { useTrends } from '../context/TrendContext'
 import { useUpload } from '../context/UploadContext'
 import { api } from '../services/api'
 import { CitationToken } from '../components/shared/CitationOverlay'
@@ -13,6 +14,12 @@ const USER_ID = '087d78e9-4bbe-49f6-8981-1588ce4934a2'
 export default function CanvasWorkflow() {
   const { concept, setConcept, activated, setActivated, persona, setPersona, region, setRegion } = useDashboard() as any
   const { addFiles, addUrl, processed } = useUpload()
+  const { snapshot, nodes: trendNodes } = useTrends()
+  const [rkbActivity, setRkbActivity] = useState<{ id: number; text: string; kind?: 'rkb'|'project'|'trends'|'ai' }[]>([])
+
+  const addActivity = (text: string, kind?: 'rkb'|'project'|'trends'|'ai') => {
+    setRkbActivity(prev => [{ id: Date.now(), text, kind }, ...prev].slice(0, 20))
+  }
   const [nodes, setNodes] = useState<NodeData[]>([])
 
   // Backend data state
@@ -73,6 +80,57 @@ export default function CanvasWorkflow() {
     setNodes(initialNodes)
   }, [])
 
+  // Ensure server project exists on mount (Canvas-first)
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        let projectId: string | null = null
+        try { projectId = localStorage.getItem('activeProjectId') } catch {}
+        const isUUID = projectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)
+        if (isUUID) return
+        // If no id, seed local and then try to create a server project
+        const localId = projectId && projectId.startsWith('local-') ? projectId : `local-${Date.now()}`
+        try { localStorage.setItem('activeProjectId', localId) } catch {}
+        addActivity('Initializing project…', 'project')
+        try {
+          const created = await api.createPublicProject({ concept: (concept || 'Untitled Project'), graph: snapshot(), focusId: null })
+          if (!cancelled && created && created.id && typeof created.id === 'string') {
+            // migrate local keys to server id
+            const newId = created.id
+            const migrate = (keyBase: string) => {
+              try {
+                const oldKey = `${keyBase}:${localId}`
+                const val = localStorage.getItem(oldKey)
+                if (val) {
+                  localStorage.setItem(`${keyBase}:${newId}`, val)
+                  localStorage.removeItem(oldKey)
+                }
+              } catch {}
+            }
+            migrate('debrief'); migrate('opps'); migrate('nf'); migrate('conv'); migrate('versions')
+            try { localStorage.setItem('activeProjectId', newId) } catch {}
+            addActivity('Project ready on server', 'project')
+          }
+        } catch {
+          if (!cancelled) addActivity('Working locally; server project not available', 'project')
+        }
+      } catch {}
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Record context ingestion activity from uploads/URL adds
+  useEffect(() => {
+    const onContext = () => addActivity('New context ingested from uploads', 'project')
+    window.addEventListener('context-updated', onContext as any)
+    return () => {
+      window.removeEventListener('context-updated', onContext as any)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Call real backend APIs when workflow is activated
   useEffect(() => {
     let cancel = false
@@ -81,17 +139,47 @@ export default function CanvasWorkflow() {
     setLoading(true)
     ;(async () => {
       try {
-        // Check if there's an existing project from file uploads
-        let projectId = localStorage.getItem('activeProjectId')
+        // Ensure a project id exists for this Canvas session
+        let projectId: string | null = null
+        try { projectId = localStorage.getItem('activeProjectId') } catch {}
         const isValidUUID = projectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)
 
         if (isValidUUID) {
           console.log('[Canvas] Using existing project:', projectId)
         } else {
-          console.log('[Canvas] No project - will use Core RKB + Live Metrics only')
-          projectId = null
+          const localId = (projectId && projectId.startsWith('local-')) ? projectId : `local-${Date.now()}`
+          try { localStorage.setItem('activeProjectId', localId) } catch {}
+          projectId = localId
+          console.log('[Canvas] Initialized local project:', localId)
+          addActivity('Initialized local project context', 'project')
+          // Try to create a real project in the background and upgrade the id
+          try {
+            const created = await api.createPublicProject({ concept, graph: snapshot(), focusId: null })
+            if (created && created.id && typeof created.id === 'string') {
+              // Migrate any local keys to the new project id
+              const newId = created.id
+              const migrate = (keyBase: string) => {
+                try {
+                  const oldKey = `${keyBase}:${localId}`
+                  const val = localStorage.getItem(oldKey)
+                  if (val) {
+                    localStorage.setItem(`${keyBase}:${newId}`, val)
+                    localStorage.removeItem(oldKey)
+                  }
+                } catch {}
+              }
+              migrate('debrief'); migrate('opps'); migrate('nf'); migrate('conv'); migrate('versions')
+              try { localStorage.setItem('activeProjectId', newId) } catch {}
+              projectId = newId
+              console.log('[Canvas] Upgraded to server project:', newId)
+              addActivity('Project created on server and upgraded', 'project')
+            }
+          } catch (e) {
+            console.log('[Canvas] Public project creation skipped/failure, staying local')
+            addActivity('Working locally; server project not created', 'project')
+          }
         }
-
+        addActivity('Analyzing with RKB + live trends + project context…', 'ai')
         const [d, o] = await Promise.all([
           api.debrief(concept, { persona, region, projectId: projectId || undefined }),
           api.opportunities(concept, { persona, region, projectId: projectId || undefined })
@@ -100,13 +188,24 @@ export default function CanvasWorkflow() {
           setDebrief(d)
           setOpps(o)
           setLoading(false)
+          // Persist to local storage for cross‑component visibility and exports
+          try { localStorage.setItem(`debrief:${projectId}`, JSON.stringify(d)) } catch {}
+          try { localStorage.setItem(`opps:${projectId}`, JSON.stringify(o)) } catch {}
+          // Persist assessment to project DB as a version snapshot (does not touch RKB)
+          try {
+            if (projectId && /^[0-9a-f\-]{36}$/i.test(projectId)) {
+              await api.saveVersion(projectId, { summary: concept, changeSummary: 'Debrief assessment', scores: { debrief: d, opportunities: o } })
+            }
+          } catch {}
           // Mark debrief node as complete after data loads
           setNodes(prev => prev.map(n =>
             n.id === 'debrief-opportunities' ? { ...n, status: 'complete' as const } : n
           ))
+          addActivity('Debrief & Opportunities ready', 'ai')
         }
       } catch (err) {
         console.error('Failed to load debrief/opportunities:', err)
+        addActivity('Analysis failed — check connection', 'ai')
         if (!cancel) setLoading(false)
       }
     })()
@@ -219,6 +318,7 @@ export default function CanvasWorkflow() {
     console.log('[Narrative] Starting narrative generation...')
     setNarrativeGenerated(true)
     setNarrativeLoading(true)
+    addActivity('Generating Narrative structure…', 'ai')
     ;(async () => {
       try {
         // Build graph with selected opportunities
@@ -239,11 +339,27 @@ export default function CanvasWorkflow() {
         if (!cancel) {
           setNarrative(narrativeResult)
           setNarrativeLoading(false)
+          // Persist minimal narrative blocks for exports and other views
+          try {
+            const pid = (localStorage.getItem('activeProjectId') || 'local')
+            const blocks = Array.isArray((narrativeResult as any).blocks)
+              ? (narrativeResult as any).blocks
+              : [{ key: 'narrative', content: (narrativeResult as any).text || '' }]
+            localStorage.setItem(`nf:${pid}`, JSON.stringify(blocks))
+          } catch {}
+          // Save narrative snapshot to project DB version history
+          try {
+            const pid = localStorage.getItem('activeProjectId')
+            if (pid && /^[0-9a-f\-]{36}$/i.test(pid)) {
+              await api.saveVersion(pid, { summary: concept, narrative: (narrativeResult as any).text || '', changeSummary: 'Narrative generated' })
+            }
+          } catch {}
           // Mark narrative node as complete
           setNodes(prev => prev.map(n =>
             n.id === 'narrative' ? { ...n, status: 'complete' as const } : n
           ))
           console.log('[Narrative] Generation complete')
+          addActivity('Narrative structure ready', 'ai')
         }
       } catch (err) {
         console.error('[Narrative] Failed to generate narrative:', err)
@@ -251,6 +367,7 @@ export default function CanvasWorkflow() {
           setNarrativeLoading(false)
           setNarrativeGenerated(false) // Reset so it can retry
         }
+        addActivity('Narrative generation failed — try again', 'ai')
       }
     })()
 
@@ -341,6 +458,25 @@ export default function CanvasWorkflow() {
   const handleFileUpload = async (files: FileList | File[]) => {
     try {
       console.log('[CanvasWorkflow] Starting file upload:', files.length, 'files')
+      // Ensure server project before uploading so assets associate correctly
+      let projectId: string | null = null
+      try { projectId = localStorage.getItem('activeProjectId') } catch {}
+      const isValidUUID = projectId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)
+      if (!isValidUUID) {
+        try {
+          const created = await api.createPublicProject({ concept: concept || 'Untitled Project', graph: snapshot(), focusId: null })
+          if (created && created.id && typeof created.id === 'string') {
+            localStorage.setItem('activeProjectId', created.id)
+            addActivity('Project created on server for uploads', 'project')
+          }
+        } catch (e) {
+          console.warn('[CanvasWorkflow] Could not create server project before upload; proceeding local')
+          if (!projectId || !projectId.startsWith('local-')) {
+            const localId = `local-${Date.now()}`
+            try { localStorage.setItem('activeProjectId', localId) } catch {}
+          }
+        }
+      }
       await addFiles(Array.from(files))
       console.log('[CanvasWorkflow] File upload successful')
       // Reset file input
@@ -522,13 +658,29 @@ export default function CanvasWorkflow() {
     }
 
     if (node.id === 'rkb') {
+      const trendsCount = (trendNodes || []).filter((n: any) => n.kind === 'trend').length
+      const creatorsCount = (trendNodes || []).filter((n: any) => n.kind === 'creator').length
+      const projectCount = processed.length
       return (
         <div className="space-y-2 text-xs">
-          <div className="text-white/70 leading-relaxed text-[11px]">
-            Ralph Knowledge Base connected
-          </div>
+          <div className="text-white/70 leading-relaxed text-[11px]">Ralph Knowledge Base connected</div>
           <div className="text-white/50 text-[10px]">
-            186 assets • Cultural insights • Trend data
+            Project context: {projectCount} item{projectCount === 1 ? '' : 's'} • Live Trends: {trendsCount} trends • {creatorsCount} creators
+          </div>
+          {(loading || narrativeLoading) && (
+            <div className="text-white/60 text-[10px] animate-pulse">Evaluating context and composing insights…</div>
+          )}
+          <div className="panel p-2 bg-white/5 border border-white/10 max-h-28 overflow-auto space-y-1">
+            {rkbActivity.length === 0 ? (
+              <div className="text-white/40 text-[10px]">No recent activity</div>
+            ) : (
+              rkbActivity.slice(0, 8).map((a) => (
+                <div key={a.id} className="flex items-center gap-2 text-[10px]">
+                  <span className={`w-1.5 h-1.5 rounded-full ${a.kind === 'ai' ? 'bg-ralph-cyan' : a.kind === 'project' ? 'bg-ralph-pink' : 'bg-white/40'}`} />
+                  <span className="text-white/70">{a.text}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )
@@ -589,6 +741,13 @@ export default function CanvasWorkflow() {
                 <div className="text-white/70 font-medium mb-2 text-[11px]">DEBRIEF</div>
                 <div className="text-white/80 text-[11px] leading-relaxed mb-2">{debrief.brief}</div>
                 <div className="text-white/60 text-[10px] leading-relaxed mb-2">{debrief.summary}</div>
+
+                {/* Used Sources Summary */}
+                <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
+                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">RKB: {(debrief?.sources?.core || []).length}</span>
+                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Project: {(debrief?.sources?.project || []).length}</span>
+                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Live Trends: {(debrief?.sources?.live || []).length}</span>
+                </div>
 
                 {/* Key Points */}
                 {debrief.keyPoints && debrief.keyPoints.length > 0 && (
@@ -765,6 +924,12 @@ export default function CanvasWorkflow() {
               {/* Narrative Content */}
               <div className="panel p-3 bg-white/5">
                 <div className="text-white/70 font-medium mb-2 text-[11px]">NARRATIVE STRUCTURE</div>
+                {/* Used Sources Summary (derived from Debrief) */}
+                <div className="mb-2 flex flex-wrap gap-2 text-[10px]">
+                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">RKB: {(debrief?.sources?.core || []).length}</span>
+                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Project: {(debrief?.sources?.project || []).length}</span>
+                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Live Trends: {(debrief?.sources?.live || []).length}</span>
+                </div>
                 <div className="text-white/80 text-[10px] leading-relaxed whitespace-pre-wrap">
                   {narrative.text}
                 </div>
