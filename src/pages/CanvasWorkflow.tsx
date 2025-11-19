@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Canvas from '../components/Canvas/Canvas'
 import { NodeData } from '../components/Canvas/Node'
-import FloatingAssistant from '../components/Canvas/FloatingAssistant'
 import { useDashboard } from '../context/DashboardContext'
 import { useTrends } from '../context/TrendContext'
 import { useUpload } from '../context/UploadContext'
@@ -18,10 +17,16 @@ function renderMarkdown(md: string): string {
   let text = esc(md)
   // Headings ###
   text = text.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>')
+  // Numbered sections like `1. Title:` -> <h4>Title</h4>
+  text = text.replace(/^\s*\d+\.\s+([^:\n]+):/gm, '<h4>$1</h4>')
+  // Subsection labels like `Content Pillars:` or `Story Arc:` -> <h5>
+  text = text.replace(/^\s*([A-Z][A-Za-z ]+):$/gm, '<h5>$1</h5>')
   // Bold **text**
   text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
   // Bullet lists: lines starting with - or *
   text = text.replace(/^(?:- |\* )(.*)$/gm, '<li>$1</li>')
+  // Lines that look like `Label: content` into paragraph with strong label
+  text = text.replace(/^([A-Za-z][^:\n]{0,40}):\s+(.*)$/gm, '<p><strong>$1:</strong> $2</p>')
   // Wrap consecutive <li> blocks into <ul>
   text = text.replace(/(?:<li>[^<]*<\/li>\n?)+/g, (m) => `<ul>${m}\n</ul>`) 
   // Paragraphs: double newlines
@@ -29,20 +34,36 @@ function renderMarkdown(md: string): string {
   return `<p>${text}</p>`
 }
 
-function signalFromSources(sources: any): { score: number; label: 'Low'|'Medium'|'High'; color: string } {
-  try {
-    const pc = Array.isArray(sources?.project) ? sources.project.length : 0
-    const cc = Array.isArray(sources?.core) ? sources.core.length : 0
-    const lc = Array.isArray(sources?.live) ? sources.live.length : 0
-    const pr = Array.isArray(sources?.predictive) ? sources.predictive.length : 0
-    // Weighted signal score emphasizing project + core
-    const raw = pc * 3 + cc * 2 + lc * 1 + pr * 1
-    const score = Math.max(0, Math.min(10, raw))
-    const label: 'Low'|'Medium'|'High' = score >= 7 ? 'High' : score >= 4 ? 'Medium' : 'Low'
-    const color = label === 'High' ? 'text-emerald-400' : label === 'Medium' ? 'text-amber-400' : 'text-red-400'
-    return { score, label, color }
-  } catch { return { score: 0, label: 'Low', color: 'text-red-400' } }
+// Attempt to split narrative into panelized sections based on numbered headings like:
+// 1. Opening Hook and Why Now:
+function extractNarrativeSections(text: string): { header?: string; sections: { title: string; body: string }[] } {
+  const lines = (text || '').split(/\r?\n/)
+  const sections: { title: string; body: string }[] = []
+  let header: string | undefined
+  let currentTitle: string | null = null
+  let currentBody: string[] = []
+
+  const numbered = /^\s*\d+\.\s+([^:\n]+):\s*$/
+  const h3 = /^\s*#+\s+(.*)$/
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const h3m = line.match(h3)
+    if (!header && h3m) { header = h3m[1].trim(); continue }
+    const m = line.match(numbered)
+    if (m) {
+      if (currentTitle) sections.push({ title: currentTitle, body: currentBody.join('\n').trim() })
+      currentTitle = m[1].trim()
+      currentBody = []
+    } else {
+      if (currentTitle) currentBody.push(line)
+    }
+  }
+  if (currentTitle) sections.push({ title: currentTitle, body: currentBody.join('\n').trim() })
+  return { header, sections }
 }
+
+// removed signal strength UI
 function ScoreBar({ label, value }: { label: string; value: number }) {
   const v = Math.max(0, Math.min(100, Math.round(value)))
   return (
@@ -159,6 +180,7 @@ export default function CanvasWorkflow() {
   const [scores, setScores] = useState<{ narrative?: number; ttpWeeks?: number; cross?: number; commercial?: number; overall?: number } | null>(null)
   const [enhancements, setEnhancements] = useState<{ text: string; target?: string; deltas?: { narrative?: number; ttp?: number; cross?: number; commercial?: number } }[]>([])
   const [selectedEnhancements, setSelectedEnhancements] = useState<Set<number>>(new Set())
+  const [scoringError, setScoringError] = useState<string | null>(null)
 
   // Track if nodes have been stacked to avoid infinite loops
   const [nodesStacked, setNodesStacked] = useState(false)
@@ -166,6 +188,13 @@ export default function CanvasWorkflow() {
   const [narrativeRefreshRequested, setNarrativeRefreshRequested] = useState(false)
   const debriefRefreshInFlight = useRef(false)
   const narrativeInFlight = useRef(false)
+
+  // Narrative cache scoping: track signature of selection+persona+region to avoid stale rehydrate
+  const selectionSig = JSON.stringify({
+    sel: Array.from(selectedOpportunities).sort(),
+    persona,
+    region,
+  })
 
   // Initialize nodes with smart auto-layout
   useEffect(() => {
@@ -486,7 +515,9 @@ export default function CanvasWorkflow() {
             const blocks = Array.isArray((narrativeResult as any).blocks)
               ? (narrativeResult as any).blocks
               : [{ key: 'narrative', content: (narrativeResult as any).text || '' }]
-            localStorage.setItem(`nf:${pid}`, JSON.stringify(blocks))
+            const key = `nf:${pid}:${selectionSig}`
+            localStorage.setItem('nfkey:'+pid, key)
+            localStorage.setItem(key, JSON.stringify(blocks))
           } catch {}
           // Save narrative snapshot to project DB version history
           try {
@@ -521,8 +552,12 @@ export default function CanvasWorkflow() {
     const pid = (() => { try { return localStorage.getItem('activeProjectId') || 'local' } catch { return 'local' } })()
     if (narrativeLoading) return
     if (narrative) return
+    // Only rehydrate when we have a matching selection signature key and no in-flight generation
+    if (narrativeInFlight.current) return
     try {
-      const blocks = JSON.parse(localStorage.getItem(`nf:${pid}`) || 'null') as any[] | null
+      const key = localStorage.getItem('nfkey:'+pid)
+      if (!key || !key.endsWith(selectionSig)) return
+      const blocks = JSON.parse(localStorage.getItem(key) || 'null') as any[] | null
       if (blocks && Array.isArray(blocks) && blocks.length) {
         const text = blocks.map(b => (b && (b.content || b.text) || '')).filter(Boolean).join('\n\n')
         if (text && text.length > 0) {
@@ -532,36 +567,35 @@ export default function CanvasWorkflow() {
         }
       }
     } catch {}
-  }, [debriefAccepted, narrativeLoading, narrative, nodes.some(n => n.id === 'narrative')])
+  }, [debriefAccepted, narrativeLoading, narrative, nodes.some(n => n.id === 'narrative'), selectionSig])
 
   // Step 3: Add Scoring & Enhancements ONLY after narrative is approved
   useEffect(() => {
     if (!narrativeApproved || nodes.find(n => n.id === 'scoring')) return
-
-    setNodes(prev => [
-      ...prev,
-      // Scoring & Enhancements node
-      {
-        id: 'scoring',
-        type: 'ai-content',
-        title: 'Scoring & Enhancements',
-        x: 1500,
-        y: 100,
-        width: 450,
-        height: 550,
-        minimized: false,
-        zIndex: 4,
-        status: 'processing',
-        connectedTo: ['narrative', 'rkb']
-      }
-    ])
-
-    // Mark as complete after 3 seconds (TODO: integrate real API)
-    setTimeout(() => {
-      setNodes(prev => prev.map(n =>
-        n.id === 'scoring' ? { ...n, status: 'complete' as const } : n
-      ))
-    }, 3000)
+    // Add scoring and tidy/minimize to ensure in‑view
+    setNodes(prev => {
+      const updated = prev.map(n => {
+        if (n.id === 'debrief-opportunities') return { ...n, minimized: true }
+        if (n.id === 'narrative') return { ...n, minimized: true, x: 900, y: 100 }
+        return n
+      })
+      return [
+        ...updated,
+        {
+          id: 'scoring',
+          type: 'ai-content',
+          title: 'Scoring & Enhancements',
+          x: 1200,
+          y: 100,
+          width: 450,
+          height: 550,
+          minimized: false,
+          zIndex: 5,
+          status: 'processing' as NodeData['status'],
+          connectedTo: ['narrative', 'rkb']
+        }
+      ]
+    })
   }, [narrativeApproved, nodes])
 
   // Auto‑tidy when scoring appears and load data
@@ -588,9 +622,13 @@ export default function CanvasWorkflow() {
           setScores(sc || null)
           const list = Array.isArray(eh?.suggestions) ? eh.suggestions : []
           setEnhancements(list)
+          setScoringError(null)
           setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
-        } catch {
-          if (!cancel) setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
+        } catch (err) {
+          if (!cancel) {
+            setScoringError('Could not fetch scores (CORS blocked or network error).')
+            setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
+          }
         }
       })()
       return () => { cancel = true }
@@ -990,21 +1028,7 @@ export default function CanvasWorkflow() {
                     <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Used Project: {(debrief?.sources?.project || []).length}</span>
                     <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Used Live Trends: {(debrief?.sources?.live || []).length}</span>
                   </div>
-                  {/* Signal strength */}
-                  {(() => {
-                    const sig = signalFromSources(debrief?.sources)
-                    return (
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className={`text-[10px] ${sig.color} font-medium flex items-center gap-1`}>
-                          <span className={`inline-block w-1.5 h-1.5 rounded-full ${sig.label==='High'?'bg-emerald-400':sig.label==='Medium'?'bg-amber-400':'bg-red-400'}`} />
-                          Signal Strength: {sig.label}
-                        </div>
-                        <div className="flex-1 h-1.5 rounded bg-white/10 overflow-hidden max-w-[160px]">
-                          <div className={`h-1.5 ${sig.label==='High'?'bg-emerald-500':sig.label==='Medium'?'bg-amber-400':'bg-red-400'}`} style={{ width: `${sig.score*10}%` }} />
-                        </div>
-                      </div>
-                    )
-                  })()}
+                  {/* Removed signal strength UI per feedback */}
                 </div>
 
                 {/* Key Points */}
@@ -1189,32 +1213,43 @@ export default function CanvasWorkflow() {
             <BrandSpinner text="Composing narrative structure with selected opportunities…" />
           ) : (
             <>
-              {/* Narrative Content */}
-              <div className="panel p-3 bg-white/5">
-                <div className="text-white/70 font-medium mb-2 text-[11px]">NARRATIVE STRUCTURE</div>
-                {/* Used Sources Summary (derived from Debrief) */}
-                <div className="mb-2 flex flex-wrap gap-2 text-[10px]">
-                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">RKB: {(debrief?.sources?.core || []).length}</span>
-                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Project: {(debrief?.sources?.project || []).length}</span>
-                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Live Trends: {(debrief?.sources?.live || []).length}</span>
-                </div>
-                {/* Signal strength (same model) */}
-                {(() => {
-                  const sig = signalFromSources(debrief?.sources)
+              {/* Narrative Content (panelized) */}
+              {(() => {
+                const parsed = extractNarrativeSections(narrative.text || '')
+                if (!parsed.sections.length) {
                   return (
-                    <div className="mb-2 flex items-center gap-2">
-                      <div className={`text-[10px] ${sig.color} font-medium flex items-center gap-1`}>
-                        <span className={`inline-block w-1.5 h-1.5 rounded-full ${sig.label==='High'?'bg-emerald-400':sig.label==='Medium'?'bg-amber-400':'bg-red-400'}`} />
-                        Signal Strength: {sig.label}
+                    <div className="panel p-3 bg-white/5">
+                      <div className="text-white/70 font-medium mb-2 text-[11px]">NARRATIVE STRUCTURE</div>
+                      <div className="mb-2 flex flex-wrap gap-2 text-[10px]">
+                        <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">RKB: {(debrief?.sources?.core || []).length}</span>
+                        <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Project: {(debrief?.sources?.project || []).length}</span>
+                        <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Live Trends: {(debrief?.sources?.live || []).length}</span>
                       </div>
-                      <div className="flex-1 h-1.5 rounded bg-white/10 overflow-hidden max-w-[160px]">
-                        <div className={`h-1.5 ${sig.label==='High'?'bg-emerald-500':sig.label==='Medium'?'bg-amber-400':'bg-red-400'}`} style={{ width: `${sig.score*10}%` }} />
-                      </div>
+                      <div className="prose prose-invert max-w-none text-[10px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(narrative.text) }} />
                     </div>
                   )
-                })()}
-                <div className="prose prose-invert max-w-none text-[10px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(narrative.text) }} />
-              </div>
+                }
+                return (
+                  <div className="space-y-3">
+                    {parsed.header && (
+                      <div className="panel p-3 bg-white/5">
+                        <div className="text-white/70 font-semibold mb-2 text-[11px]">{parsed.header}</div>
+                        <div className="mb-2 flex flex-wrap gap-2 text-[10px]">
+                          <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">RKB: {(debrief?.sources?.core || []).length}</span>
+                          <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Project: {(debrief?.sources?.project || []).length}</span>
+                          <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Live Trends: {(debrief?.sources?.live || []).length}</span>
+                        </div>
+                      </div>
+                    )}
+                    {parsed.sections.map((sec, i) => (
+                      <div key={i} className="panel p-3 bg-white/5">
+                        <div className="text-white/80 font-medium mb-1 text-[11px]">{sec.title}</div>
+                        <div className="prose prose-invert max-w-none text-[10px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(sec.body) }} />
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
 
               {/* Show selected opportunities that were integrated */}
               {selectedOpportunities.size > 0 && (
@@ -1307,6 +1342,11 @@ export default function CanvasWorkflow() {
             <>
               <div className="panel p-2 bg-white/5">
                 <div className="text-white/70 font-medium mb-2 text-[11px]">CAMPAIGN SCORING</div>
+                {scoringError && (
+                  <div className="mb-2 text-[10px] text-amber-300 bg-amber-500/10 border border-amber-400/30 rounded px-2 py-1">
+                    {scoringError}
+                  </div>
+                )}
                 <ScoreBar label="Cultural Relevance" value={scores?.narrative ?? 0} />
                 <ScoreBar label="Engagement Potential" value={scores?.cross ?? 0} />
                 <ScoreBar label="Platform Fit" value={scores?.ttpWeeks ? Math.max(0, 100 - (scores.ttpWeeks-1)*12) : 0} />
@@ -1362,10 +1402,67 @@ export default function CanvasWorkflow() {
                       setScores(sc || null)
                     } catch {}
                     setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
+
+                    // Add Concept + Creators node
+                    setNodes(prev => {
+                      if (prev.find(n => n.id === 'concept-creators')) return prev
+                      return [...prev, {
+                        id: 'concept-creators',
+                        type: 'ai-content',
+                        title: 'Concept + Creators',
+                        x: 1650,
+                        y: 100,
+                        width: 450,
+                        height: 520,
+                        minimized: false,
+                        zIndex: 6,
+                        status: 'processing' as NodeData['status'],
+                        connectedTo: ['scoring']
+                      }]
+                    })
+                    try {
+                      const rec = await api.recommendations(concept, { nodes: [], links: [] }, { persona, region })
+                      setConceptCreators(Array.isArray((rec as any)?.creators) ? (rec as any).creators : [])
+                    } catch {
+                      setConceptCreators([])
+                    }
+                    setNodes(prev => prev.map(n => n.id === 'concept-creators' ? { ...n, status: 'active' as NodeData['status'] } : n))
                   }}
                 >
                   Apply Enhancements
                 </button>
+              </div>
+            </>
+          )}
+        </div>
+      )
+    }
+
+    if (node.id === 'concept-creators') {
+      return (
+        <div className="space-y-3 text-xs max-h-full overflow-auto">
+          {node.status === 'processing' ? (
+            <BrandSpinner text="Assembling concept + matching creators…" />
+          ) : (
+            <>
+              <div className="panel p-2 bg-white/5">
+                <div className="text-white/70 font-medium mb-2 text-[11px]">CONCEPT SUMMARY</div>
+                <div className="text-white/80 text-[10px] leading-relaxed">{concept}</div>
+              </div>
+              <div className="panel p-2 bg-white/5">
+                <div className="text-white/70 font-medium mb-2 text-[11px]">RECOMMENDED CREATORS</div>
+                {Array.isArray(conceptCreators) && conceptCreators.length > 0 ? (
+                  <div className="space-y-2">
+                    {conceptCreators.slice(0,8).map((c: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between bg-white/5 rounded px-2 py-1">
+                        <div className="text-white/80 text-[10px]">{c.name || c.handle || 'Creator'}</div>
+                        <div className="text-white/50 text-[9px]">{c.platform || ''}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-white/60 text-[10px]">No recommendations available.</div>
+                )}
               </div>
             </>
           )}
@@ -1458,8 +1555,7 @@ export default function CanvasWorkflow() {
       {/* Canvas with Nodes */}
       <Canvas nodes={nodes} onNodesChange={setNodes} renderNodeContent={renderNodeContent} />
 
-      {/* Floating RalphBot Assistant */}
-      <FloatingAssistant />
+      {/* Floating assistant removed per new UX */}
     </div>
   )
 }
