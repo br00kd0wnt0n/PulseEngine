@@ -119,9 +119,9 @@ Return ONLY valid JSON. Make every field specific to "${concept}" and grounded i
         } catch {}
       } catch {}
     }
-    // If strict mode, avoid heuristic placeholders and return minimal output when insufficient signal
+    // If strict mode, avoid heuristic placeholders when there is insufficient signal only
     const noContextSignal = (!ctx.projectContent?.length && !ctx.coreKnowledge?.length && !ctx.liveMetrics?.length && !ctx.predictiveTrends?.length)
-    if (STRICT_AI_ONLY || (concept.trim().length < 8 && noContextSignal)) {
+    if ((STRICT_AI_ONLY && noContextSignal) || (concept.trim().length < 8 && noContextSignal)) {
       const minimal = {
         brief: '',
         summary: '',
@@ -243,9 +243,9 @@ Return ONLY valid JSON: { opportunities: [{ title, why, impact }], rationale }`
         } catch {}
       } catch {}
     }
-    // If strict mode, avoid heuristic placeholders and return minimal output when insufficient signal
+    // If strict mode, avoid heuristic placeholders when there is insufficient signal only
     const noContextSignal = (!ctx.projectContent?.length && !ctx.coreKnowledge?.length && !ctx.liveMetrics?.length && !ctx.predictiveTrends?.length)
-    if (STRICT_AI_ONLY || (concept.trim().length < 8 && noContextSignal)) {
+    if ((STRICT_AI_ONLY && noContextSignal) || (concept.trim().length < 8 && noContextSignal)) {
       const minimal = { opportunities: [], rationale: '', sources: ctx.sources }
       await cacheSet(cacheKey, minimal)
       return minimal

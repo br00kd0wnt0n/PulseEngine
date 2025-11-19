@@ -8,6 +8,41 @@ import { useUpload } from '../context/UploadContext'
 import { api } from '../services/api'
 import { CitationToken } from '../components/shared/CitationOverlay'
 import BrandSpinner from '../components/shared/BrandSpinner'
+
+function renderMarkdown(md: string): string {
+  // Basic safe renderer: escape HTML, then apply minimal markdown transforms
+  const esc = (s: string) => s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+  let text = esc(md)
+  // Headings ###
+  text = text.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>')
+  // Bold **text**
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+  // Bullet lists: lines starting with - or *
+  text = text.replace(/^(?:- |\* )(.*)$/gm, '<li>$1</li>')
+  // Wrap consecutive <li> blocks into <ul>
+  text = text.replace(/(?:<li>[^<]*<\/li>\n?)+/g, (m) => `<ul>${m}\n</ul>`) 
+  // Paragraphs: double newlines
+  text = text.replace(/\n\n+/g, '</p><p>')
+  return `<p>${text}</p>`
+}
+
+function signalFromSources(sources: any): { score: number; label: 'Low'|'Medium'|'High'; color: string } {
+  try {
+    const pc = Array.isArray(sources?.project) ? sources.project.length : 0
+    const cc = Array.isArray(sources?.core) ? sources.core.length : 0
+    const lc = Array.isArray(sources?.live) ? sources.live.length : 0
+    const pr = Array.isArray(sources?.predictive) ? sources.predictive.length : 0
+    // Weighted signal score emphasizing project + core
+    const raw = pc * 3 + cc * 2 + lc * 1 + pr * 1
+    const score = Math.max(0, Math.min(10, raw))
+    const label: 'Low'|'Medium'|'High' = score >= 7 ? 'High' : score >= 4 ? 'Medium' : 'Low'
+    const color = label === 'High' ? 'text-emerald-400' : label === 'Medium' ? 'text-amber-400' : 'text-red-400'
+    return { score, label, color }
+  } catch { return { score: 0, label: 'Low', color: 'text-red-400' } }
+}
 function ScoreBar({ label, value }: { label: string; value: number }) {
   const v = Math.max(0, Math.min(100, Math.round(value)))
   return (
@@ -955,6 +990,21 @@ export default function CanvasWorkflow() {
                     <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Used Project: {(debrief?.sources?.project || []).length}</span>
                     <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Used Live Trends: {(debrief?.sources?.live || []).length}</span>
                   </div>
+                  {/* Signal strength */}
+                  {(() => {
+                    const sig = signalFromSources(debrief?.sources)
+                    return (
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className={`text-[10px] ${sig.color} font-medium flex items-center gap-1`}>
+                          <span className={`inline-block w-1.5 h-1.5 rounded-full ${sig.label==='High'?'bg-emerald-400':sig.label==='Medium'?'bg-amber-400':'bg-red-400'}`} />
+                          Signal Strength: {sig.label}
+                        </div>
+                        <div className="flex-1 h-1.5 rounded bg-white/10 overflow-hidden max-w-[160px]">
+                          <div className={`h-1.5 ${sig.label==='High'?'bg-emerald-500':sig.label==='Medium'?'bg-amber-400':'bg-red-400'}`} style={{ width: `${sig.score*10}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
 
                 {/* Key Points */}
@@ -1148,7 +1198,22 @@ export default function CanvasWorkflow() {
                   <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Project: {(debrief?.sources?.project || []).length}</span>
                   <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Live Trends: {(debrief?.sources?.live || []).length}</span>
                 </div>
-                <div className="prose prose-invert max-w-none"><div className="text-white/80 text-[10px] leading-relaxed whitespace-pre-wrap">{narrative.text}</div></div>
+                {/* Signal strength (same model) */}
+                {(() => {
+                  const sig = signalFromSources(debrief?.sources)
+                  return (
+                    <div className="mb-2 flex items-center gap-2">
+                      <div className={`text-[10px] ${sig.color} font-medium flex items-center gap-1`}>
+                        <span className={`inline-block w-1.5 h-1.5 rounded-full ${sig.label==='High'?'bg-emerald-400':sig.label==='Medium'?'bg-amber-400':'bg-red-400'}`} />
+                        Signal Strength: {sig.label}
+                      </div>
+                      <div className="flex-1 h-1.5 rounded bg-white/10 overflow-hidden max-w-[160px]">
+                        <div className={`h-1.5 ${sig.label==='High'?'bg-emerald-500':sig.label==='Medium'?'bg-amber-400':'bg-red-400'}`} style={{ width: `${sig.score*10}%` }} />
+                      </div>
+                    </div>
+                  )
+                })()}
+                <div className="prose prose-invert max-w-none text-[10px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(narrative.text) }} />
               </div>
 
               {/* Show selected opportunities that were integrated */}
@@ -1280,11 +1345,17 @@ export default function CanvasWorkflow() {
                   onClick={async (e) => {
                     e.stopPropagation()
                     if (!narrative) return
-                    const applied = enhancements.filter((_, i) => selectedEnhancements.has(i))
+                    const applied = enhancements.filter((_, i) => selectedEnhancements.has(i)).map(a => a.text)
                     if (applied.length === 0) return
-                    const extra = '\n\n---\n\nApplied Enhancements:\n' + applied.map(a => '- ' + a.text).join('\n')
-                    setNarrative({ text: narrative.text + extra })
                     setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'processing' as NodeData['status'] } : n))
+                    try {
+                      const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
+                      const rewritten = await api.applyEnhancements(concept, narrative.text, applied, { persona, region, projectId: pid })
+                      if (rewritten && rewritten.text) setNarrative({ text: rewritten.text })
+                    } catch {
+                      const extra = '\n\n---\n\nApplied Enhancements:\n' + applied.map(a => '- ' + a).join('\n')
+                      setNarrative({ text: (narrative?.text || '') + extra })
+                    }
                     try {
                       const graph: any = { concept, persona, region, debrief: debrief?.brief }
                       const sc = await api.score(concept, graph, { persona, region })

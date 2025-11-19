@@ -88,7 +88,7 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
   return (
     <div
       ref={nodeRef}
-      className={`absolute rounded-lg border-2 backdrop-blur-sm transition-all ${nodeColor}${activeGlow}`}
+      className={`absolute rounded-lg border-2 backdrop-blur-sm transition-all duration-500 ease-out transform-gpu ${nodeColor}${activeGlow}`}
       style={{
         left: data.x,
         top: data.y,

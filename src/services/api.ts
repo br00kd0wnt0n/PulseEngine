@@ -44,6 +44,10 @@ export const api = {
     '/ai/concept-proposal',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, narrativeBlocks, recommendedCreators, ...(opts||{}) }) }
   ),
+  applyEnhancements: (concept: string, narrative: string, enhancements: string[], opts?: { persona?: string; region?: string; projectId?: string }) => request<{ text: string }>(
+    '/ai/rewrite-narrative',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, narrative, enhancements, ...(opts||{}) }) }
+  ),
   createProject: (payload: { concept: string; persona?: string; platforms?: string[]; areasOfInterest?: string[]; graph?: any; focusId?: string | null }) =>
     request<any>('/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
   createPublicProject: (payload: any) =>
