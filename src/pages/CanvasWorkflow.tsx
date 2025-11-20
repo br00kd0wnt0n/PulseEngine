@@ -66,6 +66,25 @@ function extractNarrativeSections(text: string): { header?: string; sections: { 
   return { header, sections }
 }
 
+function cleanSectionBody(body: string, title: string): string {
+  const lines = (body || '').split(/\r?\n/)
+  const cleaned: string[] = []
+  const norm = (s: string) => s.replace(/\*+/g, '').replace(/[:\s]+$/,'').trim().toLowerCase()
+  const titleNorm = norm(title)
+  for (let i=0;i<lines.length;i++) {
+    const l = lines[i]
+    const trimmed = l.trim()
+    // drop standalone numbers or bullets that are just residual section numbers
+    if (/^\d+$/.test(trimmed)) continue
+    // drop bold heading line that repeats the title
+    if ((/^\*\*.*\*\*$/.test(trimmed) || /^#+\s+/.test(trimmed)) && norm(trimmed.replace(/^#+\s+/, '').replace(/^\*\*|\*\*$/g,'')) === titleNorm) {
+      continue
+    }
+    cleaned.push(l)
+  }
+  return cleaned.join('\n')
+}
+
 // removed signal strength UI
 function ScoreBar({ label, value }: { label: string; value: number }) {
   const v = Math.max(0, Math.min(100, Math.round(value)))
@@ -97,6 +116,10 @@ export default function CanvasWorkflow() {
   const addActivity = (text: string, kind?: 'rkb'|'project'|'trends'|'ai') => {
     setRkbActivity(prev => [{ id: Date.now(), text, kind }, ...prev].slice(0, 20))
   }
+
+  const [wildIdeas, setWildIdeas] = useState<any[] | null>(null)
+  const [wildSources, setWildSources] = useState<string[] | null>(null)
+  const [wildLoading, setWildLoading] = useState<boolean>(false)
 
   function focusBrief() {
     setNodes(prev => {
@@ -1215,11 +1238,6 @@ export default function CanvasWorkflow() {
                   return (
                     <div className="panel p-3 bg-white/5">
                       <div className="text-white/70 font-medium mb-2 text-[11px]">NARRATIVE STRUCTURE</div>
-                      <div className="mb-2 flex flex-wrap gap-2 text-[10px]">
-                        <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">RKB: {(debrief?.sources?.core || []).length}</span>
-                        <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Project: {(debrief?.sources?.project || []).length}</span>
-                        <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Live Trends: {(debrief?.sources?.live || []).length}</span>
-                      </div>
                       <div className="prose prose-invert max-w-none text-[10px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(narrative.text) }} />
                     </div>
                   )
@@ -1229,17 +1247,12 @@ export default function CanvasWorkflow() {
                     {parsed.header && (
                       <div className="panel p-3 bg-white/5">
                         <div className="text-white/70 font-semibold mb-2 text-[11px]">{parsed.header}</div>
-                        <div className="mb-2 flex flex-wrap gap-2 text-[10px]">
-                          <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">RKB: {(debrief?.sources?.core || []).length}</span>
-                          <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Project: {(debrief?.sources?.project || []).length}</span>
-                          <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">Live Trends: {(debrief?.sources?.live || []).length}</span>
-                        </div>
                       </div>
                     )}
                     {parsed.sections.map((sec, i) => (
                       <div key={i} className="panel p-3 bg-white/5">
                         <div className="text-white/80 font-medium mb-1 text-[11px]">{sec.title}</div>
-                        <div className="prose prose-invert max-w-none text-[10px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(sec.body) }} />
+                        <div className="prose prose-invert max-w-none text-[10px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(cleanSectionBody(sec.body, sec.title)) }} />
                       </div>
                     ))}
                   </div>
@@ -1442,6 +1455,52 @@ export default function CanvasWorkflow() {
                 >
                   Apply Enhancements
                 </button>
+                <button
+                  className="mt-2 w-full px-3 py-2 rounded border border-ralph-teal/40 bg-ralph-teal/20 hover:bg-ralph-teal/30 text-xs font-medium"
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    // spawn wildcard node minimized
+                    setNodes(prev => {
+                      if (prev.find(n => n.id === 'wildcard')) return prev.map(n => n.id === 'wildcard' ? { ...n, minimized: true, status: 'processing' as NodeData['status'] } : n)
+                      return [
+                        ...prev,
+                        {
+                          id: 'wildcard',
+                          type: 'wildcard',
+                          title: 'Wildcard Insight',
+                          x: 1400,
+                          y: 680,
+                          width: 450,
+                          height: 360,
+                          minimized: true,
+                          zIndex: 6,
+                          status: 'processing' as NodeData['status'],
+                          connectedTo: ['scoring', 'rkb']
+                        }
+                      ]
+                    })
+                    try {
+                      setWildLoading(true)
+                      const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
+                      const baseline = [debrief?.brief || '', narrative?.text || ''].filter(Boolean).join('\n\n')
+                      const resp = await api.wildcard(concept, { persona, region, projectId: pid, baseline })
+                      const ideas = Array.isArray(resp?.ideas) ? resp.ideas : []
+                      const sources = Array.isArray((resp as any)?.sourcesUsed) ? (resp as any).sourcesUsed : []
+                      setWildIdeas(ideas)
+                      setWildSources(sources)
+                      try { if (pid) localStorage.setItem(`wild:${pid}`, JSON.stringify({ ts: Date.now(), ideas, sources })) } catch {}
+                      setNodes(prev => prev.map(n => n.id === 'wildcard' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n))
+                      addActivity('Rolled Wildcard insight', 'ai')
+                    } catch (err) {
+                      setWildIdeas([])
+                      setNodes(prev => prev.map(n => n.id === 'wildcard' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n))
+                    } finally {
+                      setWildLoading(false)
+                    }
+                  }}
+                >
+                  Roll Wildcard
+                </button>
               </div>
             </>
           )}
@@ -1466,6 +1525,114 @@ export default function CanvasWorkflow() {
       )
     }
 
+    if (node.id === 'wildcard') {
+      return (
+        <div className="space-y-3 text-xs max-h-full overflow-auto">
+          {node.status === 'processing' || wildLoading ? (
+            <BrandSpinner text="Hunting for contrarian insight…" />
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <div className="text-white/70 font-medium text-[11px]">WILDCARD INSIGHT</div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 hover:bg-white/10"
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      try {
+                        setWildLoading(true)
+                        const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
+                        const baseline = [debrief?.brief || '', narrative?.text || ''].filter(Boolean).join('\n\n')
+                        const resp = await api.wildcard(concept, { persona, region, projectId: pid, baseline })
+                        const ideas = Array.isArray(resp?.ideas) ? resp.ideas : []
+                        const sources = Array.isArray((resp as any)?.sourcesUsed) ? (resp as any).sourcesUsed : []
+                        setWildIdeas(ideas)
+                        setWildSources(sources)
+                        try { if (pid) localStorage.setItem(`wild:${pid}`, JSON.stringify({ ts: Date.now(), ideas, sources })) } catch {}
+                        addActivity('Regenerated Wildcard insight', 'ai')
+                      } catch {
+                        setWildIdeas([])
+                      } finally {
+                        setWildLoading(false)
+                      }
+                    }}
+                  >Regenerate</button>
+                </div>
+              </div>
+              {(Array.isArray(wildIdeas) && wildIdeas.length > 0) ? (
+                <div className="space-y-3">
+                  {wildIdeas.map((idea: any, idx: number) => (
+                    <div key={idx} className="panel p-2 bg-white/5">
+                      <div className="text-white/90 text-[11px] font-medium mb-1">{idea.title || 'Idea'}</div>
+                      {Array.isArray(idea.contrarianWhy) && idea.contrarianWhy.length > 0 && (
+                        <div className="mb-1">
+                          <div className="text-white/60 text-[10px] mb-0.5">Why Contrarian</div>
+                          <ul className="list-disc pl-4 text-[10px] text-white/80">
+                            {idea.contrarianWhy.map((w: string, i: number) => <li key={i}>{w}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {Array.isArray(idea.evidence) && idea.evidence.length > 0 && (
+                        <div className="mb-1">
+                          <div className="text-white/60 text-[10px] mb-0.5">Evidence</div>
+                          <div className="flex flex-wrap gap-1">
+                            {idea.evidence.map((ev: string, i: number) => (
+                              <span key={i} className="px-1.5 py-0.5 rounded bg-ralph-teal/15 border border-ralph-teal/40 text-[10px]">{ev}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {idea.upside && (
+                        <div className="text-white/80 text-[10px] mb-1"><span className="text-white/60">Potential Upside:</span> {idea.upside}</div>
+                      )}
+                      {Array.isArray(idea.risks) && idea.risks.length > 0 && (
+                        <div className="mb-1">
+                          <div className="text-white/60 text-[10px] mb-0.5">Risks / Failure Modes</div>
+                          <ul className="list-disc pl-4 text-[10px] text-white/80">
+                            {idea.risks.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {Array.isArray(idea.testPlan) && idea.testPlan.length > 0 && (
+                        <div className="mb-1">
+                          <div className="text-white/60 text-[10px] mb-0.5">How to Test This Week</div>
+                          <ul className="list-disc pl-4 text-[10px] text-white/80">
+                            {idea.testPlan.map((t: string, i: number) => <li key={i}>{t}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {idea.firstStep && (
+                        <div className="text-white/80 text-[10px]"><span className="text-white/60">First Step:</span> {idea.firstStep}</div>
+                      )}
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          className="text-[10px] px-2 py-0.5 rounded bg-ralph-teal/70 hover:bg-ralph-teal"
+                          onClick={() => {
+                            // append a Wildcard Track to narrative
+                            const block = `\n\n---\n\nWildcard Track: ${idea.title}\n\nWhy Contrarian:\n- ${(idea.contrarianWhy||[]).join('\n- ')}\n\nTest Plan:\n- ${(idea.testPlan||[]).join('\n- ')}\n\nFirst Step: ${idea.firstStep || ''}`
+                            const current = narrative?.text || ''
+                            const updated = current + block
+                            setNodes(prev => prev.map(n => n.id === 'wildcard' ? { ...n, status: 'processing' as NodeData['status'] } : n))
+                            try { setNarrative({ text: updated }) } catch {}
+                            setTimeout(() => setNodes(prev => prev.map(n => n.id === 'wildcard' ? { ...n, status: 'active' as NodeData['status'] } : n)), 400)
+                            addActivity('Applied Wildcard to narrative', 'ai')
+                          }}
+                        >Apply to Narrative</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-white/50 text-[11px]">No wildcard ideas available.</div>
+              )}
+              {Array.isArray(wildSources) && wildSources.length > 0 && (
+                <div className="text-[10px] text-white/50">Sources used: {wildSources.join(', ')}</div>
+              )}
+            </>
+          )}
+        </div>
+      )
+    }
     if (node.id === 'creative-partner') {
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">

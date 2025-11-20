@@ -64,8 +64,12 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
     onUpdate(data.id, { minimized: !data.minimized })
   }
 
-  // Type-based colors
+  // Type-based colors (brand-consistent accents)
   const getNodeColor = () => {
+    // Wildcard: standout teal accent
+    if (data.type === 'wildcard') {
+      return 'border-ralph-teal/60 bg-ralph-teal/20'
+    }
     // RKB only - orange
     if (data.type === 'rkb') {
       return 'border-orange-400/40 bg-orange-400/10'
@@ -74,7 +78,7 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
     if (data.type === 'ai-content' || data.type === 'debrief') {
       return 'border-ralph-pink/40 bg-ralph-pink/10'
     }
-    // User input - blue
+    // User input - cyan
     if (data.type === 'user-input' || data.type === 'input' || data.type === 'upload') {
       return 'border-ralph-cyan/40 bg-ralph-cyan/10'
     }
@@ -83,12 +87,15 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
   }
 
   const nodeColor = getNodeColor()
-  const activeGlow = data.status === 'active' ? ' ring-2 ring-ralph-cyan/50 shadow-xl shadow-ralph-cyan/40' : ''
+  // Hover-only glow (subtle fade). Teal for wildcard, cyan otherwise.
+  const hoverGlow = (data.type === 'wildcard')
+    ? 'hover:ring-2 hover:ring-ralph-teal/50 hover:shadow-xl hover:shadow-ralph-teal/40'
+    : 'hover:ring-2 hover:ring-ralph-cyan/50 hover:shadow-xl hover:shadow-ralph-cyan/40'
 
   return (
     <div
       ref={nodeRef}
-      className={`absolute rounded-lg border-2 backdrop-blur-sm transition-all duration-500 ease-out transform-gpu ${nodeColor}${activeGlow}`}
+      className={`absolute rounded-lg border-2 backdrop-blur-sm transition-all duration-300 ease-out transform-gpu ${nodeColor} ${hoverGlow}`}
       style={{
         left: data.x,
         top: data.y,
@@ -103,6 +110,7 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
       <div className="flex items-center justify-between p-2 border-b border-white/10">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${
+            (data.status === 'active' && data.type === 'wildcard') ? 'bg-ralph-teal' :
             data.status === 'active' ? 'bg-ralph-cyan' :
             data.status === 'complete' ? 'bg-ralph-pink' :
             data.status === 'processing' ? 'bg-orange-400 animate-pulse' :

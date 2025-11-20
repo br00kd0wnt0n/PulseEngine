@@ -43,6 +43,10 @@ export const api = {
     '/ai/opportunities',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(opts||{}) }) }
   ),
+  wildcard: (concept: string, opts?: { persona?: string; region?: string; projectId?: string; baseline?: string }) => request<{ ideas: any[]; sourcesUsed?: string[] }>(
+    '/ai/wildcard',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(opts||{}) }) }
+  ),
   conceptProposal: (concept: string, narrativeBlocks: { key: string; content: string }[], recommendedCreators: any[], opts?: { persona?: string; projectId?: string }) => request<any>(
     '/ai/concept-proposal',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, narrativeBlocks, recommendedCreators, ...(opts||{}) }) }

@@ -1,5 +1,8 @@
 import { Router } from 'express'
 import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements, generateConceptProposal } from '../services/ai.js'
+import { retrieveContext, formatContextForPrompt } from '../services/retrieval.js'
+import { generateEmbedding } from '../services/embeddings.js'
+import { searchResultCache, generateCacheKey } from '../services/cache.js'
 
 const router = Router()
 
@@ -83,6 +86,167 @@ router.post('/rewrite-narrative', async (req, res) => {
     res.json({ text: narrative })
   }
 })
+
+router.post('/wildcard', async (req, res) => {
+  const { concept, persona, region, projectId, baseline } = req.body || {}
+  if (!concept) return res.status(400).json({ error: 'concept required' })
+  try {
+    const userId = (req as any).user?.sub || null
+    // cache key to avoid duplicate re-runs during a session
+    const cacheKey = generateCacheKey('wildcard', concept, persona || '', region || '', projectId || '', baseline || '')
+    const cached = searchResultCache.get(cacheKey)
+    if (cached) {
+      return res.json(cached)
+    }
+
+    const ctx = await retrieveContext(concept, userId, { maxResults: 20, includeCore: true, includeLive: true, projectId: projectId || null })
+
+    // Flatten and enumerate context to force grounded citations
+    type CtxItem = { id: string; text: string; source: string; bucket: 'project'|'core'|'live'|'predictive' }
+    const flat: CtxItem[] = []
+    const pushItems = (arr: string[], src: string[], bucket: CtxItem['bucket']) => {
+      const len = Math.min(arr.length, src.length)
+      for (let i = 0; i < len; i++) {
+        flat.push({ id: `ctx${flat.length+1}`, text: arr[i], source: src[i], bucket })
+      }
+    }
+    pushItems(ctx.projectContent, ctx.sources.project, 'project')
+    pushItems(ctx.coreKnowledge, ctx.sources.core, 'core')
+    pushItems(ctx.liveMetrics, ctx.sources.live, 'live')
+    pushItems(ctx.predictiveTrends, ctx.sources.predictive, 'predictive')
+
+    const enumerated = flat.map(it => `${it.id}: ${it.text}`).join('\n')
+
+    const prompt = `You are a contrarian campaign strategist. Generate 1–2 WILDCARD insights that defy default assumptions AND are testable this week.
+Concept: "${concept}"${persona?` (persona: ${persona})`:''}${region?` (region: ${region})`:''}
+
+Grounding context (each item has an id). Cite ONLY using these ids:
+${enumerated}
+
+Strict rules:
+- No generic advice; do not restate any existing narrative or debrief.
+- Each idea must clearly challenge common platform tactics or biases and include at least one trade‑off.
+- Each idea MUST include exactly 3 evidence citations using id format like "ctx3" that map to the provided context.
+- Be specific, quantified where possible.
+
+Output ONLY strict JSON with this schema and keys, no prose:
+{
+  "ideas": [
+    {
+      "title": string,                  // <= 12 words
+      "contrarianWhy": string[],        // 1-2 bullets
+      "evidence": string[],             // exactly 3 items, each like "ctx#"
+      "upside": string,                 // quantified potential (e.g., +X%)
+      "risks": string[],                // <= 3 bullets
+      "testPlan": string[],             // <= 3 bullets for this week
+      "firstStep": string               // 1 line, cheap + falsifiable
+    }
+  ]
+}`
+
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) return res.json({ ideas: [] })
+    const { OpenAI } = await import('openai')
+    const client = new OpenAI({ apiKey })
+    
+    async function callModel(extraSystem?: string) {
+      const messages = [
+        { role: 'system' as const, content: 'You challenge assumptions and propose bold but testable wildcard insights. Be specific and cite only provided ids.' },
+        ...(extraSystem ? [{ role: 'system' as const, content: extraSystem }] : []),
+        { role: 'user' as const, content: prompt }
+      ]
+      const resp = await client.chat.completions.create({
+        model: process.env.MODEL_NAME || 'gpt-4o-mini',
+        temperature: 0.9,
+        top_p: 0.9,
+        presence_penalty: 0.6,
+        frequency_penalty: 0.4,
+        messages,
+        max_tokens: 650
+      })
+      return resp.choices?.[0]?.message?.content || '{}'
+    }
+
+    function tryParse(jsonText: string): any | null {
+      try { return JSON.parse(jsonText) } catch {}
+      // Extract JSON block if model wrapped in prose
+      const m = jsonText.match(/\{[\s\S]*\}/)
+      if (m) { try { return JSON.parse(m[0]) } catch {} }
+      return null
+    }
+
+    function validateAndMapIdeas(obj: any): { ideas: any[]; sourcesUsed: string[] } {
+      const out: any[] = []
+      const used = new Set<string>()
+      const validIds = new Set(flat.map(f => f.id))
+      if (!obj || !Array.isArray(obj.ideas)) return { ideas: [], sourcesUsed: [] }
+      for (const idea of obj.ideas) {
+        if (!idea || typeof idea !== 'object') continue
+        const title = typeof idea.title === 'string' ? idea.title.trim() : null
+        const contrarianWhy = Array.isArray(idea.contrarianWhy) ? idea.contrarianWhy.filter((s: any) => typeof s === 'string' && s.trim()).slice(0, 2) : []
+        const evidence = Array.isArray(idea.evidence) ? idea.evidence.filter((s: any) => typeof s === 'string' && validIds.has(s.trim())).slice(0, 3) : []
+        const upside = typeof idea.upside === 'string' ? idea.upside.trim() : null
+        const risks = Array.isArray(idea.risks) ? idea.risks.filter((s: any) => typeof s === 'string' && s.trim()).slice(0, 3) : []
+        const testPlan = Array.isArray(idea.testPlan) ? idea.testPlan.filter((s: any) => typeof s === 'string' && s.trim()).slice(0, 3) : []
+        const firstStep = typeof idea.firstStep === 'string' ? idea.firstStep.trim() : null
+
+        if (!title || !upside || !firstStep) continue
+        if (evidence.length !== 3) continue
+        // Map sources used
+        evidence.forEach((eid: string) => {
+          const match = flat.find(f => f.id === eid)
+          if (match) used.add(match.source)
+        })
+        out.push({ title, contrarianWhy, evidence, upside, risks, testPlan, firstStep })
+      }
+      return { ideas: out.slice(0, 2), sourcesUsed: Array.from(used) }
+    }
+
+    // First roll
+    let raw = await callModel()
+    let parsed = tryParse(raw)
+    let { ideas, sourcesUsed } = validateAndMapIdeas(parsed)
+
+    // Optional novelty gate against baseline (debrief+narrative, if provided)
+    if (baseline && ideas.length) {
+      try {
+        const baseEmb = await generateEmbedding(baseline)
+        const ideaEmbeds = await Promise.all(ideas.map(i => generateEmbedding(
+          `${i.title}. Why: ${i.contrarianWhy?.join(' ')}. ${i.upside}. ${i.testPlan?.join(' ')}`
+        )))
+        const sims = ideaEmbeds.map(vec => cosineSimilarity(vec, baseEmb))
+        const tooSimilar = sims.map(s => (typeof s === 'number' && s >= 0.8))
+        if (tooSimilar.every(Boolean)) {
+          // re-roll once with explicit novelty instruction
+          raw = await callModel('Avoid overlap with prior narrative/debrief; generate different ideas with new angles.')
+          parsed = tryParse(raw)
+          const v2 = validateAndMapIdeas(parsed)
+          ideas = v2.ideas
+          sourcesUsed = v2.sourcesUsed
+        } else {
+          // filter out similar ones
+          ideas = ideas.filter((_, idx) => !tooSimilar[idx])
+        }
+      } catch {}
+    }
+
+    const payload = { ideas, sourcesUsed }
+    searchResultCache.set(cacheKey, payload)
+    return res.json(payload)
+  } catch (e: any) {
+    console.error('[AI] wildcard failed:', e)
+    res.json({ ideas: [] })
+  }
+})
+
+// local cosine similarity helper (handles nulls)
+function cosineSimilarity(a: number[] | null, b: number[] | null): number | null {
+  if (!a || !b || a.length !== b.length) return null
+  let dot = 0, na = 0, nb = 0
+  for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i] }
+  if (na === 0 || nb === 0) return null
+  return dot / (Math.sqrt(na) * Math.sqrt(nb))
+}
 
 router.post('/score', async (req, res) => {
   const { concept, graph } = req.body || {}
