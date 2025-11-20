@@ -1463,7 +1463,7 @@ export default function CanvasWorkflow() {
                         persona,
                         region,
                         debrief: debrief?.brief,
-                        opportunities,
+                        opportunities: opps?.opportunities,
                         narrative: narrative?.text,
                         enhancements: appliedEnhancements,
                         projectId: pid
@@ -1568,7 +1568,7 @@ export default function CanvasWorkflow() {
                         persona,
                         region,
                         debrief: debrief?.brief,
-                        opportunities,
+                        opportunities: opps?.opportunities,
                         narrative: narrative?.text,
                         enhancements: appliedEnhancements,
                         projectId: pid
