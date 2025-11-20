@@ -29,13 +29,15 @@ function renderMarkdown(md: string): string {
   text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
   // Bullet lists: lines starting with - or *
   text = text.replace(/^(?:- |\* )(.*)$/gm, '<li>$1</li>')
-  // Lines that look like `Label: content` into paragraph with strong label
-  text = text.replace(/^([A-Za-z][^:\n]{0,40}):\s+(.*)$/gm, '<p><strong>$1:</strong> $2</p>')
+  // Lines that look like `Label: content` - split into heading + content with paragraph breaks preserved
+  text = text.replace(/^([A-Z][A-Za-z\s]+):\s+(.+)$/gm, '<h5 class="mt-3 mb-1">$1</h5>\n<p>$2')
   // Wrap consecutive <li> blocks into <ul>
   text = text.replace(/(?:<li>[^<]*<\/li>\n?)+/g, (m) => `<ul>${m}\n</ul>`)
   // Paragraphs: double newlines
-  text = text.replace(/\n\n+/g, '</p><p>')
-  return `<p>${text}</p>`
+  text = text.replace(/\n\n+/g, '</p>\n<p>')
+  // Close any unclosed <p> tags
+  text = text.replace(/<p>([^<]*?)(?=<(?:h[345]|ul|$))/g, '<p>$1</p>')
+  return `<div>${text}</div>`
 }
 
 // Attempt to split narrative into panelized sections based on numbered headings like:
