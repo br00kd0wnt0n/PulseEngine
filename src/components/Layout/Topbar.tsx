@@ -62,6 +62,34 @@ export default function Topbar() {
   const hasPlaceholders = (files: any[]) => files.some(f => f.summary === '[processing]')
   const showIndexingStatus = processed.length > 0 && hasPlaceholders(processed)
 
+  // Truncate long concepts intelligently
+  const truncateConcept = (text: string, maxLength: number = 60): string => {
+    if (!text || text.length <= maxLength) return text
+
+    // Try to find a natural break point (comma, period, semicolon)
+    const truncated = text.substring(0, maxLength)
+    const lastBreak = Math.max(
+      truncated.lastIndexOf(','),
+      truncated.lastIndexOf('.'),
+      truncated.lastIndexOf(';')
+    )
+
+    if (lastBreak > maxLength * 0.6) {
+      return truncated.substring(0, lastBreak).trim() + '…'
+    }
+
+    // Otherwise truncate at last space
+    const lastSpace = truncated.lastIndexOf(' ')
+    if (lastSpace > maxLength * 0.6) {
+      return truncated.substring(0, lastSpace).trim() + '…'
+    }
+
+    // Fallback: hard truncate
+    return truncated.trim() + '…'
+  }
+
+  const displayConcept = truncateConcept(concept)
+
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
       <div className="bg-gradient-to-r from-ralph-pink to-ralph-teal">
@@ -120,10 +148,25 @@ export default function Topbar() {
         {(concept || persona || region || showIndexingStatus) && (
           <div className="px-4 md:px-8 pb-3 pt-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs">
-                {concept && <div className="px-2 py-1 rounded bg-ralph-cyan/20 border border-ralph-cyan/40 text-white">{concept}</div>}
-                {persona && <div className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white">Persona: {persona}</div>}
-                {region && <div className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white">Region: {region}</div>}
+              <div className="flex items-center gap-2 text-xs flex-wrap">
+                {concept && (
+                  <div
+                    className="px-2 py-1 rounded bg-ralph-cyan/20 border border-ralph-cyan/40 text-white max-w-md truncate"
+                    title={concept}
+                  >
+                    {displayConcept}
+                  </div>
+                )}
+                {persona && (
+                  <div className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white whitespace-nowrap">
+                    Persona: {persona}
+                  </div>
+                )}
+                {region && (
+                  <div className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white whitespace-nowrap">
+                    Region: {region}
+                  </div>
+                )}
               </div>
             </div>
             {showIndexingStatus && (
