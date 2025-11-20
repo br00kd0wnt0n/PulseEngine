@@ -130,6 +130,9 @@ export default function CanvasWorkflow() {
   const [conceptOverview, setConceptOverview] = useState<string | null>(null)
   const [overviewLoading, setOverviewLoading] = useState<boolean>(false)
 
+  // Track if we've already positioned scoring/narrative nodes to prevent repositioning on re-render
+  const nodesPositionedRef = useRef(false)
+
   function focusBrief() {
     setNodes(prev => {
       const maxZ = prev.reduce((m, p) => Math.max(m, p.zIndex), 0)
@@ -645,12 +648,26 @@ export default function CanvasWorkflow() {
     const scoring = nodes.find(n => n.id === 'scoring')
     const narr = nodes.find(n => n.id === 'narrative')
     if (!scoring || !narr) return
-    // Ensure on screen placement
-    setNodes(prev => prev.map(n => {
-      if (n.id === 'narrative') return { ...n, x: 900, y: 100 }
-      if (n.id === 'scoring') return { ...n, x: 1400, y: 100 }
-      return n
-    }))
+
+    // Only position nodes once on first appearance to prevent moving user-positioned nodes
+    if (!nodesPositionedRef.current) {
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1800
+      const margin = 60
+      const scoringWidth = 450
+      const narrativeWidth = 450
+
+      // Position scoring on right, narrative to its left, both within viewport
+      const scoringX = Math.max(margin + narrativeWidth + margin, Math.min(vw - scoringWidth - margin, vw * 0.58))
+      const narrativeX = Math.max(margin, scoringX - narrativeWidth - margin)
+
+      setNodes(prev => prev.map(n => {
+        if (n.id === 'narrative') return { ...n, x: narrativeX, y: 100 }
+        if (n.id === 'scoring') return { ...n, x: scoringX, y: 100 }
+        return n
+      }))
+
+      nodesPositionedRef.current = true
+    }
     if (scoring.status === 'processing') {
       let cancel = false
       ;(async () => {
@@ -1512,16 +1529,26 @@ export default function CanvasWorkflow() {
                     // spawn wildcard node minimized
                     setNodes(prev => {
                       if (prev.find(n => n.id === 'wildcard')) return prev.map(n => n.id === 'wildcard' ? { ...n, minimized: true, status: 'processing' as NodeData['status'] } : n)
+
+                      // Calculate viewport-aware position
+                      const vw = typeof window !== 'undefined' ? window.innerWidth : 1800
+                      const vh = typeof window !== 'undefined' ? window.innerHeight : 1000
+                      const nodeWidth = 450
+                      const nodeHeight = 360
+                      const margin = 60
+                      const wildcardX = Math.max(margin, Math.min(vw - nodeWidth - margin, vw * 0.58))
+                      const wildcardY = Math.max(margin, Math.min(vh - nodeHeight - margin, 400))
+
                       return [
                         ...prev,
                         {
                           id: 'wildcard',
                           type: 'wildcard',
                           title: 'Wildcard Insight',
-                          x: 1400,
-                          y: 680,
-                          width: 450,
-                          height: 360,
+                          x: wildcardX,
+                          y: wildcardY,
+                          width: nodeWidth,
+                          height: nodeHeight,
                           minimized: true,
                           zIndex: 6,
                           status: 'processing' as NodeData['status'],
