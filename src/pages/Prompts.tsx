@@ -64,7 +64,7 @@ export default function Prompts() {
                   >{saving[it.key] ? 'Saving…' : 'Save'}</button>
                 </div>
               </div>
-              <div className="text-white/50 text-[10px] mb-1">Use placeholders like: {{concept}}, {{persona}}, {{region}}, {{context}}. Changes persist immediately.</div>
+              <div className="text-white/50 text-[10px] mb-1">Use placeholders like: {'{{concept}}'}, {'{{persona}}'}, {'{{region}}'}, {'{{context}}'}. Changes persist immediately.</div>
               <textarea
                 className="w-full h-56 text-xs bg-charcoal-900 border border-white/10 rounded p-2 font-mono"
                 value={current}
