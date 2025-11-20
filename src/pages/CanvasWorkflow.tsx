@@ -1421,14 +1421,21 @@ export default function CanvasWorkflow() {
                     // Add Concept Overview and Creative Partner nodes
                     setNodes(prev => {
                       const next: NodeData[] = [...prev]
+                      // Calculate viewport-aware positions to ensure nodes are visible
+                      const viewportWidth = window.innerWidth
+                      const viewportHeight = window.innerHeight
+                      const nodeWidth = 450
+                      // Position nodes in the right portion of viewport with padding
+                      const baseX = Math.max(100, Math.min(viewportWidth - nodeWidth - 100, viewportWidth * 0.55))
+
                       if (!prev.find(n => n.id === 'concept-overview')) {
                         next.push({
                           id: 'concept-overview',
                           type: 'ai-content',
                           title: 'Concept Overview',
-                          x: 1650,
+                          x: baseX,
                           y: 100,
-                          width: 450,
+                          width: nodeWidth,
                           height: 260,
                           minimized: false,
                           zIndex: 6,
@@ -1441,9 +1448,9 @@ export default function CanvasWorkflow() {
                           id: 'creative-partner',
                           type: 'ai-content',
                           title: 'Need a Creative Partner?',
-                          x: 1650,
+                          x: baseX,
                           y: 380,
-                          width: 450,
+                          width: nodeWidth,
                           height: 340,
                           minimized: true,
                           zIndex: 6,
