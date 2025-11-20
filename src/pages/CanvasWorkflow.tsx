@@ -125,6 +125,9 @@ export default function CanvasWorkflow() {
   const [wildSources, setWildSources] = useState<string[] | null>(null)
   const [wildLoading, setWildLoading] = useState<boolean>(false)
 
+  const [conceptOverview, setConceptOverview] = useState<string | null>(null)
+  const [overviewLoading, setOverviewLoading] = useState<boolean>(false)
+
   function focusBrief() {
     setNodes(prev => {
       const maxZ = prev.reduce((m, p) => Math.max(m, p.zIndex), 0)
@@ -1450,10 +1453,42 @@ export default function CanvasWorkflow() {
                       }
                       return next
                     })
+
+                    // Generate concept overview
+                    try {
+                      setOverviewLoading(true)
+                      const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
+                      const appliedEnhancements = Array.from(selectedEnhancements).map(idx => enhancements[idx]?.text).filter(Boolean)
+                      const result = await api.conceptOverview(concept, {
+                        persona,
+                        region,
+                        debrief: debrief?.brief,
+                        opportunities,
+                        narrative: narrative?.text,
+                        enhancements: appliedEnhancements,
+                        projectId: pid
+                      })
+                      setConceptOverview(result?.overview || null)
+                      console.log('[ConceptOverview] Generated:', result?.overview)
+                    } catch (err) {
+                      console.error('[ConceptOverview] Failed:', err)
+                      setConceptOverview(null)
+                    } finally {
+                      setOverviewLoading(false)
+                    }
+
+                    // Fetch creators
                     try {
                       const rec = await api.recommendations(concept, { nodes: [], links: [] }, { persona, region })
-                      setConceptCreators(Array.isArray((rec as any)?.creators) ? (rec as any).creators : [])
-                    } catch { setConceptCreators([]) }
+                      console.log('[Creators] API response:', rec)
+                      const creators = Array.isArray((rec as any)?.creators) ? (rec as any).creators : []
+                      console.log('[Creators] Extracted creators:', creators)
+                      setConceptCreators(creators)
+                    } catch (err) {
+                      console.error('[Creators] API failed:', err)
+                      setConceptCreators([])
+                    }
+
                     setNodes(prev => prev.map(n => (n.id === 'concept-overview' || n.id === 'creative-partner') ? { ...n, status: 'active' as NodeData['status'] } : n))
                   }}
                 >
@@ -1515,15 +1550,46 @@ export default function CanvasWorkflow() {
     if (node.id === 'concept-overview') {
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
-          {node.status === 'processing' ? (
-            <BrandSpinner text="Summarizing concept…" />
-          ) : (
+          {(node.status === 'processing' || overviewLoading) ? (
+            <BrandSpinner text="Synthesizing final overview…" />
+          ) : conceptOverview ? (
             <>
-              <div className="panel p-2 bg-white/5">
-                <div className="text-white/70 font-medium mb-2 text-[11px]">CONCEPT OVERVIEW</div>
-                <div className="text-white/80 text-[10px] leading-relaxed">{concept}</div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-white/70 font-medium text-[11px]">CONCEPT OVERVIEW</div>
+                <button
+                  className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 hover:bg-white/10"
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    try {
+                      setOverviewLoading(true)
+                      const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
+                      const appliedEnhancements = Array.from(selectedEnhancements).map(idx => enhancements[idx]?.text).filter(Boolean)
+                      const result = await api.conceptOverview(concept, {
+                        persona,
+                        region,
+                        debrief: debrief?.brief,
+                        opportunities,
+                        narrative: narrative?.text,
+                        enhancements: appliedEnhancements,
+                        projectId: pid
+                      })
+                      setConceptOverview(result?.overview || null)
+                    } catch (err) {
+                      console.error('[ConceptOverview] Refresh failed:', err)
+                    } finally {
+                      setOverviewLoading(false)
+                    }
+                  }}
+                >Refresh</button>
+              </div>
+              <div className="panel p-3 bg-white/5">
+                <div className="prose prose-invert max-w-none text-[10px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(conceptOverview) }} />
               </div>
             </>
+          ) : (
+            <div className="text-white/50 text-[11px]">
+              Click "Apply Enhancements" to generate the final concept overview.
+            </div>
           )}
         </div>
       )
