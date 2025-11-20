@@ -1,7 +1,7 @@
 import { useTheme } from '../../context/ThemeContext'
 import { Link } from 'react-router-dom'
 import { useLayout } from '../../context/LayoutContext'
-import LogoMark from '../LogoMark'
+// import LogoMark from '../LogoMark'
 
 import { useState } from 'react'
 import { api } from '../../services/api'
@@ -14,19 +14,26 @@ export default function Topbar() {
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<{ trends: any[]; creators: any[]; assets: any[] }>({ trends: [], creators: [], assets: [] })
 
+  let timer: any
   async function runSearch(text: string) {
     const query = text.trim()
-    if (!query) { setResults({ trends: [], creators: [], assets: [] }); return }
+    if (timer) clearTimeout(timer)
+    if (!query) { setResults({ trends: [], creators: [], assets: [] }); setOpen(false); return }
     setLoading(true)
-    try {
-      // MVP: fetch public lists and filter client-side; replace with backend search endpoint when ready
-      const [trends, creators] = await Promise.all([api.trends().catch(()=>[]), api.creators().catch(()=>[])])
-      const ql = query.toLowerCase()
-      const t = (trends||[]).filter((t: any) => String(t.label||'').toLowerCase().includes(ql)).slice(0,10)
-      const c = (creators||[]).filter((c: any) => String(c.name||'').toLowerCase().includes(ql)).slice(0,10)
-      setResults({ trends: t, creators: c, assets: [] })
-      setOpen(true)
-    } finally { setLoading(false) }
+    timer = setTimeout(async () => {
+      try {
+        const data = await api.search(query)
+        setResults({
+          trends: Array.isArray(data?.trends) ? data.trends.slice(0,10) : [],
+          creators: Array.isArray(data?.creators) ? data.creators.slice(0,10) : [],
+          assets: Array.isArray(data?.assets) ? data.assets.slice(0,10) : [],
+        })
+        setOpen(true)
+      } catch {
+        setResults({ trends: [], creators: [], assets: [] })
+        setOpen(true)
+      } finally { setLoading(false) }
+    }, 200)
   }
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
@@ -36,8 +43,8 @@ export default function Topbar() {
             ☰
           </button>
           <Link to="/" className="flex items-center gap-3">
-            <LogoMark size={32} className="" />
-            <div className="hidden sm:block font-semibold tracking-wide uppercase text-xs">Storytelling Intelligence</div>
+            <img src="/ralph_logo.png" alt="Narrativ" className="h-8 w-auto rounded" />
+            <div className="hidden sm:block font-semibold tracking-wide uppercase text-xs">NARRATIV™ - Storytelling Intelligence</div>
           </Link>
           <div className="relative flex-1 max-w-2xl ml-auto">
             <input
@@ -57,12 +64,16 @@ export default function Topbar() {
                   <>
                     <div className="mb-1 text-white/60">Trends</div>
                     {results.trends.length ? results.trends.map((t:any,i:number)=> (
-                      <div key={'t'+i} className="px-2 py-1 rounded hover:bg-white/10 cursor-pointer">{t.label}</div>
+                      <div key={'t'+i} className="px-2 py-1 rounded hover:bg-white/10 cursor-pointer">{t.label || t.name}</div>
                     )) : <div className="px-2 py-1 text-white/40">No trends</div>}
                     <div className="mt-2 mb-1 text-white/60">Creators</div>
                     {results.creators.length ? results.creators.map((c:any,i:number)=> (
-                      <div key={'c'+i} className="px-2 py-1 rounded hover:bg-white/10 cursor-pointer">{c.name}</div>
+                      <div key={'c'+i} className="px-2 py-1 rounded hover:bg-white/10 cursor-pointer">{c.name || c.handle}</div>
                     )) : <div className="px-2 py-1 text-white/40">No creators</div>}
+                    <div className="mt-2 mb-1 text-white/60">Assets</div>
+                    {results.assets.length ? results.assets.map((a:any,i:number)=> (
+                      <div key={'a'+i} className="px-2 py-1 rounded hover:bg-white/10 cursor-pointer">{a.name || a.filename}</div>
+                    )) : <div className="px-2 py-1 text-white/40">No assets</div>}
                   </>
                 )}
               </div>

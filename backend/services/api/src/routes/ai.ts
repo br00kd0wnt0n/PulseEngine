@@ -57,6 +57,33 @@ router.post('/narrative', async (req, res) => {
 
 export default router
 
+router.post('/rewrite-narrative', async (req, res) => {
+  const { concept, narrative, enhancements, persona, region, projectId } = req.body || {}
+  if (!concept || !narrative) return res.status(400).json({ error: 'concept and narrative required' })
+  const enh = Array.isArray(enhancements) ? enhancements.filter((t: any) => typeof t === 'string' && t.trim()).slice(0, 8) : []
+  const prompt = `You are a campaign strategist.\nRewrite the narrative below for the concept "${concept}"${persona?` (persona: ${persona})`:''}${region?` (region: ${region})`:''}, integrating these selected enhancements. Keep the same structure (numbered sections) and make it crisp, specific, and actionable.\n\n# Current Narrative\n${narrative}\n\n# Selected Enhancements\n${enh.map((e: string, i: number) => `${i+1}. ${e}`).join('\\n')}\n\nReturn ONLY the rewritten narrative, preserving numbered section headings.`
+  try {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) return res.json({ text: narrative })
+    const { OpenAI } = await import('openai')
+    const client = new OpenAI({ apiKey })
+    const resp = await client.chat.completions.create({
+      model: process.env.MODEL_NAME || 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'You are an entertainment storytelling strategist. Be concise, insight-first.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.6,
+      max_tokens: 700
+    })
+    const text = resp.choices?.[0]?.message?.content || narrative
+    res.json({ text })
+  } catch (e: any) {
+    console.error('[AI] rewrite-narrative failed:', e)
+    res.json({ text: narrative })
+  }
+})
+
 router.post('/score', async (req, res) => {
   const { concept, graph } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })

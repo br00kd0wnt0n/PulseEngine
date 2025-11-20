@@ -65,7 +65,7 @@ export async function generateDebrief(concept: string, userId?: string | null, p
   try {
     let ctx
     try {
-      ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true, projectId: projectId || null })
+      ctx = await retrieveContext(concept, userId || null, { maxResults: 15, includeCore: true, includeLive: true, projectId: projectId || null })
     } catch (err) {
       console.error('[AI] retrieveContext failed for debrief:', err)
       // Fallback to empty context if retrieval fails
@@ -192,7 +192,7 @@ export async function generateOpportunities(concept: string, userId?: string | n
   try {
     let ctx
     try {
-      ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true, projectId: projectId || null })
+      ctx = await retrieveContext(concept, userId || null, { maxResults: 15, includeCore: true, includeLive: true, projectId: projectId || null })
     } catch (err) {
       console.error('[AI] retrieveContext failed for opportunities:', err)
       // Fallback to empty context if retrieval fails
@@ -440,7 +440,7 @@ export async function generateRecommendations(
   let context
   try {
     context = await retrieveContext(concept, userId || null, {
-      maxResults: 5,
+      maxResults: 12,
       includeCore: true,
       includeLive: true,
       projectId: projectId || null
@@ -620,7 +620,7 @@ export async function generateConceptProposal(
   try {
     let ctx
     try {
-      ctx = await retrieveContext(concept, userId || null, { maxResults: 6, includeCore: true, includeLive: true, projectId: projectId || null })
+      ctx = await retrieveContext(concept, userId || null, { maxResults: 15, includeCore: true, includeLive: true, projectId: projectId || null })
     } catch (err) {
       console.error('[AI] retrieveContext failed for concept proposal:', err)
       ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }

@@ -13,6 +13,7 @@ import assetRoutes from './routes/assets.js'
 import aiRoutes from './routes/ai.js'
 import statusRoutes from './routes/status.js'
 import publicRoutes from './routes/public.js'
+import searchRoutes from './routes/search.js'
 import adminRoutes from './routes/admin.js'
 import projectRoutes from './routes/projects.js'
 import versionsRoutes from './routes/versions.js'
@@ -81,6 +82,7 @@ async function main() {
   // Public AI endpoints for MVP (no auth required)
   app.use('/ai', aiRoutes)
   app.use('/public', publicRoutes)
+  app.use('/search', searchRoutes)
 
   // Secure routes (require authentication)
   app.use(authMiddleware, attachRls)

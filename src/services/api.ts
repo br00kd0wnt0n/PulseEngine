@@ -32,6 +32,9 @@ export const api = {
     '/ai/recommendations',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph, ...(opts||{}) }) }
   ),
+  search: (q: string) => request<{ trends: any[]; creators: any[]; assets: any[] }>(
+    `/search?q=${encodeURIComponent(q)}`
+  ),
   debrief: (concept: string, opts?: { persona?: string; region?: string; projectId?: string }) => request<any>(
     '/ai/debrief',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(opts||{}) }) }

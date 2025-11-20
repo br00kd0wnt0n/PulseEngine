@@ -114,6 +114,13 @@ export async function retrieveContext(
   context.predictiveTrends = predictive.content
   context.sources.predictive = predictive.sources
 
+  // Dedupe sources to avoid double attribution and cap by maxResults
+  const cap = (arr: string[]) => Array.from(new Set(arr)).slice(0, maxResults)
+  context.sources.project = cap(context.sources.project)
+  context.sources.core = cap(context.sources.core)
+  context.sources.live = cap(context.sources.live)
+  context.sources.predictive = cap(context.sources.predictive)
+
   console.log('[RETRIEVAL] Final context:', {
     projectContent: context.projectContent.length,
     coreKnowledge: context.coreKnowledge.length,

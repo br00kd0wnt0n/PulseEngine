@@ -37,29 +37,32 @@ function renderMarkdown(md: string): string {
 // Attempt to split narrative into panelized sections based on numbered headings like:
 // 1. Opening Hook and Why Now:
 function extractNarrativeSections(text: string): { header?: string; sections: { title: string; body: string }[] } {
-  const lines = (text || '').split(/\r?\n/)
-  const sections: { title: string; body: string }[] = []
-  let header: string | undefined
-  let currentTitle: string | null = null
-  let currentBody: string[] = []
-
-  const numbered = /^\s*\d+\.\s+([^:\n]+):\s*$/
+  const src = (text || '').trim()
+  const lines = src.split(/\r?\n/)
+  // Header is first markdown heading or first non-empty line if it looks like a title
   const h3 = /^\s*#+\s+(.*)$/
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    const h3m = line.match(h3)
-    if (!header && h3m) { header = h3m[1].trim(); continue }
-    const m = line.match(numbered)
-    if (m) {
-      if (currentTitle) sections.push({ title: currentTitle, body: currentBody.join('\n').trim() })
-      currentTitle = m[1].trim()
-      currentBody = []
-    } else {
-      if (currentTitle) currentBody.push(line)
-    }
+  let header: string | undefined
+  for (const l of lines) {
+    const m = l.match(h3)
+    if (m) { header = m[1].trim(); break }
+    if (!header && l.trim().length > 0 && l.trim().length < 120) { header = l.trim(); break }
   }
-  if (currentTitle) sections.push({ title: currentTitle, body: currentBody.join('\n').trim() })
+  // Split by numbered sections like "1. Title:" possibly with **bold** and colon not necessarily at EOL
+  const pattern = /(?:^|\n)\s*(?:\*\*)?\d+\.\s+([^:\n]+):\s*/g
+  const sections: { title: string; body: string }[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  const indices: { idx: number; title: string }[] = []
+  while ((match = pattern.exec(src)) !== null) {
+    indices.push({ idx: match.index + match[0].length, title: match[1].trim() })
+  }
+  if (indices.length === 0) return { header, sections: [] }
+  for (let i = 0; i < indices.length; i++) {
+    const start = indices[i].idx
+    const end = i + 1 < indices.length ? indices[i+1].idx - (indices[i+1].title.length + 4) : src.length
+    const body = src.substring(start, end).trim()
+    sections.push({ title: indices[i].title, body })
+  }
   return { header, sections }
 }
 
@@ -575,9 +578,13 @@ export default function CanvasWorkflow() {
     if (!narrativeApproved || nodes.find(n => n.id === 'scoring')) return
     // Add scoring and tidy/minimize to ensure in‑view
     setNodes(prev => {
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1800
+      const margin = 40
+      const scoringWidth = 450
+      const scoringX = Math.max(700, Math.min(1200, vw - scoringWidth - margin))
       const updated = prev.map(n => {
         if (n.id === 'debrief-opportunities') return { ...n, minimized: true }
-        if (n.id === 'narrative') return { ...n, minimized: true, x: 900, y: 100 }
+        if (n.id === 'narrative') return { ...n, minimized: true, x: Math.max(400, scoringX - 500), y: 100 }
         return n
       })
       return [
@@ -586,9 +593,9 @@ export default function CanvasWorkflow() {
           id: 'scoring',
           type: 'ai-content',
           title: 'Scoring & Enhancements',
-          x: 1200,
+          x: scoringX,
           y: 100,
-          width: 450,
+          width: scoringWidth,
           height: 550,
           minimized: false,
           zIndex: 5,
@@ -636,42 +643,7 @@ export default function CanvasWorkflow() {
     }
   }, [nodes.find(n => n.id === 'scoring')?.status])
 
-  // Step 4: Add Creative Partner node after enhancements selected (simulated after 5 seconds)
-  useEffect(() => {
-    if (!nodes.find(n => n.id === 'scoring')) return
-
-    const scoringNode = nodes.find(n => n.id === 'scoring')
-    if (scoringNode?.status === 'processing' && !nodes.find(n => n.id === 'creative-partner')) {
-      const timer = setTimeout(() => {
-        // Mark scoring as complete
-        setNodes(prev => prev.map(n =>
-          n.id === 'scoring' ? { ...n, status: 'complete' as const } : n
-        ))
-
-        setTimeout(() => {
-          setNodes(prev => [
-            ...prev,
-            // Creative Partner node
-            {
-              id: 'creative-partner',
-              type: 'ai-content',
-              title: 'Need a Creative Partner?',
-              x: 2000,
-              y: 100,
-              width: 400,
-              height: 500,
-              minimized: false,
-              zIndex: 5,
-              status: 'active',
-              connectedTo: ['scoring']
-            }
-          ])
-        }, 500)
-      }, 5000)
-
-      return () => clearTimeout(timer)
-    }
-  }, [nodes])
+  // Removed old simulated Creative Partner node timer
 
   const handleSubmit = () => {
     if (!concept) return
@@ -1404,30 +1376,46 @@ export default function CanvasWorkflow() {
                     } catch {}
                     setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
 
-                    // Add Concept + Creators node
+                    // Add Concept Overview and Creative Partner nodes
                     setNodes(prev => {
-                      if (prev.find(n => n.id === 'concept-creators')) return prev
-                      return [...prev, {
-                        id: 'concept-creators',
-                        type: 'ai-content',
-                        title: 'Concept + Creators',
-                        x: 1650,
-                        y: 100,
-                        width: 450,
-                        height: 520,
-                        minimized: false,
-                        zIndex: 6,
-                        status: 'processing' as NodeData['status'],
-                        connectedTo: ['scoring']
-                      }]
+                      const next: NodeData[] = [...prev]
+                      if (!prev.find(n => n.id === 'concept-overview')) {
+                        next.push({
+                          id: 'concept-overview',
+                          type: 'ai-content',
+                          title: 'Concept Overview',
+                          x: 1650,
+                          y: 100,
+                          width: 450,
+                          height: 260,
+                          minimized: false,
+                          zIndex: 6,
+                          status: 'processing' as NodeData['status'],
+                          connectedTo: ['scoring']
+                        })
+                      }
+                      if (!prev.find(n => n.id === 'creative-partner')) {
+                        next.push({
+                          id: 'creative-partner',
+                          type: 'ai-content',
+                          title: 'Need a Creative Partner?',
+                          x: 1650,
+                          y: 380,
+                          width: 450,
+                          height: 340,
+                          minimized: true,
+                          zIndex: 6,
+                          status: 'processing' as NodeData['status'],
+                          connectedTo: ['scoring']
+                        })
+                      }
+                      return next
                     })
                     try {
                       const rec = await api.recommendations(concept, { nodes: [], links: [] }, { persona, region })
                       setConceptCreators(Array.isArray((rec as any)?.creators) ? (rec as any).creators : [])
-                    } catch {
-                      setConceptCreators([])
-                    }
-                    setNodes(prev => prev.map(n => n.id === 'concept-creators' ? { ...n, status: 'active' as NodeData['status'] } : n))
+                    } catch { setConceptCreators([]) }
+                    setNodes(prev => prev.map(n => (n.id === 'concept-overview' || n.id === 'creative-partner') ? { ...n, status: 'active' as NodeData['status'] } : n))
                   }}
                 >
                   Apply Enhancements
@@ -1439,31 +1427,16 @@ export default function CanvasWorkflow() {
       )
     }
 
-    if (node.id === 'concept-creators') {
+    if (node.id === 'concept-overview') {
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
           {node.status === 'processing' ? (
-            <BrandSpinner text="Assembling concept + matching creators…" />
+            <BrandSpinner text="Summarizing concept…" />
           ) : (
             <>
               <div className="panel p-2 bg-white/5">
-                <div className="text-white/70 font-medium mb-2 text-[11px]">CONCEPT SUMMARY</div>
+                <div className="text-white/70 font-medium mb-2 text-[11px]">CONCEPT OVERVIEW</div>
                 <div className="text-white/80 text-[10px] leading-relaxed">{concept}</div>
-              </div>
-              <div className="panel p-2 bg-white/5">
-                <div className="text-white/70 font-medium mb-2 text-[11px]">RECOMMENDED CREATORS</div>
-                {Array.isArray(conceptCreators) && conceptCreators.length > 0 ? (
-                  <div className="space-y-2">
-                    {conceptCreators.slice(0,8).map((c: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between bg-white/5 rounded px-2 py-1">
-                        <div className="text-white/80 text-[10px]">{c.name || c.handle || 'Creator'}</div>
-                        <div className="text-white/50 text-[9px]">{c.platform || ''}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-white/60 text-[10px]">No recommendations available.</div>
-                )}
               </div>
             </>
           )}
@@ -1474,57 +1447,32 @@ export default function CanvasWorkflow() {
     if (node.id === 'creative-partner') {
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
-          <div className="text-white/80 leading-relaxed mb-2">
-            Based on your campaign, here are recommended creators:
-          </div>
-
-          <div className="space-y-2">
-            <div className="panel p-2 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-8 h-8 rounded-full bg-ralph-pink/20 border border-ralph-pink/40" />
-                <div>
-                  <div className="text-white/80 text-[11px] font-medium">@musicdiscovery</div>
-                  <div className="text-white/50 text-[9px]">1.2M followers • Music curator</div>
+          {Array.isArray(conceptCreators) && conceptCreators.length > 0 ? (
+            conceptCreators.slice(0,8).map((c: any, i: number) => {
+              const followers = c.followers || c.metrics?.followers || c.stats?.followers
+              const engagement = c.engagement || c.metrics?.engagementRate || c.stats?.engagement
+              const tags: string[] = Array.isArray(c.tags) ? c.tags : Array.isArray(c.metadata?.tags) ? c.metadata.tags : []
+              return (
+                <div key={i} className="panel p-2 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="text-white/80 text-[11px] font-medium">{c.name || c.handle || 'Creator'}</div>
+                    <div className="text-white/50 text-[9px]">{c.platform || ''}{c.category?` • ${c.category}`:''}</div>
+                  </div>
+                  <div className="mt-1 text-white/60 text-[10px]">
+                    {followers ? <span>{new Intl.NumberFormat().format(followers)} followers</span> : <span />}
+                    {engagement ? <span className="ml-2">{typeof engagement==='number'?`${engagement}%`:`${engagement}` } engagement</span> : null}
+                  </div>
+                  {tags && tags.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {tags.slice(0,6).map((t, j) => <span key={j} className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-[9px]">{t}</span>)}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="text-white/60 text-[10px]">
-                Specializes in emerging artists, 8.7% avg engagement
-              </div>
-            </div>
-
-            <div className="panel p-2 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-8 h-8 rounded-full bg-ralph-pink/20 border border-ralph-pink/40" />
-                <div>
-                  <div className="text-white/80 text-[11px] font-medium">@trendsettervibes</div>
-                  <div className="text-white/50 text-[9px]">850K followers • Dance trends</div>
-                </div>
-              </div>
-              <div className="text-white/60 text-[10px]">
-                Creates viral dance content, strong Gen Z audience
-              </div>
-            </div>
-
-            <div className="panel p-2 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-8 h-8 rounded-full bg-ralph-pink/20 border border-ralph-pink/40" />
-                <div>
-                  <div className="text-white/80 text-[11px] font-medium">@culturecollective</div>
-                  <div className="text-white/50 text-[9px]">450K followers • Micro-influencer</div>
-                </div>
-              </div>
-              <div className="text-white/60 text-[10px]">
-                Authentic voice, high trust factor with followers
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={(e) => e.stopPropagation()}
-            className="w-full px-3 py-2 rounded bg-ralph-pink/70 hover:bg-ralph-pink text-xs font-medium"
-          >
-            Connect with Creators
-          </button>
+              )
+            })
+          ) : (
+            <div className="text-white/60 text-[10px]">No recommendations available.</div>
+          )}
         </div>
       )
     }
