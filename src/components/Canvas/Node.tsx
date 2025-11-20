@@ -24,10 +24,13 @@ type NodeProps = {
 export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [isResizing, setIsResizing] = useState(false)
+  const [resizeStart, setResizeStart] = useState({ width: 0, height: 0, mouseX: 0, mouseY: 0 })
   const nodeRef = useRef<HTMLDivElement>(null)
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.node-content')) return // Don't drag when clicking content
+    if ((e.target as HTMLElement).closest('.resize-handle')) return // Don't drag when resizing
     e.preventDefault() // Prevent text selection during drag
     setIsDragging(true)
     onFocus(data.id)
@@ -35,6 +38,19 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
     setDragOffset({
       x: e.clientX - data.x,
       y: e.clientY - data.y
+    })
+  }
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent drag from triggering
+    e.preventDefault()
+    setIsResizing(true)
+    onFocus(data.id)
+    setResizeStart({
+      width: data.width,
+      height: data.height,
+      mouseX: e.clientX,
+      mouseY: e.clientY
     })
   }
 
@@ -59,6 +75,30 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
       window.removeEventListener('mouseup', handleMouseUp)
     }
   }, [isDragging, dragOffset, data.id, onUpdate])
+
+  useEffect(() => {
+    if (!isResizing) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - resizeStart.mouseX
+      const deltaY = e.clientY - resizeStart.mouseY
+      const newWidth = Math.max(300, resizeStart.width + deltaX) // Min width 300px
+      const newHeight = Math.max(200, resizeStart.height + deltaY) // Min height 200px
+      onUpdate(data.id, { width: newWidth, height: newHeight })
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizing, resizeStart, data.id, onUpdate])
 
   const toggleMinimize = () => {
     onUpdate(data.id, { minimized: !data.minimized })
@@ -144,9 +184,20 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
 
       {/* Content */}
       {!data.minimized && (
-        <div className="node-content p-3 overflow-auto" style={{ height: data.height - 48 }}>
-          {children}
-        </div>
+        <>
+          <div className="node-content p-3 overflow-auto" style={{ height: data.height - 48 }}>
+            {children}
+          </div>
+          {/* Resize handle */}
+          <div
+            className="resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize opacity-50 hover:opacity-100 transition-opacity"
+            onMouseDown={handleResizeMouseDown}
+            style={{
+              background: 'linear-gradient(135deg, transparent 0%, transparent 50%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0.5) 100%)'
+            }}
+            title="Drag to resize"
+          />
+        </>
       )}
     </div>
   )
