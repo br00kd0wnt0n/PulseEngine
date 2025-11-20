@@ -100,7 +100,7 @@ class LRUCache<T> {
 
 // Singleton cache instances
 export const embeddingCache = new LRUCache<number[]>(500, 120) // 500 embeddings, 2hr TTL
-export const searchResultCache = new LRUCache<any[]>(200, 30) // 200 search results, 30min TTL
+export const searchResultCache = new LRUCache<any>(200, 30) // 200 search results (arrays or objects), 30min TTL
 
 /**
  * Generate a cache key from query parameters
