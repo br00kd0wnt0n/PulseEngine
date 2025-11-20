@@ -66,9 +66,9 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
 
   // Type-based colors (brand-consistent accents)
   const getNodeColor = () => {
-    // Wildcard: standout teal accent
+    // Wildcard: standout yellow accent
     if (data.type === 'wildcard') {
-      return 'border-ralph-teal/60 bg-ralph-teal/20'
+      return 'border-yellow-400/60 bg-yellow-400/20'
     }
     // RKB only - orange
     if (data.type === 'rkb') {
@@ -86,11 +86,25 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
     return 'border-white/20 bg-charcoal-800/90'
   }
 
+  // Type-based hover glow that matches node color
+  const getHoverGlow = () => {
+    if (data.type === 'wildcard') {
+      return 'hover:ring-2 hover:ring-yellow-400/50 hover:shadow-xl hover:shadow-yellow-400/40'
+    }
+    if (data.type === 'rkb') {
+      return 'hover:ring-2 hover:ring-orange-400/50 hover:shadow-xl hover:shadow-orange-400/40'
+    }
+    if (data.type === 'ai-content' || data.type === 'debrief') {
+      return 'hover:ring-2 hover:ring-ralph-pink/50 hover:shadow-xl hover:shadow-ralph-pink/40'
+    }
+    if (data.type === 'user-input' || data.type === 'input' || data.type === 'upload') {
+      return 'hover:ring-2 hover:ring-ralph-cyan/50 hover:shadow-xl hover:shadow-ralph-cyan/40'
+    }
+    return 'hover:ring-2 hover:ring-white/30 hover:shadow-xl hover:shadow-white/20'
+  }
+
   const nodeColor = getNodeColor()
-  // Hover-only glow (subtle fade). Teal for wildcard, cyan otherwise.
-  const hoverGlow = (data.type === 'wildcard')
-    ? 'hover:ring-2 hover:ring-ralph-teal/50 hover:shadow-xl hover:shadow-ralph-teal/40'
-    : 'hover:ring-2 hover:ring-ralph-cyan/50 hover:shadow-xl hover:shadow-ralph-cyan/40'
+  const hoverGlow = getHoverGlow()
 
   return (
     <div
@@ -110,7 +124,7 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
       <div className="flex items-center justify-between p-2 border-b border-white/10">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${
-            (data.status === 'active' && data.type === 'wildcard') ? 'bg-ralph-teal' :
+            (data.status === 'active' && data.type === 'wildcard') ? 'bg-yellow-400' :
             data.status === 'active' ? 'bg-ralph-cyan' :
             data.status === 'complete' ? 'bg-ralph-pink' :
             data.status === 'processing' ? 'bg-orange-400 animate-pulse' :

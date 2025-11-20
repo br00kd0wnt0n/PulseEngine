@@ -15,20 +15,24 @@ function renderMarkdown(md: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
   let text = esc(md)
+
+  // Remove standalone ** markers (lines that are just ** or whitespace + **)
+  text = text.replace(/^\s*\*\*\s*$/gm, '')
+
   // Headings ###
   text = text.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>')
   // Numbered sections like `1. Title:` -> <h4>Title</h4>
   text = text.replace(/^\s*\d+\.\s+([^:\n]+):/gm, '<h4>$1</h4>')
   // Subsection labels like `Content Pillars:` or `Story Arc:` -> <h5>
   text = text.replace(/^\s*([A-Z][A-Za-z ]+):$/gm, '<h5>$1</h5>')
-  // Bold **text**
+  // Bold **text** (non-greedy, single line)
   text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
   // Bullet lists: lines starting with - or *
   text = text.replace(/^(?:- |\* )(.*)$/gm, '<li>$1</li>')
   // Lines that look like `Label: content` into paragraph with strong label
   text = text.replace(/^([A-Za-z][^:\n]{0,40}):\s+(.*)$/gm, '<p><strong>$1:</strong> $2</p>')
   // Wrap consecutive <li> blocks into <ul>
-  text = text.replace(/(?:<li>[^<]*<\/li>\n?)+/g, (m) => `<ul>${m}\n</ul>`) 
+  text = text.replace(/(?:<li>[^<]*<\/li>\n?)+/g, (m) => `<ul>${m}\n</ul>`)
   // Paragraphs: double newlines
   text = text.replace(/\n\n+/g, '</p><p>')
   return `<p>${text}</p>`
