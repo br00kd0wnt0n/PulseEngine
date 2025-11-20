@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { AppDataSource } from '../db/data-source.js'
 import { AICache } from '../db/entities/AICache.js'
+import { Creator } from '../db/entities/Creator.js'
 import { retrieveContext, formatContextForPrompt, type RetrievalContext } from './retrieval.js'
 
 export type TrendGraph = { nodes: { id: string; label: string; kind: 'trend'|'creator'|'content' }[]; links: { source: string; target: string }[] }
@@ -44,8 +45,10 @@ export async function narrativeFromTrends(graph: TrendGraph, focusId?: string | 
   const cached = await cacheGet<string>(key)
   if (cached) return cached
 
-  const prompt = `Given these active trends: ${trends.join(', ')}${focus ? `\nFocus on: ${focus}` : ''}.\n` +
-    `Explain the narrative opportunity in 4-6 sentences: why now, which hooks, and predicted time-to-peak. Keep it direct.`
+  const prompt = (await import('./promptStore.js')).renderTemplate(
+    await (await import('./promptStore.js')).getPrompt('narrative_from_trends'),
+    { trends: trends.join(', '), focus }
+  )
   try {
     const text = await callOpenAI(prompt)
     await cacheSet(key, text)
@@ -81,29 +84,10 @@ export async function generateDebrief(concept: string, userId?: string | null, p
         const client = new OpenAI({ apiKey })
         const model = process.env.MODEL_NAME || 'gpt-4o-mini'
         const contextStr = formatContextForPrompt(ctx)
-        const prompt = `You are a campaign strategist creating a strategic brief for persona: ${persona || 'General'}.
-
-CAMPAIGN CONCEPT: "${concept}"
-
-${contextStr ? `# RELEVANT CONTEXT (cite these specific trends and insights):
-${contextStr}
-
-` : ''}# YOUR TASK:
-Create a strategic campaign brief as JSON with these fields:
-
-1. "brief" (2-3 sentences): Explain WHY this concept is strategically valuable right now. Reference specific trending content, platforms, or cultural moments from the context above. Be concrete and actionable.
-
-2. "summary" (1 sentence): The core campaign insight or hook that makes this timely and engaging.
-
-3. "keyPoints" (4 strategic bullets): Actionable campaign strategy points. Each should:
-   - Be specific to THIS concept (not generic advice)
-   - Reference trends or insights from the context when possible
-   - Focus on execution strategy (platforms, formats, collaborations, content beats)
-   - Example: "Leverage TikTok's #fyp algorithm by creating 15s hooks that mirror trending dance formats"
-
-4. "didYouKnow" (3 contextual insights): Surprising facts or trend insights from the context that support this campaign. Cite specific platform data, trending topics, or cultural insights.
-
-Return ONLY valid JSON. Make every field specific to "${concept}" and grounded in the provided context.`
+        const prompt = (await import('./promptStore.js')).renderTemplate(
+          await (await import('./promptStore.js')).getPrompt('debrief'),
+          { concept, persona, personaOrGeneral: persona || 'General', context: contextStr }
+        )
         const resp = await client.chat.completions.create({
           model,
           messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
@@ -238,26 +222,10 @@ export async function generateOpportunities(concept: string, userId?: string | n
         const client = new OpenAI({ apiKey })
         const model = process.env.MODEL_NAME || 'gpt-4o-mini'
         const contextStr = formatContextForPrompt(ctx)
-        const prompt = `You are a campaign strategist for persona: ${persona || 'General'}. Analyze this campaign concept: "${concept}"
-
-${contextStr ? `# RELEVANT CONTEXT (reference specific trends and data):
-${contextStr}
-
-` : ''}# YOUR TASK:
-Identify 5 HIGH-IMPACT campaign opportunities that are:
-- Specific to THIS concept (not generic tactics)
-- Grounded in the trending data and insights from context above
-- Actionable execution opportunities (not vague advice)
-- Campaign-focused (story beats, content formats, creator partnerships, platform plays)
-
-For each opportunity provide:
-- **title**: Clear, specific opportunity (e.g., "Launch with micro-influencer unboxing series on TikTok")
-- **why**: Business/strategic rationale tied to the concept and trends (50-80 chars)
-- **impact**: Estimated impact score 0-100 based on trend alignment and execution potential
-
-Also provide a brief **rationale** explaining how these opportunities work together as a campaign strategy.
-
-Return ONLY valid JSON: { opportunities: [{ title, why, impact }], rationale }`
+        const prompt = (await import('./promptStore.js')).renderTemplate(
+          await (await import('./promptStore.js')).getPrompt('opportunities'),
+          { concept, persona, personaOrGeneral: persona || 'General', context: contextStr }
+        )
         const resp = await client.chat.completions.create({
           model,
           messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
@@ -370,26 +338,18 @@ export async function generateEnhancements(concept: string, graph: TrendGraph, u
       const { OpenAI } = await import('openai')
       const client = new OpenAI({ apiKey })
       const model = process.env.MODEL_NAME || 'gpt-4o-mini'
-      const prompt = `You are a campaign strategist optimizing this concept for persona ${persona || 'General'}: "${concept}"
-
-Current campaign scores (0-100):
-- Narrative Strength: ${narrative}
-- Time to Peak: ${ttp}
-- Cross-Platform Potential: ${cross}
-- Commercial Viability: ${commercial}
-
-# YOUR TASK:
-Propose 4 SPECIFIC, ACTIONABLE enhancements to strengthen this campaign. Each enhancement should:
-- Be campaign-specific (not generic advice like "improve hook")
-- Target a specific narrative element: origin|hook|arc|pivots|evidence|resolution
-- Provide concrete execution guidance (e.g., "Open with 3-second product transformation visual before narration")
-
-For each enhancement provide:
-- **text**: Specific, actionable enhancement tied to "${concept}" (not generic)
-- **target**: Which narrative block it enhances (origin|hook|arc|pivots|evidence|resolution)
-- **deltas**: Expected score improvements { narrative, ttp, cross, commercial } (integers, can be 0 if no impact)
-
-Return ONLY valid JSON: { suggestions: [{ text, target, deltas: { narrative, ttp, cross, commercial } }] }`
+      const prompt = (await import('./promptStore.js')).renderTemplate(
+        await (await import('./promptStore.js')).getPrompt('enhancements'),
+        {
+          concept,
+          persona,
+          personaOrGeneral: persona || 'General',
+          narrativeScore: narrative,
+          ttpScore: ttp,
+          crossScore: cross,
+          commercialScore: commercial,
+        }
+      )
       const resp = await client.chat.completions.create({
         model,
         messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
@@ -489,6 +449,24 @@ export async function generateRecommendations(
     sources: context.sources
   })
 
+  // Query creators from database
+  let creators: any[] = []
+  try {
+    const creatorRepo = AppDataSource.getRepository(Creator)
+    const allCreators = await creatorRepo.find({ take: 10, order: { createdAt: 'DESC' } })
+    creators = allCreators.map(c => ({
+      id: c.id,
+      name: c.name,
+      platform: c.platform || 'Unknown',
+      category: c.category || 'General',
+      metadata: c.metadata || {}
+    }))
+    console.log('[RAG] Found creators:', creators.length)
+  } catch (err) {
+    console.error('[RAG] Failed to query creators:', err)
+    creators = []
+  }
+
   const apiKey = process.env.OPENAI_API_KEY
   console.log('[RAG] OpenAI key present:', !!apiKey)
 
@@ -500,42 +478,10 @@ export async function generateRecommendations(
 
       // Format context for prompt
       const contextStr = formatContextForPrompt(context)
-
-      const prompt = `You are a campaign strategist for persona: ${persona || 'General'}. You're creating an execution plan for this campaign concept: "${concept}"
-
-${contextStr ? `# RELEVANT CONTEXT (reference specific trends and insights):
-${contextStr}
-
-` : ''}# YOUR TASK:
-Create a tactical campaign execution plan with 4 categories of recommendations. Each recommendation should be:
-- Specific to THIS campaign concept (not generic advice)
-- Grounded in the context above (cite trending formats, platforms, or cultural moments when relevant)
-- Actionable and execution-ready
-
-**1. Narrative Development** (3 bullets):
-   - Story beats, hooks, arc progression, emotional journey
-   - Example: "Open with 3-second shock moment showcasing transformation, then reveal journey"
-
-**2. Content Strategy** (3 bullets):
-   - Content formats, posting cadence, content pillars, engagement loops
-   - Example: "Create 5-part episodic series with cliffhangers driving viewers to next installment"
-
-**3. Platform Coverage** (3 bullets):
-   - Platform-specific tactics, format adaptations, algorithmic optimization
-   - Reference trending formats from context (TikTok sounds, Instagram features, etc.)
-   - Example: "Launch on TikTok using trending #fyp dance format, then adapt for Instagram Reels with extended behind-the-scenes"
-
-**4. Collaboration** (3 bullets):
-   - Creator partnerships, audience participation, remix/duet opportunities
-   - Example: "Partner with 3 micro-influencers in gaming vertical for authentic reaction videos"
-
-**5. Framework Scoring**:
-   Include a framework object with 3 dimensions:
-   - market: { score: 0-100, why: "one-sentence explanation of market opportunity" }
-   - narrative: { score: 0-100, why: "one-sentence explanation of story strength" }
-   - commercial: { score: 0-100, why: "one-sentence explanation of monetization potential" }
-
-Return ONLY valid JSON with keys: narrative, content, platform, collab (arrays of strings), and framework object.`
+      const prompt = (await import('./promptStore.js')).renderTemplate(
+        await (await import('./promptStore.js')).getPrompt('recommendations'),
+        { concept, persona, personaOrGeneral: persona || 'General', context: contextStr }
+      )
 
       console.log('[RAG] Calling OpenAI with model:', model)
       console.log('[RAG] Prompt length:', prompt.length, 'characters')
@@ -551,9 +497,10 @@ Return ONLY valid JSON with keys: narrative, content, platform, collab (arrays o
 
       try {
         const result = JSON.parse(raw)
-        // Attach sources for attribution
+        // Attach sources and creators
         result.sources = context.sources
-        console.log('[RAG] Successfully parsed OpenAI response, returning with sources')
+        result.creators = creators
+        console.log('[RAG] Successfully parsed OpenAI response, returning with sources and', creators.length, 'creators')
         return result
       } catch (parseErr) {
         console.error('[RAG] Failed to parse OpenAI JSON response:', parseErr)
@@ -566,8 +513,8 @@ Return ONLY valid JSON with keys: narrative, content, platform, collab (arrays o
   }
   console.log('[RAG] Using heuristic fallback')
   const heuristic = buildHeuristicRecs(concept)
-  // Attach empty sources for heuristic mode
-  return { ...heuristic, sources: { user: [], core: [], live: [], predictive: [] } }
+  // Attach empty sources and creators for heuristic mode
+  return { ...heuristic, sources: { user: [], core: [], live: [], predictive: [] }, creators }
 }
 
 function buildHeuristicRecs(concept?: string) {
@@ -676,36 +623,20 @@ export async function generateConceptProposal(
         const evidence = narrativeBlocks.find(b => b.key === 'evidence')?.content || ''
         const resolution = narrativeBlocks.find(b => b.key === 'resolution')?.content || ''
 
-        const prompt = `You are a creative strategist crafting a shareable campaign proposal for persona: ${persona || 'General'}.
-
-CAMPAIGN CONCEPT: "${concept}"
-
-NARRATIVE FRAMEWORK:
-- Origin: ${origin || concept}
-- Hook: ${hook}
-- Narrative Arc: ${arc}
-- Pivotal Moments: ${pivots}
-- Supporting Evidence: ${evidence}
-- Resolution/Outcome: ${resolution}
-
-RECOMMENDED CREATIVE PARTNERS:
-${recommendedCreators.map(c => `- ${c.name} (${c.platform} • ${c.category}): ${c.tags.slice(0, 2).join(', ')}`).join('\n')}
-
-${contextStr ? `# RELEVANT CONTEXT (reference these insights):
-${contextStr}
-
-` : ''}# YOUR TASK:
-Create a compelling shareable pitch narrative (5-7 sentences) that:
-
-1. Opens with the campaign hook and core concept
-2. Explains WHY this concept is strategically valuable right now (reference context/trends if available)
-3. Highlights the PIVOTAL MOMENTS or key story beats that make this campaign engaging
-4. Explains WHY these specific creators are perfect matches:
-   - Connect each creator to specific aspects of the campaign (e.g., "${recommendedCreators[0]?.name}'s ${recommendedCreators[0]?.tags[0]} expertise aligns with...")
-   - Show how their platforms/audiences amplify the campaign
-5. End with the expected OUTCOME/IMPACT and call-to-action
-
-Write as a cohesive pitch narrative, NOT a bulleted list. Make it compelling and specific to THIS concept and THESE creators.`
+        const prompt = (await import('./promptStore.js')).renderTemplate(
+          await (await import('./promptStore.js')).getPrompt('concept_proposal'),
+          {
+            personaOrGeneral: persona || 'General',
+            concept,
+            hook,
+            origin: origin || concept,
+            arc,
+            pivots,
+            evidence,
+            resolution,
+            context: contextStr,
+          }
+        )
 
         const resp = await client.chat.completions.create({
           model,
