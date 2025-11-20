@@ -19,10 +19,12 @@ type NodeProps = {
   onUpdate: (id: string, updates: Partial<NodeData>) => void
   onFocus: (id: string) => void
   onStartLink?: (id: string) => void
+  scale?: number
+  getCanvasBounds?: () => DOMRect | null
   children: React.ReactNode
 }
 
-export default function Node({ data, onUpdate, onFocus, onStartLink, children }: NodeProps) {
+export default function Node({ data, onUpdate, onFocus, onStartLink, scale = 1, getCanvasBounds, children }: NodeProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [isResizing, setIsResizing] = useState(false)
@@ -36,10 +38,10 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, children }:
     setIsDragging(true)
     onFocus(data.id)
     // Calculate offset from current node position to mouse position
-    setDragOffset({
-      x: e.clientX - data.x,
-      y: e.clientY - data.y
-    })
+    const rect = getCanvasBounds?.() || { left: 0, top: 0 } as any
+    const cx = (e.clientX - (rect.left || 0)) / scale
+    const cy = (e.clientY - (rect.top || 0)) / scale
+    setDragOffset({ x: cx - data.x, y: cy - data.y })
   }
 
   const handleResizeMouseDown = (e: React.MouseEvent) => {
@@ -47,20 +49,21 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, children }:
     e.preventDefault()
     setIsResizing(true)
     onFocus(data.id)
-    setResizeStart({
-      width: data.width,
-      height: data.height,
-      mouseX: e.clientX,
-      mouseY: e.clientY
-    })
+    const rect = getCanvasBounds?.() || { left: 0, top: 0 } as any
+    const cx = (e.clientX - (rect.left || 0)) / scale
+    const cy = (e.clientY - (rect.top || 0)) / scale
+    setResizeStart({ width: data.width, height: data.height, mouseX: cx, mouseY: cy })
   }
 
   useEffect(() => {
     if (!isDragging) return
 
     const handleMouseMove = (e: MouseEvent) => {
-      const newX = e.clientX - dragOffset.x
-      const newY = e.clientY - dragOffset.y
+      const rect = getCanvasBounds?.() || { left: 0, top: 0 } as any
+      const cx = (e.clientX - (rect.left || 0)) / scale
+      const cy = (e.clientY - (rect.top || 0)) / scale
+      const newX = cx - dragOffset.x
+      const newY = cy - dragOffset.y
       onUpdate(data.id, { x: newX, y: newY })
     }
 
@@ -81,8 +84,11 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, children }:
     if (!isResizing) return
 
     const handleMouseMove = (e: MouseEvent) => {
-      const deltaX = e.clientX - resizeStart.mouseX
-      const deltaY = e.clientY - resizeStart.mouseY
+      const rect = getCanvasBounds?.() || { left: 0, top: 0 } as any
+      const cx = (e.clientX - (rect.left || 0)) / scale
+      const cy = (e.clientY - (rect.top || 0)) / scale
+      const deltaX = cx - resizeStart.mouseX
+      const deltaY = cy - resizeStart.mouseY
       const newWidth = Math.max(300, resizeStart.width + deltaX) // Min width 300px
       const newHeight = Math.max(200, resizeStart.height + deltaY) // Min height 200px
       onUpdate(data.id, { width: newWidth, height: newHeight })

@@ -22,6 +22,7 @@ import conversationRoutes from './routes/conversation.js'
 import ingestionRoutes from './routes/ingestion.js'
 import { authMiddleware, attachRls } from './middleware/auth.js'
 import { startTrendCollector } from './services/scheduler/trend-collector.js'
+import trendsSummaryRoutes from './routes/trends-summary.js'
 
 dotenv.config()
 const logger = pino({ level: process.env.NODE_ENV === 'production' ? 'info' : 'debug' })
@@ -84,6 +85,7 @@ async function main() {
   app.use('/ai', aiRoutes)
   app.use('/public', publicRoutes)
   app.use('/search', searchRoutes)
+  app.use('/trends/summary', trendsSummaryRoutes)
   app.use('/prompts', promptsRoutes)
 
   // Secure routes (require authentication)

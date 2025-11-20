@@ -240,7 +240,25 @@ async function retrieveProjectContent(
     return `[${a.name}] (${similarity}% match): ${snippet}`
   })
 
-  const sources = assets.map((a: any) => a.name)
+  let sources = assets.map((a: any) => a.name)
+
+  // Include any non-embedded project assets so uploads are always referenced (fills gaps while embeddings are pending)
+  try {
+    const nonEmbedded = await AppDataSource.query(
+      `SELECT * FROM content_assets WHERE embedding IS NULL AND "projectId" = $1 ORDER BY "createdAt" DESC`,
+      [projectId]
+    )
+    if (nonEmbedded && nonEmbedded.length) {
+      console.log('[PROJECT CONTENT] Including', nonEmbedded.length, 'non-embedded project assets')
+      for (const a of nonEmbedded) {
+        const snippet = a.metadata?.insights?.snippet || a.metadata?.text || ''
+        content.push(`[${a.name}] (new upload): ${snippet}`)
+        sources.push(a.name)
+      }
+    }
+  } catch (e) {
+    console.warn('[PROJECT CONTENT] Failed to include non-embedded assets:', e)
+  }
 
   return { content, sources }
 }
@@ -473,10 +491,27 @@ async function retrieveLiveMetrics(
   concept: string,
   limit: number
 ): Promise<{ content: string[]; sources: string[] }> {
+  // Prefer precomputed trend summaries to keep responses fast and deterministic
+  try {
+    const period = (process.env.RAG_SUMMARY_PERIOD as any) || 'week'
+    const platform = 'all'
+    const { getTrendSummary } = await import('./trendSummary.js')
+    const summary: any = await getTrendSummary(period, platform)
+    if (summary && Array.isArray(summary.items) && summary.items.length) {
+      const items = summary.items.slice(0, limit)
+      const content = items.map((m: any) => `[${(m.platform||'LIVE').toUpperCase()}] ${m.label || ''} (Engagement: ${m.engagement || 0}, Velocity: ${m.velocity || 0})`)
+      const sources = items.map((m: any, idx: number) => liveSourceId({ platform: m.platform, metric_type: m.type, value: m.value, createdAt: m.createdAt, engagement: m.engagement, velocity: m.velocity }, idx))
+      return { content, sources }
+    }
+  } catch (e) {
+    console.warn('[LIVE METRICS] Summary fetch failed or empty; falling back to raw metrics')
+  }
   console.log('[LIVE METRICS] Retrieving metrics for concept:', concept)
 
   // Query recent metrics (last 7 days)
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  // Configurable live window (days)
+  const days = Number(process.env.LIVE_WINDOW_DAYS || 7)
+  const sinceDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 
   // Extract keywords from concept for better matching
   const keywords = extractKeywords(concept)
@@ -491,10 +526,10 @@ async function retrieveLiveMetrics(
       WHERE "createdAt" > $1
       ORDER BY engagement DESC, velocity DESC
       LIMIT $2
-    `, [sevenDaysAgo, limit])
+    `, [sinceDate, limit])
 
     const content = topMetrics.map((m: any) => formatMetricContent(m))
-    const sources = topMetrics.map((m: any) => `${m.platform}:live`)
+    const sources = topMetrics.map((m: any, idx: number) => liveSourceId(m, idx))
     console.log('[LIVE METRICS] Returning', content.length, 'top trending items')
     return { content, sources }
   }
@@ -506,7 +541,7 @@ async function retrieveLiveMetrics(
     .join(' OR ')
 
   const params = [
-    sevenDaysAgo,
+    sinceDate,
     limit,
     ...keywords.map(kw => `%${kw}%`)
   ]
@@ -521,12 +556,24 @@ async function retrieveLiveMetrics(
   `
 
   console.log('[LIVE METRICS] Running query with', keywords.length, 'keywords')
-  const metrics = await AppDataSource.query(query, params)
+  let metrics = await AppDataSource.query(query, params)
 
   console.log('[LIVE METRICS] Found', metrics.length, 'matching metrics')
 
+  // If keyword match is sparse, top up with top trending to reach desired limit
+  if (metrics.length < Math.min(5, limit)) {
+    const fill = await AppDataSource.query(`
+      SELECT platform, metric_type, value, engagement, velocity, metadata, "createdAt"
+      FROM platform_metrics
+      WHERE "createdAt" > $1
+      ORDER BY engagement DESC, velocity DESC
+      LIMIT $2
+    `, [sinceDate, limit - metrics.length])
+    metrics = [...metrics, ...fill]
+  }
+
   const content = metrics.map((m: any) => formatMetricContent(m))
-  const sources = metrics.map((m: any) => `${m.platform}:live`)
+  const sources = metrics.map((m: any, idx: number) => liveSourceId(m, idx))
 
   return { content, sources }
 }
@@ -565,6 +612,22 @@ function formatMetricContent(metric: any): string {
     default:
       return `[${platform}] ${JSON.stringify(value).substring(0, 100)}`
   }
+}
+
+// Create a unique, stable-ish id for each live metric so source counts reflect items, not just platforms
+function liveSourceId(m: any, idx: number): string {
+  const plat = (m.platform || 'live').toString().toLowerCase()
+  const typ = (m.metric_type || 'metric').toString().toLowerCase()
+  const ts = (m.createdAt ? new Date(m.createdAt).toISOString() : `idx${idx}`)
+  // Extract a compact token from value (title/hashtag/id if present)
+  let token = ''
+  try {
+    const v = m.value || {}
+    token = v.id || v.hashtag || v.title || v.caption || ''
+    if (typeof token !== 'string') token = JSON.stringify(v).slice(0, 24)
+  } catch { token = '' }
+  token = (token || '').toString().replace(/\s+/g, '-').slice(0, 24)
+  return `${plat}:${typ}:${ts}:${token}`
 }
 
 /**

@@ -1,5 +1,6 @@
 import cron from 'node-cron'
 import { collectAllMetrics, cleanupOldMetrics } from '../external/apify.js'
+import { buildTrendSummaries } from '../trendSummary.js'
 
 /**
  * Daily trend collection scheduler
@@ -28,6 +29,10 @@ export function startTrendCollector() {
       const deleted = await cleanupOldMetrics(30)
       console.log('[SCHEDULER] Cleanup complete, deleted:', deleted)
 
+      // 3. Build summaries for day/week/month
+      await buildTrendSummaries(['day','week','month'])
+      console.log('[SCHEDULER] Trend summaries built')
+
     } catch (error) {
       console.error('[SCHEDULER] Daily collection failed:', error)
     }
@@ -39,7 +44,10 @@ export function startTrendCollector() {
   if (process.env.RUN_COLLECTION_ON_STARTUP === 'true') {
     console.log('[SCHEDULER] Running initial collection on startup...')
     collectAllMetrics()
-      .then(results => console.log('[SCHEDULER] Initial collection complete:', results))
+      .then(async results => {
+        console.log('[SCHEDULER] Initial collection complete:', results)
+        try { await buildTrendSummaries(['day','week','month']); console.log('[SCHEDULER] Initial summaries built') } catch (e) { console.error('[SCHEDULER] Initial summaries failed:', e) }
+      })
       .catch(err => console.error('[SCHEDULER] Initial collection failed:', err))
   }
 }

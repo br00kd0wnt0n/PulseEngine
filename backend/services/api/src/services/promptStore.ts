@@ -28,7 +28,7 @@ export const defaultTemplates: Record<PromptKey, string> = {
     `Given these active trends: {{trends}}{{#if focus}}\nFocus on: {{focus}}{{/if}}.\nExplain the narrative opportunity in 4-6 sentences: why now, which hooks, and predicted time-to-peak. Keep it direct.`,
 
   debrief:
-    `You are a campaign strategist creating a strategic brief for persona: {{personaOrGeneral}}.
+    `You are a {{personaRole}} creating a strategic brief.
 
 CAMPAIGN CONCEPT: "{{concept}}"
 
@@ -49,7 +49,7 @@ Create a strategic campaign brief as JSON with these fields:
 Return ONLY valid JSON with keys: brief, summary, keyPoints, didYouKnow.`,
 
   opportunities:
-    `You are a campaign strategist for persona: {{personaOrGeneral}}. Analyze this campaign concept: "{{concept}}"
+    `You are a {{personaRole}}. Analyze this campaign concept: "{{concept}}"
 
 {{#if context}}# RELEVANT CONTEXT (reference specific trends and data):
 {{context}}
@@ -60,7 +60,7 @@ Identify 5 HIGH-IMPACT campaign opportunities that are specific to this concept,
 Return ONLY JSON: { "opportunities": [{ "title": string, "why": string, "impact": number }], "rationale": string }`,
 
   enhancements:
-    `You are a campaign strategist optimizing this concept for persona: {{personaOrGeneral}}: "{{concept}}"
+    `You are a {{personaRole}} optimizing this concept: "{{concept}}"
 
 Current campaign scores (0-100):
 - Narrative Strength: {{narrativeScore}}
@@ -74,7 +74,7 @@ Propose 4 SPECIFIC, ACTIONABLE enhancements to strengthen this campaign. Each en
 Return ONLY JSON: { "suggestions": [{ "text": string, "target": string, "deltas": { "narrative": number, "ttp": number, "cross": number, "commercial": number } }] }`,
 
   recommendations:
-    `You are a campaign strategist for persona: {{personaOrGeneral}}. You're creating an execution plan for: "{{concept}}"
+    `You are a {{personaRole}}. You're creating an execution plan for: "{{concept}}"
 
 {{#if context}}# CONTEXT (for grounding):
 {{context}}
@@ -85,7 +85,7 @@ Provide arrays for: narrative, content, platform, collab (execution bullets) and
 Return ONLY JSON with keys exactly: narrative, content, platform, collab, framework.`,
 
   concept_proposal:
-    `You are a creative strategist crafting a shareable campaign proposal for persona: {{personaOrGeneral}}.
+    `You are a {{personaRole}} crafting a shareable campaign proposal.
 
 CONCEPT: "{{concept}}"
 
@@ -103,7 +103,7 @@ Resolution: {{resolution}}
 {{/if}}Write a compelling, specific, narrative-driven proposal that can be shared with partners. Keep it crisp and persuasive.`,
 
   rewrite_narrative:
-    `You are a campaign strategist. Rewrite the narrative below for the concept "{{concept}}"{{personaRegion}}, integrating these selected enhancements. Keep the same structure (numbered sections) and make it crisp, specific, and actionable.
+    `You are a {{personaRole}}. Rewrite the narrative below for the concept "{{concept}}"{{personaRegion}}, integrating these selected enhancements. Keep the same structure (numbered sections) and make it crisp, specific, and actionable.
 
 # Current Narrative
 {{narrative}}
@@ -114,7 +114,7 @@ Resolution: {{resolution}}
 Return ONLY the rewritten narrative, preserving numbered section headings.`,
 
   wildcard:
-    `You are a contrarian campaign strategist. Generate 1–2 WILDCARD insights that defy default assumptions AND are testable this week.
+    `You are a contrarian {{personaRole}}. Generate 1–2 WILDCARD insights that defy default assumptions AND are testable this week.
 Concept: "{{concept}}"{{personaRegion}}
 
 Grounding context (each item has an id). Cite ONLY using these ids:
@@ -153,6 +153,15 @@ export async function listPrompts(): Promise<{ key: PromptKey; content: string; 
 
 export function renderTemplate(tpl: string, vars: Record<string, any>): string {
   // simple {{var}} replacement with a couple of helpers
+  const persona = vars.persona ? String(vars.persona) : ''
+  const personaRole = persona ? `campaign strategist for ${persona}` : 'campaign strategist'
+  const pl = (persona || '').toLowerCase()
+  let personaTone = 'insight-first, specific, execution-ready'
+  if (/cmo|executive|vp|brand|marketing/.test(pl)) personaTone = 'board-ready, ROI-oriented, concise'
+  else if (/creator|influencer|ugc/.test(pl)) personaTone = 'creator-first, social-native, practical'
+  else if (/gen\s*z|teen|youth/.test(pl)) personaTone = 'punchy, culturally current, minimal jargon'
+  else if (/gaming|gamer|esports/.test(pl)) personaTone = 'platform-savvy, gaming vernacular, concise'
+
   return tpl
     .replace(/\{\{personaOrGeneral\}\}/g, vars.persona ? String(vars.persona) : 'General')
     .replace(/\{\{personaRegion\}\}/g, (() => {
@@ -161,6 +170,8 @@ export function renderTemplate(tpl: string, vars: Record<string, any>): string {
       if (vars.region) parts.push(`region: ${vars.region}`)
       return parts.length ? ` (${parts.join(', ')})` : ''
     })())
+    .replace(/\{\{personaRole\}\}/g, personaRole)
+    .replace(/\{\{personaTone\}\}/g, personaTone)
     .replace(/\{\{trends\}\}/g, String(vars.trends || ''))
     .replace(/\{\{focus\}\}/g, String(vars.focus || ''))
     .replace(/\{\{concept\}\}/g, String(vars.concept || ''))
@@ -183,4 +194,3 @@ export function renderTemplate(tpl: string, vars: Record<string, any>): string {
     // remove simple {{#if var}}...{{/if}} blocks when var is falsy
     .replace(/\{\{#if ([^}]+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (_m, v, inner) => vars[v.trim()] ? inner : '')
 }
-
