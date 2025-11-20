@@ -21,12 +21,12 @@ export default function Sidebar() {
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-30 bg-black/50 transition-opacity ${sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-[100] bg-black/50 transition-opacity ${sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={closeSidebar}
       />
       {/* Drawer */}
       <aside
-        className={`fixed z-40 top-0 left-0 h-full w-64 bg-charcoal-800/95 border-r border-white/10 backdrop-blur transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed z-[110] top-0 left-0 h-full w-64 bg-charcoal-800/95 border-r border-white/10 backdrop-blur transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
         aria-hidden={!sidebarOpen}
       >
         <div className="flex flex-col gap-4 p-4 h-full">

@@ -91,7 +91,7 @@ export default function Topbar() {
   const displayConcept = truncateConcept(concept)
 
   return (
-    <header className="sticky top-0 z-20 border-b border-white/10 shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
+    <header className="sticky top-0 z-[100] border-b border-white/10 shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
       <div className="bg-gradient-to-r from-ralph-pink to-ralph-teal">
         {/* Main navigation row */}
         <div className="px-4 md:px-8 py-3 flex items-center gap-3 text-white">
