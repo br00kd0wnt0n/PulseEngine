@@ -405,7 +405,7 @@ Return ONLY valid JSON: { suggestions: [{ text, target, deltas: { narrative, ttp
 
 export function scoreConceptMvp(concept: string, graph: TrendGraph) {
   const text = concept.toLowerCase()
-  const trendLabels = graph.nodes.filter(n => n.kind === 'trend').map(n => n.label.toLowerCase())
+  const trendLabels = (graph?.nodes || []).filter(n => n.kind === 'trend').map(n => n.label.toLowerCase())
   const trendHits = trendLabels.filter(t => text.includes(t))
   const keywords = ['ai','music','dance','challenge','loop','retro','gaming','edit','tutorial','short','reels','collab','remix']
   const keywordHits = keywords.filter(k => text.includes(k))
