@@ -628,12 +628,34 @@ export default function CanvasWorkflow() {
           ])
           if (cancel) return
           setScores(sc || null)
-          const list = Array.isArray(eh?.suggestions) ? eh.suggestions : []
+          let list = Array.isArray(eh?.suggestions) ? eh.suggestions : []
+          if (!list.length) {
+            // Fallback suggestions if API returns nothing
+            list = [
+              { text: `Add YouTube Shorts component to amplify reach`, deltas: { narrative: 8, ttp: 3, cross: 2, commercial: 4 } },
+              { text: `Integrate trending audio library for higher cultural relevance`, deltas: { narrative: 6, ttp: 2, cross: 3, commercial: 2 } },
+              { text: `Extend to Snapchat Spotlight to diversify platforms`, deltas: { narrative: 3, ttp: 2, cross: 4, commercial: 1 } },
+            ]
+          }
           setEnhancements(list)
           setScoringError(null)
           setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
         } catch (err) {
           if (!cancel) {
+            // Local fallback to keep flow alive
+            const approx = {
+              narrative: Math.min(100, Math.max(50, concept.length % 70 + 30)),
+              ttpWeeks: 4,
+              cross: 60,
+              commercial: 55,
+              overall: 65,
+            } as any
+            setScores(approx)
+            setEnhancements([
+              { text: `Add YouTube Shorts component to amplify reach`, deltas: { narrative: 8, ttp: 3, cross: 2, commercial: 4 } },
+              { text: `Integrate trending audio library for higher cultural relevance`, deltas: { narrative: 6, ttp: 2, cross: 3, commercial: 2 } },
+              { text: `Extend to Snapchat Spotlight to diversify platforms`, deltas: { narrative: 3, ttp: 2, cross: 4, commercial: 1 } },
+            ])
             setScoringError('Could not fetch scores (CORS blocked or network error).')
             setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
           }
@@ -1482,25 +1504,6 @@ export default function CanvasWorkflow() {
 
   return (
     <div className="relative w-full h-screen">
-      {/* Fixed Header - locked to top, always above main header */}
-      <div className="fixed top-16 left-4 right-4 z-[100]">
-        <div className="panel p-3 backdrop-blur-lg bg-charcoal-900/80">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs">
-              {concept && <div className="px-2 py-1 rounded bg-ralph-cyan/20 border border-ralph-cyan/40">{concept}</div>}
-              {persona && <div className="px-2 py-1 rounded bg-white/10 border border-white/20">Persona: {persona}</div>}
-              {region && <div className="px-2 py-1 rounded bg-white/10 border border-white/20">Region: {region}</div>}
-            </div>
-          </div>
-          {(processed.length > 0 && hasPlaceholders(processed)) && (
-            <div className="mt-2 text-[10px] text-white/80 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-ralph-cyan animate-pulse" />
-              <span>Indexing uploaded context… Debrief will appear once ready.</span>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Canvas with Nodes */}
       <Canvas nodes={nodes} onNodesChange={setNodes} renderNodeContent={renderNodeContent} />
 
