@@ -13,6 +13,7 @@ import assetRoutes from './routes/assets.js'
 import aiRoutes from './routes/ai.js'
 import statusRoutes from './routes/status.js'
 import publicRoutes from './routes/public.js'
+import promptsRoutes from './routes/prompts.js'
 import searchRoutes from './routes/search.js'
 import adminRoutes from './routes/admin.js'
 import projectRoutes from './routes/projects.js'
@@ -83,6 +84,7 @@ async function main() {
   app.use('/ai', aiRoutes)
   app.use('/public', publicRoutes)
   app.use('/search', searchRoutes)
+  app.use('/prompts', promptsRoutes)
 
   // Secure routes (require authentication)
   app.use(authMiddleware, attachRls)

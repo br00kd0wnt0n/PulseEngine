@@ -11,6 +11,7 @@ const nav = [
   { to: '/trends-admin', label: 'Trends' },
   { to: '/admin', label: 'Backend' },
   { to: '/rkb', label: 'RKB' },
+  { to: '/prompts', label: 'Prompts' },
 ]
 
 export default function Sidebar() {

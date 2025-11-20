@@ -17,6 +17,7 @@ import RKB from './pages/RKB'
 import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
 import TrendsAdmin from './pages/TrendsAdmin'
+import Prompts from './pages/Prompts'
 import { ThemeProvider } from './context/ThemeContext'
 import { TrendProvider } from './context/TrendContext'
 import { CreatorProvider } from './context/CreatorContext'
@@ -43,6 +44,7 @@ const router = createBrowserRouter([
       { path: 'admin', element: <AdminDashboard /> },
       { path: 'trends-admin', element: <TrendsAdmin /> },
       { path: 'rkb', element: <RKB /> },
+      { path: 'prompts', element: <Prompts /> },
       // Alternate view routes removed
     ],
   },

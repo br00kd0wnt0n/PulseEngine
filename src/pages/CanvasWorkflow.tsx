@@ -430,6 +430,8 @@ export default function CanvasWorkflow() {
       setNodes(prev => ([
         ...prev,
         { id: 'rkb', type: 'rkb', title: 'Ralph Knowledge Base', x: 50, y: 620, width: 300, height: 150, minimized: false, zIndex: 2, status: 'idle' as const },
+        { id: 'gwi', type: 'integration', title: 'GWI (inactive)', x: 50, y: 800, width: 260, height: 80, minimized: false, zIndex: 1, status: 'idle' as const },
+        { id: 'glimpse', type: 'integration', title: 'GLIMPSE (inactive)', x: 50, y: 900, width: 260, height: 80, minimized: false, zIndex: 1, status: 'idle' as const },
       ]))
     }
 
@@ -1502,7 +1504,7 @@ export default function CanvasWorkflow() {
                   Apply Enhancements
                 </button>
                 <button
-                  className="mt-2 w-full px-3 py-2 rounded border border-ralph-teal/40 bg-ralph-teal/20 hover:bg-ralph-teal/30 text-xs font-medium"
+                  className="mt-2 w-full px-3 py-2 rounded border border-yellow-400/40 bg-yellow-400/10 hover:bg-yellow-400/20 text-xs font-medium"
                   onClick={async (e) => {
                     e.stopPropagation()
                     // spawn wildcard node minimized
@@ -1654,7 +1656,7 @@ export default function CanvasWorkflow() {
                           <div className="text-white/60 text-[10px] mb-0.5">Evidence</div>
                           <div className="flex flex-wrap gap-1">
                             {idea.evidence.map((ev: string, i: number) => (
-                              <span key={i} className="px-1.5 py-0.5 rounded bg-ralph-teal/15 border border-ralph-teal/40 text-[10px]">{ev}</span>
+                              <span key={i} className="px-1.5 py-0.5 rounded bg-yellow-400/10 border border-yellow-400/40 text-[10px]">{ev}</span>
                             ))}
                           </div>
                         </div>
@@ -1683,7 +1685,7 @@ export default function CanvasWorkflow() {
                       )}
                       <div className="mt-2 flex items-center gap-2">
                         <button
-                          className="text-[10px] px-2 py-0.5 rounded bg-ralph-teal/70 hover:bg-ralph-teal"
+                          className="text-[10px] px-2 py-0.5 rounded bg-yellow-400/70 hover:bg-yellow-400 text-black"
                           onClick={() => {
                             // append a Wildcard Track to narrative
                             const block = `\n\n---\n\nWildcard Track: ${idea.title}\n\nWhy Contrarian:\n- ${(idea.contrarianWhy||[]).join('\n- ')}\n\nTest Plan:\n- ${(idea.testPlan||[]).join('\n- ')}\n\nFirst Step: ${idea.firstStep || ''}`

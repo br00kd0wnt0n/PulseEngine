@@ -10,6 +10,8 @@ type CanvasProps = {
 export default function Canvas({ nodes, onNodesChange, renderNodeContent }: CanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null)
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
+  const [linkFrom, setLinkFrom] = useState<string | null>(null)
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null)
 
   const handleNodeUpdate = (id: string, updates: Partial<NodeData>) => {
     onNodesChange(nodes.map(n => n.id === id ? { ...n, ...updates } : n))
@@ -23,6 +25,49 @@ export default function Canvas({ nodes, onNodesChange, renderNodeContent }: Canv
       n.id === id ? { ...n, zIndex: maxZ + 1 } : n
     ))
   }
+
+  const startLink = (id: string) => {
+    setLinkFrom(id)
+    setDragPos(null)
+  }
+
+  // Track mouse for link dragging
+  useEffect(() => {
+    if (!linkFrom) return
+    const handleMove = (e: MouseEvent) => {
+      const rect = canvasRef.current?.getBoundingClientRect()
+      if (!rect) return
+      setDragPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+    }
+    const handleUp = (e: MouseEvent) => {
+      const rect = canvasRef.current?.getBoundingClientRect()
+      if (!rect) { setLinkFrom(null); setDragPos(null); return }
+      const upPos = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+      // Find node under cursor (top-most by zIndex)
+      const sorted = [...nodes].sort((a,b) => b.zIndex - a.zIndex)
+      const target = sorted.find(n => {
+        const w = n.minimized ? 240 : n.width
+        const h = n.minimized ? 48 : n.height
+        return upPos.x >= n.x && upPos.x <= n.x + w && upPos.y >= n.y && upPos.y <= n.y + h
+      })
+      if (target && target.id !== linkFrom) {
+        onNodesChange(nodes.map(n => {
+          if (n.id !== linkFrom) return n
+          const existing = new Set(n.connectedTo || [])
+          existing.add(target.id)
+          return { ...n, connectedTo: Array.from(existing) }
+        }))
+      }
+      setLinkFrom(null)
+      setDragPos(null)
+    }
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleUp)
+    }
+  }, [linkFrom, nodes, onNodesChange])
 
   // Draw connection lines between nodes
   const renderConnections = () => {
@@ -62,6 +107,19 @@ export default function Canvas({ nodes, onNodesChange, renderNodeContent }: Canv
     return lines
   }
 
+  const renderTempLink = () => {
+    if (!linkFrom || !dragPos) return null
+    const src = nodes.find(n => n.id === linkFrom)
+    if (!src) return null
+    const sourceX = src.x + (src.minimized ? 240 : src.width)
+    const sourceY = src.y + (src.minimized ? 24 : src.height / 2)
+    const midX = (sourceX + dragPos.x) / 2
+    const path = `M ${sourceX} ${sourceY} C ${midX} ${sourceY}, ${midX} ${dragPos.y}, ${dragPos.x} ${dragPos.y}`
+    return (
+      <path d={path} stroke="url(#connectionGradient)" strokeWidth="2" fill="none" style={{ opacity: 0.6 }} />
+    )
+  }
+
   return (
     <div ref={canvasRef} className="relative w-full h-screen overflow-hidden bg-charcoal-900">
       {/* Optional WebGL Background Iframe */}
@@ -82,6 +140,7 @@ export default function Canvas({ nodes, onNodesChange, renderNodeContent }: Canv
           </linearGradient>
         </defs>
         {renderConnections()}
+        {renderTempLink()}
       </svg>
 
       {/* Nodes */}
@@ -91,6 +150,7 @@ export default function Canvas({ nodes, onNodesChange, renderNodeContent }: Canv
           data={node}
           onUpdate={handleNodeUpdate}
           onFocus={handleNodeFocus}
+          onStartLink={startLink}
         >
           {renderNodeContent?.(node)}
         </Node>

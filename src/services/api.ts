@@ -84,6 +84,14 @@ export const api = {
   postConversation: (projectId: string, payload: { role: 'user'|'ai'; content: string }) =>
     request<any>(`/projects/${projectId}/conversation`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
 
+  // Prompts admin (live-editable templates)
+  listPrompts: () => request<any[]>(`/prompts`),
+  getPrompt: (key: string) => request<{ key: string; content: string }>(`/prompts/${encodeURIComponent(key)}`),
+  savePrompt: (key: string, content: string) => request<{ ok: boolean }>(
+    `/prompts/${encodeURIComponent(key)}`,
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) }
+  ),
+
   // APIFY Admin endpoints
   collectTrends: () => request<any>('/admin/collect-trends', { method: 'POST' }),
   getCollectionStatus: () => request<any>('/admin/collect-trends/status'),

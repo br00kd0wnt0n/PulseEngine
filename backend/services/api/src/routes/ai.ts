@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements, generateConceptProposal } from '../services/ai.js'
 import { retrieveContext, formatContextForPrompt } from '../services/retrieval.js'
+import { getPrompt as getTpl, renderTemplate } from '../services/promptStore.js'
 import { generateEmbedding } from '../services/embeddings.js'
 import { searchResultCache, generateCacheKey } from '../services/cache.js'
 
@@ -64,7 +65,13 @@ router.post('/rewrite-narrative', async (req, res) => {
   const { concept, narrative, enhancements, persona, region, projectId } = req.body || {}
   if (!concept || !narrative) return res.status(400).json({ error: 'concept and narrative required' })
   const enh = Array.isArray(enhancements) ? enhancements.filter((t: any) => typeof t === 'string' && t.trim()).slice(0, 8) : []
-  const prompt = `You are a campaign strategist.\nRewrite the narrative below for the concept "${concept}"${persona?` (persona: ${persona})`:''}${region?` (region: ${region})`:''}, integrating these selected enhancements. Keep the same structure (numbered sections) and make it crisp, specific, and actionable.\n\n# Current Narrative\n${narrative}\n\n# Selected Enhancements\n${enh.map((e: string, i: number) => `${i+1}. ${e}`).join('\\n')}\n\nReturn ONLY the rewritten narrative, preserving numbered section headings.`
+  const prompt = renderTemplate(await getTpl('rewrite_narrative'), {
+    concept,
+    persona,
+    region,
+    narrative,
+    enhancementsList: enh.map((e: string, i: number) => `${i + 1}. ${e}`).join('\\n')
+  })
   try {
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) return res.json({ text: narrative })
@@ -116,33 +123,12 @@ router.post('/wildcard', async (req, res) => {
     pushItems(ctx.predictiveTrends, ctx.sources.predictive, 'predictive')
 
     const enumerated = flat.map(it => `${it.id}: ${it.text}`).join('\n')
-
-    const prompt = `You are a contrarian campaign strategist. Generate 1–2 WILDCARD insights that defy default assumptions AND are testable this week.
-Concept: "${concept}"${persona?` (persona: ${persona})`:''}${region?` (region: ${region})`:''}
-
-Grounding context (each item has an id). Cite ONLY using these ids:
-${enumerated}
-
-Strict rules:
-- No generic advice; do not restate any existing narrative or debrief.
-- Each idea must clearly challenge common platform tactics or biases and include at least one trade‑off.
-- Each idea MUST include exactly 3 evidence citations using id format like "ctx3" that map to the provided context.
-- Be specific, quantified where possible.
-
-Output ONLY strict JSON with this schema and keys, no prose:
-{
-  "ideas": [
-    {
-      "title": string,                  // <= 12 words
-      "contrarianWhy": string[],        // 1-2 bullets
-      "evidence": string[],             // exactly 3 items, each like "ctx#"
-      "upside": string,                 // quantified potential (e.g., +X%)
-      "risks": string[],                // <= 3 bullets
-      "testPlan": string[],             // <= 3 bullets for this week
-      "firstStep": string               // 1 line, cheap + falsifiable
-    }
-  ]
-}`
+    const prompt = renderTemplate(await getTpl('wildcard'), {
+      concept,
+      persona,
+      region,
+      enumerated,
+    })
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) return res.json({ ideas: [] })

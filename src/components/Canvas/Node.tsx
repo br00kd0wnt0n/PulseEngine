@@ -18,10 +18,11 @@ type NodeProps = {
   data: NodeData
   onUpdate: (id: string, updates: Partial<NodeData>) => void
   onFocus: (id: string) => void
+  onStartLink?: (id: string) => void
   children: React.ReactNode
 }
 
-export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
+export default function Node({ data, onUpdate, onFocus, onStartLink, children }: NodeProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [isResizing, setIsResizing] = useState(false)
@@ -110,6 +111,10 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
     if (data.type === 'wildcard') {
       return 'border-yellow-400/60 bg-yellow-400/20'
     }
+    // Integrations (inactive): subtle greyed
+    if (data.type === 'integration') {
+      return 'border-dashed border-white/20 bg-white/5 opacity-60'
+    }
     // RKB only - orange
     if (data.type === 'rkb') {
       return 'border-orange-400/40 bg-orange-400/10'
@@ -130,6 +135,9 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
   const getHoverGlow = () => {
     if (data.type === 'wildcard') {
       return 'hover:ring-2 hover:ring-yellow-400/50 hover:shadow-xl hover:shadow-yellow-400/40'
+    }
+    if (data.type === 'integration') {
+      return 'hover:ring-2 hover:ring-white/20 hover:shadow-xl hover:shadow-white/10'
     }
     if (data.type === 'rkb') {
       return 'hover:ring-2 hover:ring-orange-400/50 hover:shadow-xl hover:shadow-orange-400/40'
@@ -198,6 +206,18 @@ export default function Node({ data, onUpdate, onFocus, children }: NodeProps) {
             title="Drag to resize"
           />
         </>
+      )}
+
+      {/* Connection handle (for integrations) */}
+      {data.type === 'integration' && (
+        <div
+          className="absolute -right-2 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-white/20 border border-white/30 hover:bg-white/40 cursor-crosshair transition-colors"
+          title="Drag to connect"
+          onMouseDown={(e) => {
+            e.stopPropagation()
+            if (onStartLink) onStartLink(data.id)
+          }}
+        />
       )}
     </div>
   )
