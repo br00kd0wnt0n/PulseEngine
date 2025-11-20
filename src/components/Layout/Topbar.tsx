@@ -43,8 +43,9 @@ export default function Topbar() {
             ☰
           </button>
           <Link to="/" className="flex items-center gap-3">
-            <img src="/ralph_logo.png" alt="Narrativ" className="h-8 w-auto rounded" />
-            <div className="hidden sm:block font-semibold tracking-wide uppercase text-xs">NARRATIV™ - Storytelling Intelligence</div>
+            <div className="text-2xl font-bold tracking-tight" style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>ralph</div>
+            <div className="hidden md:block h-6 w-px bg-white/30" />
+            <div className="hidden md:block font-semibold tracking-wide uppercase text-xs">Storytelling Intelligence</div>
           </Link>
           <div className="relative flex-1 max-w-2xl ml-auto">
             <input
