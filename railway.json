@@ -27,9 +27,9 @@
     {
       "name": "web",
       "rootDir": ".",
-      "build": { "cmd": "npm ci && npm run build" },
+      "build": { "cmd": "rm -rf node_modules/.vite && npm ci && npm run build" },
       "deploy": {
-        "startCommand": "npx serve -s dist -l $PORT",
+        "startCommand": "npm run preview",
         "env": { "PORT": "3000", "NODE_ENV": "production" },
         "healthcheckPath": "/"
       }
