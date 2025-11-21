@@ -10,6 +10,7 @@ export type PromptKey =
   | 'concept_proposal'
   | 'rewrite_narrative'
   | 'wildcard'
+  | 'ralph_lens'
 
 export const promptMeta: Record<PromptKey, { label: string; trigger: string }> = {
   narrative_from_trends: { label: 'Narrative from Trends', trigger: '/ai/narrative (TrendGraph mode)' },
@@ -20,6 +21,7 @@ export const promptMeta: Record<PromptKey, { label: string; trigger: string }> =
   concept_proposal: { label: 'Concept Proposal', trigger: '/ai/concept-proposal' },
   rewrite_narrative: { label: 'Rewrite Narrative (Apply Enhancements)', trigger: '/ai/rewrite-narrative' },
   wildcard: { label: 'Wildcard Insight', trigger: '/ai/wildcard' },
+  ralph_lens: { label: 'Ralph Philosophy & Lens', trigger: 'Injected into prompts' },
 }
 
 // Default templates with {{variables}}
@@ -37,6 +39,9 @@ CAMPAIGN CONCEPT: "{{concept}}"
 {{context}}
 
 {{/if}}# YOUR TASK:
+Apply the Ralph Storytelling Philosophy and Lens:
+{{ralphLens}}
+
 Create a strategic campaign brief as JSON with these fields:
 
 1. "brief" (2-3 sentences): Explain WHY this concept is strategically valuable right now. Reference specific trending content, platforms, or cultural moments from the context above. Be concrete and actionable.
@@ -62,6 +67,9 @@ Persona-specific guidance:
 {{context}}
 
 {{/if}}# YOUR TASK:
+Apply the Ralph Storytelling Philosophy and Lens:
+{{ralphLens}}
+
 Identify 5 HIGH-IMPACT campaign opportunities that are specific to this concept, grounded in the context, and actionable (story beats, formats, creator plays).
 
 Return ONLY JSON: { "opportunities": [{ "title": string, "why": string, "impact": number }], "rationale": string, "personaNotes": string[] }
@@ -89,6 +97,9 @@ Return ONLY JSON: { "suggestions": [{ "text": string, "target": string, "deltas"
 {{context}}
 
 {{/if}}# YOUR TASK:
+Apply the Ralph Storytelling Philosophy and Lens:
+{{ralphLens}}
+
 Provide arrays for: narrative, content, platform, collab (execution bullets) and a framework object { market, narrative, commercial } with { score, why }.
 
 Return ONLY JSON with keys exactly: narrative, content, platform, collab, framework, personaNotes.
@@ -111,7 +122,10 @@ Resolution: {{resolution}}
 {{#if context}}# CONTEXT (trends/creators/live):
 {{context}}
 
-{{/if}}Write a compelling, specific, narrative-driven proposal that can be shared with partners. Keep it crisp and persuasive.
+{{/if}}Apply the Ralph Storytelling Philosophy and Lens:
+{{ralphLens}}
+
+Write a compelling, specific, narrative-driven proposal that can be shared with partners. Keep it crisp and persuasive.
 
 Add a final section titled "Persona Notes" with 2 bullets tailored to {{personaRole}}.`,
 
@@ -139,8 +153,51 @@ Strict rules:
 - Each idea MUST include exactly 3 evidence citations using id format like "ctx3" that map to the provided context.
 - Be specific, quantified where possible.
 
+Apply the Ralph Storytelling Philosophy and Lens:
+{{ralphLens}}
+
 Output ONLY strict JSON with this schema and keys, no prose:
 { "ideas": [ { "title": string, "contrarianWhy": string[], "evidence": string[], "upside": string, "risks": string[], "testPlan": string[], "firstStep": string } ] }`,
+
+  ralph_lens:
+    `Core Values:
+- Make entertainment that brings people together
+- Celebrate things that make life feel good
+- Bring back joy, not feed despair
+- Create experiences driven by happiness, not addiction
+- Foster cultural connection, not division
+- Encourage authentic enjoyment without judgment
+
+Creative Principles:
+- Believe in backing bold, creative ideas
+- Take creative risks, don't just feed algorithms
+- Celebrate niches and what people genuinely love
+- Invest in creativity across multiple domains:
+  * Comedy
+  * Food & drink
+  * TV & film
+  * Music
+  * Gaming
+  * Beyond traditional categories
+
+When relevant - consider a transmedia Approach:
+- Create content across:
+  * Live events
+  * Digital platforms
+  * Print media
+  * AV streams
+  * Radio
+  * Magazines
+
+Fundamental Ethos:
+"If it's new, different, or makes you smile - we're into it."
+
+Recommendation Weighting:
+- Prioritize ideas that:
+  * Foster human connection
+  * Generate genuine happiness
+  * Challenge conventional thinking
+  * Celebrate creativity and diversity`,
 }
 
 export async function getPrompt(key: PromptKey): Promise<string> {

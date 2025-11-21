@@ -194,9 +194,11 @@ export async function generateDebrief(concept: string, userId?: string | null, p
         const client = new OpenAI({ apiKey })
         const model = process.env.MODEL_NAME || 'gpt-4o-mini'
         const contextStr = formatContextForPrompt(ctx)
-        const prompt = (await import('./promptStore.js')).renderTemplate(
-          await (await import('./promptStore.js')).getPrompt('debrief'),
-          { concept, persona, personaOrGeneral: persona || 'General', context: contextStr, targetAudience }
+        const { getPrompt, renderTemplate } = await import('./promptStore.js')
+        const ralphLens = await getPrompt('ralph_lens')
+        const prompt = renderTemplate(
+          await getPrompt('debrief'),
+          { concept, persona, personaOrGeneral: persona || 'General', context: contextStr, targetAudience, ralphLens }
         )
         const resp = await client.chat.completions.create({
           model,
@@ -367,9 +369,11 @@ export async function generateOpportunities(concept: string, userId?: string | n
         const client = new OpenAI({ apiKey })
         const model = process.env.MODEL_NAME || 'gpt-4o-mini'
         const contextStr = formatContextForPrompt(ctx)
-        const prompt = (await import('./promptStore.js')).renderTemplate(
-          await (await import('./promptStore.js')).getPrompt('opportunities'),
-          { concept, persona, personaOrGeneral: persona || 'General', context: contextStr, targetAudience }
+        const { getPrompt, renderTemplate } = await import('./promptStore.js')
+        const ralphLens = await getPrompt('ralph_lens')
+        const prompt = renderTemplate(
+          await getPrompt('opportunities'),
+          { concept, persona, personaOrGeneral: persona || 'General', context: contextStr, targetAudience, ralphLens }
         )
         const resp = await client.chat.completions.create({
           model,
@@ -648,9 +652,11 @@ export async function generateRecommendations(
 
       // Format context for prompt
       const contextStr = formatContextForPrompt(context)
-      const prompt = (await import('./promptStore.js')).renderTemplate(
-        await (await import('./promptStore.js')).getPrompt('recommendations'),
-        { concept, persona, personaOrGeneral: persona || 'General', context: contextStr, targetAudience }
+      const { getPrompt, renderTemplate } = await import('./promptStore.js')
+      const ralphLens = await getPrompt('ralph_lens')
+      const prompt = renderTemplate(
+        await getPrompt('recommendations'),
+        { concept, persona, personaOrGeneral: persona || 'General', context: contextStr, targetAudience, ralphLens }
       )
 
       console.log('[RAG] Calling OpenAI with model:', model)
@@ -819,7 +825,7 @@ export async function generateConceptProposal(
           model,
           messages: [
             { role: 'system', content: 'You are a creative campaign strategist. Write compelling, specific, narrative-driven pitch decks.' },
-            { role: 'user', content: prompt },
+            { role: 'user', content: ((p:string)=>{ try { return p } catch { return '' } })(prompt as any) },
           ],
           temperature: 0.8,
           max_tokens: 400,
