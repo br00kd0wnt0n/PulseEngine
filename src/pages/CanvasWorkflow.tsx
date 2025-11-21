@@ -744,22 +744,37 @@ export default function CanvasWorkflow() {
           setEnhancements(list)
           setScoringError(null)
           setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
-        } catch (err) {
-          if (!cancel) {
-            // Local fallback to keep flow alive
-            const approx = {
-              narrative: Math.min(100, Math.max(50, concept.length % 70 + 30)),
-              ttpWeeks: 4,
-              cross: 60,
-              commercial: 55,
-              overall: 65,
-            } as any
-            setScores(approx)
-            setEnhancements([
-              { text: `Add YouTube Shorts component to amplify reach`, deltas: { narrative: 8, ttp: 3, cross: 2, commercial: 4 } },
-              { text: `Integrate trending audio library for higher cultural relevance`, deltas: { narrative: 6, ttp: 2, cross: 3, commercial: 2 } },
-              { text: `Extend to Snapchat Spotlight to diversify platforms`, deltas: { narrative: 3, ttp: 2, cross: 4, commercial: 1 } },
-            ])
+          } catch (err) {
+            if (!cancel) {
+              // Local fallback to keep flow alive
+              const narrativeStrength = Math.min(100, Math.max(50, concept.length % 70 + 30))
+              const timeToPeakWeeks = 4
+              const collaborationOpportunity = 60
+              const ralph = {
+                crossPlatformPotential: 62,
+                culturalRelevance: 58,
+                narrativeAdaptability: 60,
+              }
+              const ttpScore = Math.max(0, Math.min(100, 100 - (timeToPeakWeeks - 1) * 12))
+              const commercial = Math.round(0.6 * collaborationOpportunity + 0.4 * (ralph.culturalRelevance))
+              const overall = Math.round((narrativeStrength + ttpScore + ralph.crossPlatformPotential + commercial) / 4)
+              const approx = {
+                scores: { narrativeStrength, timeToPeakWeeks, collaborationOpportunity },
+                ralph,
+                extended: {
+                  overall,
+                  commercialPotential: commercial,
+                  crossPlatformPotential: ralph.crossPlatformPotential,
+                  timeToPeakScore: ttpScore,
+                  impactMap: { hookClarity: 10, loopMoment: 0, collabPlan: 8 },
+                }
+              }
+              setScores(approx as any)
+              setEnhancements([
+                { text: `Add YouTube Shorts component to amplify reach`, deltas: { narrative: 8, ttp: 3, cross: 2, commercial: 4 } },
+                { text: `Integrate trending audio library for higher cultural relevance`, deltas: { narrative: 6, ttp: 2, cross: 3, commercial: 2 } },
+                { text: `Extend to Snapchat Spotlight to diversify platforms`, deltas: { narrative: 3, ttp: 2, cross: 4, commercial: 1 } },
+              ])
             setScoringError('Could not fetch scores (CORS blocked or network error).')
             setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
           }
@@ -923,6 +938,14 @@ export default function CanvasWorkflow() {
               <option value="Asia Pacific">Asia Pacific</option>
             </select>
           </div>
+          <input
+            type="text"
+            value={targetAudience}
+            onChange={(e) => { setTargetAudience(e.target.value); try { localStorage.setItem('targetAudience', e.target.value) } catch {} }}
+            onMouseDown={(e) => e.stopPropagation()}
+            placeholder="Target audience (e.g., Gen Z parents, guitar enthusiasts, collectors)"
+            className="w-full bg-charcoal-800/70 border border-white/10 rounded px-3 py-1.5 text-xs"
+          />
           <button
             onClick={(e) => { e.stopPropagation(); handleSubmit(); }}
             onMouseDown={(e) => e.stopPropagation()}
@@ -1180,6 +1203,17 @@ export default function CanvasWorkflow() {
                         )
                       })}
                     </div>
+                  </div>
+                )}
+
+                {Array.isArray((debrief as any).personaNotes) && (debrief as any).personaNotes.length > 0 && (
+                  <div className="mt-3">
+                    <div className="text-white/60 font-medium mb-1 text-[10px]">Persona Notes</div>
+                    <ul className="list-disc pl-4 space-y-1">
+                      {(debrief as any).personaNotes.slice(0,2).map((p: string, i: number) => (
+                        <li key={i} className="text-white/70 text-[10px]">{p}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>

@@ -36,7 +36,7 @@ async function callOpenAI(prompt: string): Promise<string> {
   return resp.choices?.[0]?.message?.content || ''
 }
 
-const STRICT_AI_ONLY = (process.env.STRICT_AI_ONLY === 'true') || (process.env.DISABLE_HEURISTIC_FALLBACK === 'true')
+const STRICT_AI_ONLY = true // Force strict AI-only mode by default as requested
 
 export async function narrativeFromTrends(graph: TrendGraph, focusId?: string | null) {
   const focus = focusId ? graph.nodes.find(n => n.id === focusId)?.label : null
@@ -94,9 +94,27 @@ export async function generateDebrief(concept: string, userId?: string | null, p
           temperature: 0.5,
           max_tokens: 350,
         })
-        const raw = resp.choices?.[0]?.message?.content || '{}'
+        let raw = resp.choices?.[0]?.message?.content || '{}'
+        const tryParse = (s: string) => {
+          try { return JSON.parse(s) } catch {
+            const m = s.match(/\{[\s\S]*\}/)
+            if (m) { try { return JSON.parse(m[0]) } catch {} }
+            return null
+          }
+        }
+        let parsed = tryParse(raw)
+        // If parse fails, re‑try once with a stronger instruction
+        if (!parsed) {
+          const resp2 = await client.chat.completions.create({
+            model,
+            messages: [ { role: 'system', content: 'Return only JSON with keys: brief, summary, keyPoints, didYouKnow, personaNotes.' }, { role: 'user', content: prompt } ],
+            temperature: 0.5,
+            max_tokens: 350,
+          })
+          raw = resp2.choices?.[0]?.message?.content || '{}'
+          parsed = tryParse(raw)
+        }
         try {
-          const parsed = JSON.parse(raw)
           const withSources = { ...parsed, sources: ctx.sources, _debug: { prompt, model } }
           await cacheSet(cacheKey, withSources)
           return withSources
@@ -182,6 +200,16 @@ export async function generateDebrief(concept: string, userId?: string | null, p
           ? `Trending creator partnerships in your concept space show 4-6x organic amplification`
           : `Authentic creator collaborations generate ${isCampaignStrategy ? 'trust signals that' : ''} outperform traditional ads by 3-5x`)
 
+        // Pull one dynamic signal from context when available
+        try {
+          const live = (ctx.liveMetrics || [])[0]
+          if (live) insights.unshift(`Live signal: ${String(live).slice(0, 120)}…`)
+        } catch {}
+        try {
+          const core = (ctx.coreKnowledge || [])[0]
+          if (core) insights.push(`RKB: ${String(core).slice(0, 120)}…`)
+        } catch {}
+
         return insights.slice(0, 3) // Return top 3 insights
       })(),
       sources: ctx.sources,
@@ -239,9 +267,26 @@ export async function generateOpportunities(concept: string, userId?: string | n
           temperature: 0.6,
           max_tokens: 380,
         })
-        const raw = resp.choices?.[0]?.message?.content || '{}'
+        let raw = resp.choices?.[0]?.message?.content || '{}'
+        const tryParse = (s: string) => {
+          try { return JSON.parse(s) } catch {
+            const m = s.match(/\{[\s\S]*\}/)
+            if (m) { try { return JSON.parse(m[0]) } catch {} }
+            return null
+          }
+        }
+        let parsed = tryParse(raw)
+        if (!parsed) {
+          const resp2 = await client.chat.completions.create({
+            model,
+            messages: [ { role: 'system', content: 'Return only JSON with keys: opportunities, rationale, personaNotes.' }, { role: 'user', content: prompt } ],
+            temperature: 0.6,
+            max_tokens: 380,
+          })
+          raw = resp2.choices?.[0]?.message?.content || '{}'
+          parsed = tryParse(raw)
+        }
         try {
-          const parsed = JSON.parse(raw)
           const withSources = { ...parsed, sources: ctx.sources, _debug: { prompt, model } }
           await cacheSet(cacheKey, withSources)
           return withSources

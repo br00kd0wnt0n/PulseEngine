@@ -20,6 +20,7 @@ export default function Topbar() {
   const [concept, setConcept] = useState('')
   const [persona, setPersona] = useState('')
   const [region, setRegion] = useState('')
+  const [audience, setAudience] = useState('')
 
   useEffect(() => {
     // Initial read
@@ -27,6 +28,7 @@ export default function Topbar() {
       setConcept(localStorage.getItem('concept') || '')
       setPersona(localStorage.getItem('persona') || '')
       setRegion(localStorage.getItem('region') || '')
+      setAudience(localStorage.getItem('targetAudience') || '')
     }
 
     updateFromLocalStorage()
@@ -158,6 +160,11 @@ export default function Topbar() {
                 {region && (
                   <div className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white whitespace-nowrap">
                     Region: {region}
+                  </div>
+                )}
+                {audience && (
+                  <div className="px-2 py-1 rounded bg-white/10 border border-white/20 text-white whitespace-nowrap">
+                    Audience: {audience}
                   </div>
                 )}
               </div>

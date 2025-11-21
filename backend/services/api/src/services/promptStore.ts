@@ -43,9 +43,9 @@ Create a strategic campaign brief as JSON with these fields:
 
 2. "summary" (1 sentence): The core campaign insight or hook that makes this timely and engaging.
 
-3. "keyPoints" (4 strategic bullets): Actionable campaign strategy points. Each should be specific to THIS concept and reference the context when possible.
+3. "keyPoints" (4 strategic bullets, each ≤ 12 words): Actionable campaign strategy points. Each should be specific to THIS concept and reference the context when possible.
 
-4. "didYouKnow" (3 contextual insights): Surprising facts or trend insights from the context that support this campaign.
+4. "didYouKnow" (3 contextual insights, each ≤ 12 words): Surprising facts or trend insights from the context that support this campaign.
 
 Return ONLY valid JSON with keys: brief, summary, keyPoints, didYouKnow, personaNotes.
 
