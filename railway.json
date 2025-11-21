@@ -27,7 +27,7 @@
     {
       "name": "web",
       "rootDir": ".",
-      "build": { "cmd": "rm -rf node_modules/.vite && npm ci && npm run build" },
+      "build": { "cmd": "npm ci && npm run railway:build" },
       "deploy": {
         "startCommand": "npm run preview",
         "env": { "PORT": "3000", "NODE_ENV": "production" },
