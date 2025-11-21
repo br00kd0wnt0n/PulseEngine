@@ -20,7 +20,7 @@ export const api = {
     '/ai/narrative',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ graph, focusId }) }
   ),
-  score: (concept: string, graph: any, opts?: { persona?: string; region?: string }) => request<any>(
+  score: (concept: string, graph: any, opts?: { persona?: string; region?: string; projectId?: string; targetAudience?: string }) => request<any>(
     '/ai/score',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph, ...(opts||{}) }) }
   ),

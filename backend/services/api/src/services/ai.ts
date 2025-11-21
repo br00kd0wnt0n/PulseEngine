@@ -63,6 +63,116 @@ export async function narrativeFromTrends(graph: TrendGraph, focusId?: string | 
   }
 }
 
+// AI-based Scoring with rubric and evidence
+export async function generateScoresAI(
+  concept: string,
+  userId?: string | null,
+  persona?: string | null,
+  projectId?: string | null,
+  targetAudience?: string | null
+) {
+  // Retrieve context
+  let ctx: RetrievalContext
+  try {
+    ctx = await retrieveContext(concept, userId || null, { maxResults: 15, includeCore: true, includeLive: true, projectId: projectId || null })
+  } catch (err) {
+    throw new Error('context_unavailable')
+  }
+
+  // Enumerate context items for grounded citations
+  type CtxItem = { id: string; text: string }
+  const flat: CtxItem[] = []
+  const push = (arr: string[]) => { for (const t of arr) flat.push({ id: `ctx${flat.length+1}`, text: t }) }
+  push(ctx.projectContent)
+  push(ctx.coreKnowledge)
+  push(ctx.liveMetrics)
+  const enumerated = flat.map(it => `${it.id}: ${it.text}`).join('\n')
+
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error('no-openai')
+
+  const { OpenAI } = await import('openai')
+  const client = new OpenAI({ apiKey })
+  const model = process.env.MODEL_NAME || 'gpt-4o-mini'
+
+  const personaRole = persona ? `campaign strategist for ${persona}` : 'campaign strategist'
+  const parts: string[] = []
+  parts.push(`You are a ${personaRole}. Return ONLY JSON.`)
+  if (targetAudience) parts.push(`Target audience: ${targetAudience}.`)
+  parts.push(
+    `Score the campaign concept: "${concept}" using the provided context (with ids). Each score MUST be evidence-backed.`
+  )
+  parts.push(`Context for evidence (use ids like ctx3):\n${enumerated}`)
+  parts.push(`Schema strictly: {
+  "scores": { "narrativeStrength": 0-100, "timeToPeakWeeks": 1-12, "collaborationOpportunity": 0-100 },
+  "ralph": { "narrativeAdaptability": 0-100, "crossPlatformPotential": 0-100, "culturalRelevance": 0-100 },
+  "rationales": { "narrative": string[], "timing": string[], "cross": string[], "commercial": string[] },
+  "evidence": string[]
+}`)
+  parts.push(`Rules:
+- Use at least 2 evidence ids from context when available.
+- Each rationale bullet ≤ 12 words and specific.
+- Penalize generic claims. Use live signals for timing when possible.
+- Return only JSON, no prose.`)
+
+  const prompt = parts.join('\n\n')
+
+  const resp = await client.chat.completions.create({
+    model,
+    messages: [ { role: 'system', content: 'Return only valid JSON. Be concise and evidence-based.' }, { role: 'user', content: prompt } ],
+    temperature: 0.2,
+    max_tokens: 500,
+  })
+  const raw = resp.choices?.[0]?.message?.content || '{}'
+  const tryParse = (s: string) => {
+    try { return JSON.parse(s) } catch {
+      const m = s.match(/\{[\s\S]*\}/)
+      if (m) { try { return JSON.parse(m[0]) } catch {} }
+      return null
+    }
+  }
+  const parsed = tryParse(raw)
+  if (!parsed || !parsed.scores || !parsed.ralph) throw new Error('parse_failed')
+
+  const scores = parsed.scores || {}
+  const ralph = parsed.ralph || {}
+  // Compute extended metrics
+  const ttpWeeks = Math.max(1, Math.min(12, Number(scores.timeToPeakWeeks || 8)))
+  const timeToPeakScore = Math.max(0, Math.min(100, 100 - (ttpWeeks - 1) * 12))
+  const commercialPotential = Math.round(
+    0.6 * Number(scores.collaborationOpportunity || 0) + 0.4 * Number(ralph.culturalRelevance || 0)
+  )
+  const overall = Math.round((
+    Number(scores.narrativeStrength || 0) + timeToPeakScore + Number(ralph.crossPlatformPotential || 0) + commercialPotential
+  ) / 4)
+
+  const result = {
+    scores: {
+      narrativeStrength: Number(scores.narrativeStrength || 0),
+      timeToPeakWeeks: ttpWeeks,
+      collaborationOpportunity: Number(scores.collaborationOpportunity || 0),
+    },
+    ralph: {
+      narrativeAdaptability: Number(ralph.narrativeAdaptability || 0),
+      crossPlatformPotential: Number(ralph.crossPlatformPotential || 0),
+      culturalRelevance: Number(ralph.culturalRelevance || 0),
+    },
+    extended: {
+      overall,
+      commercialPotential,
+      crossPlatformPotential: Number(ralph.crossPlatformPotential || 0),
+      timeToPeakScore,
+      impactMap: undefined as any,
+    },
+    rationales: parsed.rationales || {},
+    sources: ctx.sources,
+    evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],
+    _debug: { prompt, model }
+  }
+
+  return result
+}
+
 // Debrief: recap + key points + did-you-know insights
 export async function generateDebrief(concept: string, userId?: string | null, persona?: string | null, projectId?: string | null, targetAudience?: string | null) {
   try {

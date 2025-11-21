@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements, generateConceptProposal } from '../services/ai.js'
+import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements, generateConceptProposal, generateScoresAI } from '../services/ai.js'
 import { retrieveContext, formatContextForPrompt } from '../services/retrieval.js'
 import { getPrompt as getTpl, renderTemplate } from '../services/promptStore.js'
 import { generateEmbedding } from '../services/embeddings.js'
@@ -297,25 +297,16 @@ function cosineSimilarity(a: number[] | null, b: number[] | null): number | null
 }
 
 router.post('/score', async (req, res) => {
-  const { concept, graph } = req.body || {}
+  const { concept, graph, persona, projectId, targetAudience } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
-  const g = graph ?? { nodes: [], links: [] }
-  const result = scoreConceptMvp(concept, g)
-  // Extend with overall + commercial + impact map
-  const narrative = result.scores.narrativeStrength
-  const ttpWks = result.scores.timeToPeakWeeks
-  const ttp = Math.max(0, Math.min(100, 100 - (ttpWks - 1) * 12)) // sooner peak => higher score
-  const cross = (result as any).ralph?.crossPlatformPotential ?? 0
-  const commercial = Math.round(
-    0.6 * result.scores.collaborationOpportunity + 0.4 * ((result as any).ralph?.culturalRelevance ?? 50)
-  )
-  const overall = Math.round((narrative + ttp + cross + commercial) / 4)
-  const impactMap = {
-    hookClarity: Math.min(20, (result.hits.keywordHits?.length || 0) * 2),
-    loopMoment: (concept.toLowerCase().includes('loop') ? 10 : 0),
-    collabPlan: Math.min(20, result.scores.collaborationOpportunity / 5),
+  try {
+    const userId = (req as any).user?.sub || null
+    const data = await generateScoresAI(concept, userId, persona || null, projectId || null, targetAudience || null)
+    res.json(data)
+  } catch (e: any) {
+    // Explicitly signal unavailability so UI can show 'Scores not available'
+    res.status(503).json({ error: 'scores_unavailable' })
   }
-  res.json({ ...result, extended: { overall, commercialPotential: commercial, crossPlatformPotential: cross, timeToPeakScore: ttp, impactMap } })
 })
 
 router.post('/recommendations', async (req, res) => {

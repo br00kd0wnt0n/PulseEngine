@@ -3,6 +3,7 @@ import { api } from '../../services/api'
 import { useDashboard } from '../../context/DashboardContext'
 import { useTrends } from '../../context/TrendContext'
 import { logActivity } from '../../utils/activity'
+import Tooltip from '../shared/Tooltip'
 
 export default function ScoringEnhancements() {
   const { concept } = useDashboard()
@@ -12,6 +13,7 @@ export default function ScoringEnhancements() {
   const [updatedAfterApply, setUpdatedAfterApply] = useState<boolean>(false)
   const [enh, setEnh] = useState<{ suggestions: { text: string; target: string; impact: number }[] } | null>(null)
   const graph = useMemo(() => snapshot(), [snapshot])
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancel = false
@@ -23,9 +25,15 @@ export default function ScoringEnhancements() {
         const persona = (localStorage.getItem('persona') || '').replace(/"/g,'')
         const mods = [region?`Region: ${region}`:'', persona?`Persona: ${persona}`:''].filter(Boolean).join('; ')
         const modConcept = mods ? `${concept} (${mods})` : concept
-        const [s, e] = await Promise.all([api.score(modConcept, graph), api.enhancements(modConcept, graph)])
+        const targetAudience = (localStorage.getItem('targetAudience') || '').replace(/"/g,'')
+        const pid = localStorage.getItem('activeProjectId') || undefined
+        const [s, e] = await Promise.all([
+          api.score(concept, graph, { persona, region, projectId: pid, targetAudience }),
+          api.enhancements(modConcept, graph)
+        ])
         if (!cancel) {
           setScore(s); setEnh(e)
+          setError(null)
           // persist compact score snapshot for co‑pilot guidance
           try {
             const pid = localStorage.getItem('activeProjectId') || 'local'
@@ -40,7 +48,9 @@ export default function ScoringEnhancements() {
             localStorage.setItem(`score:${pid}`, JSON.stringify(snap))
           } catch {}
         }
-      } catch {}
+      } catch (e) {
+        if (!cancel) { setScore(null); setError('Scores not available'); }
+      }
     })()
     return () => { cancel = true }
   }, [concept, graph])
@@ -70,7 +80,9 @@ export default function ScoringEnhancements() {
           const persona = (localStorage.getItem('persona') || '').replace(/"/g,'')
           const mods = [region?`Region: ${region}`:'', persona?`Persona: ${persona}`:''].filter(Boolean).join('; ')
           const modConcept = mods ? `${concept} (${mods})` : concept
-          const s = await api.score(modConcept, graph)
+          const targetAudience = (localStorage.getItem('targetAudience') || '').replace(/"/g,'')
+          const pid = localStorage.getItem('activeProjectId') || undefined
+          const s = await api.score(concept, graph, { persona, region, projectId: pid, targetAudience })
           setScore(s)
           try {
             const pid = localStorage.getItem('activeProjectId') || 'local'
@@ -102,14 +114,14 @@ export default function ScoringEnhancements() {
         </div>
       </div>
       {!score && (
-        <div className="text-xs text-white/60 mb-2">Scoring concept and computing targeted enhancements…</div>
+        <div className="text-xs text-white/60 mb-2">{error ? error : 'Scoring concept and computing targeted enhancements…'}</div>
       )}
       <div className="grid md:grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Metric label="Narrative Potential" value={score?.scores?.narrativeStrength} previousValue={lastExt?.narrative} delta={diff(score?.scores?.narrativeStrength, lastExt?.narrative)} />
-          <Metric label="Time to Peak" value={score?.scores?.timeToPeakWeeks} previousValue={lastExt?.ttpWeeks} unit="wks" delta={diff(score?.scores?.timeToPeakWeeks, lastExt?.ttpWeeks)} />
-          <Metric label="Cross‑platform" value={score?.ralph?.crossPlatformPotential} previousValue={lastExt?.cross} delta={diff(ext?.crossPlatformPotential, lastExt?.cross)} />
-          <Metric label="Commercial" value={ext?.commercialPotential} previousValue={lastExt?.commercial} delta={diff(ext?.commercialPotential, lastExt?.commercial)} />
+          <Metric label="Narrative" value={score?.scores?.narrativeStrength} previousValue={lastExt?.narrative} delta={diff(score?.scores?.narrativeStrength, lastExt?.narrative)} tips={score?.rationales?.narrative} />
+          <Metric label="Time to Peak" value={score?.scores?.timeToPeakWeeks} previousValue={lastExt?.ttpWeeks} unit="wks" delta={diff(score?.scores?.timeToPeakWeeks, lastExt?.ttpWeeks)} tips={score?.rationales?.timing} />
+          <Metric label="Cross‑platform" value={score?.ralph?.crossPlatformPotential} previousValue={lastExt?.cross} delta={diff(ext?.crossPlatformPotential, lastExt?.cross)} tips={score?.rationales?.cross} />
+          <Metric label="Commercial" value={ext?.commercialPotential} previousValue={lastExt?.commercial} delta={diff(ext?.commercialPotential, lastExt?.commercial)} tips={score?.rationales?.commercial} />
         </div>
         <div className="space-y-2">
           <div className="text-xs text-white/60 mb-1">Targeted Enhancements</div>
@@ -131,6 +143,20 @@ export default function ScoringEnhancements() {
           </div>
         </div>
       </div>
+
+      {/* Rationale tooltips reduce clutter; shown inline per metric */}
+
+      {/* Evidence chips */}
+      {Array.isArray((score as any)?.evidence) && (score as any).evidence.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs text-white/60 mb-1">Evidence</div>
+          <div className="flex flex-wrap gap-1.5 text-[10px]">
+            {(score as any).evidence.slice(0,6).map((e: string, i: number) => (
+              <span key={i} className="px-2 py-0.5 rounded bg-white/5 border border-white/10">{e}</span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -172,10 +198,19 @@ function diff(curr?: number, prev?: number) {
   return d === 0 ? undefined : d
 }
 
-function Metric({ label, value, unit, delta, previousValue }: { label: string; value?: number; unit?: string; delta?: number; previousValue?: number }) {
+function Metric({ label, value, unit, delta, previousValue, tips }: { label: string; value?: number; unit?: string; delta?: number; previousValue?: number; tips?: string[] }) {
   if (typeof value !== 'number') return (
     <div className="panel p-2">
-      <div className="text-xs text-white/60">{label}</div>
+      <div className="text-xs text-white/60 flex items-center gap-1">
+        <span>{label}</span>
+        {Array.isArray(tips) && tips.length > 0 && (
+          <Tooltip label={`Why: ${label}`}>
+            <ul className="list-disc pl-4 space-y-0.5">
+              {tips.slice(0,3).map((t, i) => <li key={i}>{t}</li>)}
+            </ul>
+          </Tooltip>
+        )}
+      </div>
       <div className="text-sm text-white/50">—</div>
     </div>
   )
@@ -187,8 +222,15 @@ function Metric({ label, value, unit, delta, previousValue }: { label: string; v
   return (
     <div className="panel p-2">
       <div className="text-xs text-white/60 flex items-center justify-between">
-        <span className="flex items-center gap-2">
-          {label}
+        <span className="flex items-center gap-1.5">
+          <span>{label}</span>
+          {Array.isArray(tips) && tips.length > 0 && (
+            <Tooltip label={`Why: ${label}`}>
+              <ul className="list-disc pl-4 space-y-0.5">
+                {tips.slice(0,3).map((t, i) => <li key={i}>{t}</li>)}
+              </ul>
+            </Tooltip>
+          )}
           {typeof delta === 'number' && (
             <span className={`text-[10px] px-1.5 py-0.5 rounded border ${delta>0?'border-ralph-pink/40 bg-ralph-pink/10 text-ralph-pink':'border-ralph-cyan/40 bg-ralph-cyan/10 text-ralph-cyan'}`}>{fmt(delta)}</span>
           )}
