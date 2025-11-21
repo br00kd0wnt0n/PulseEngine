@@ -250,7 +250,7 @@ export default function CanvasWorkflow() {
       {
         id: 'brief-input',
         type: 'input',
-        title: 'Story Brief',
+        title: 'What story do you want to tell?',
         x: 50,
         y: 100,
         width: 400,
@@ -909,7 +909,7 @@ export default function CanvasWorkflow() {
             value={concept}
             onChange={(e) => { setConcept(e.target.value); try { localStorage.setItem('concept', e.target.value) } catch {} }}
             onMouseDown={(e) => e.stopPropagation()}
-            placeholder="Describe your campaign story..."
+            placeholder="Describe your brief, story concept or proposal vision and add any useful files or references below"
             className="w-full h-24 bg-charcoal-800/70 border border-white/10 rounded px-3 py-2 text-sm resize-none"
           />
           <div className="grid grid-cols-2 gap-2">
