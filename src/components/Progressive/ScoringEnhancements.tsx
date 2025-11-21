@@ -34,6 +34,7 @@ export default function ScoringEnhancements() {
         if (!cancel) {
           setScore(s); setEnh(e)
           setError(null)
+          logActivity('Scores updated')
           // persist compact score snapshot for co‑pilot guidance
           try {
             const pid = localStorage.getItem('activeProjectId') || 'local'
@@ -84,6 +85,7 @@ export default function ScoringEnhancements() {
           const pid = localStorage.getItem('activeProjectId') || undefined
           const s = await api.score(concept, graph, { persona, region, projectId: pid, targetAudience })
           setScore(s)
+          logActivity('Scores recalculated after enhancement')
           try {
             const pid = localStorage.getItem('activeProjectId') || 'local'
             const ext = s?.extended || {}
