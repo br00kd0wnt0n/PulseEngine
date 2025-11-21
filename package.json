@@ -6,10 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "railway:build": "rm -rf node_modules/.vite || true && npm run build",
+    "railway:build": "(mv node_modules/.vite node_modules/.vite.bak 2>/dev/null || true) && npm run build",
     "start": "serve -s dist",
     "preview": "serve -s dist -l $PORT",
-    "prebuild": "rm -rf node_modules/.vite",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
