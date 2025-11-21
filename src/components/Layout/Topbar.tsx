@@ -103,7 +103,10 @@ export default function Topbar() {
           <Link to="/" className="flex items-center gap-3">
             <div className="text-2xl font-bold tracking-tight" style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>ralph</div>
             <div className="hidden md:block h-6 w-px bg-white/30" />
-            <div className="hidden md:block font-semibold tracking-wide uppercase text-xs">Storytelling Intelligence</div>
+            <div className="hidden md:flex items-center gap-2">
+              <div className="font-semibold tracking-wide uppercase text-xs">Storytelling Intelligence</div>
+              <div className="px-1.5 py-0.5 rounded bg-ralph-cyan/20 border border-ralph-cyan/40 text-ralph-cyan font-bold text-[9px] tracking-wider">BETA</div>
+            </div>
           </Link>
           <div className="relative flex-1 max-w-2xl ml-auto">
             <input

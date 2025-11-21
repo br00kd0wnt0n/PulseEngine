@@ -262,11 +262,11 @@ export default function CanvasWorkflow() {
       {
         id: 'context-upload',
         type: 'upload',
-        title: 'Context & Files',
+        title: 'References & Content',
         x: 50,
         y: 400,
         width: 400,
-        height: 180,
+        height: 140,
         minimized: false,
         zIndex: 1,
         status: 'idle',
@@ -961,13 +961,9 @@ export default function CanvasWorkflow() {
     if (node.id === 'context-upload') {
       return (
         <div className="space-y-2">
-          <div className="text-xs text-white/60 mb-1">
-            {processed.length} file{processed.length !== 1 ? 's' : ''} uploaded {processed.length === 0 && '(optional)'}
-          </div>
-
           {/* Show uploaded files */}
           {processed.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2 max-h-20 overflow-auto">
+            <div className="flex flex-wrap gap-1 mb-1 max-h-20 overflow-auto">
               {processed.map((p, i) => (
                 <span key={i} className="px-2 py-0.5 rounded bg-ralph-cyan/10 border border-ralph-cyan/30 text-[10px] flex items-center gap-1">
                   {p.name}
