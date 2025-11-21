@@ -28,18 +28,18 @@ export const api = {
     '/ai/enhancements',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph, ...(opts||{}) }) }
   ),
-  recommendations: (concept: string, graph: any, opts?: { persona?: string; region?: string; projectId?: string }) => request<any>(
+  recommendations: (concept: string, graph: any, opts?: { persona?: string; region?: string; projectId?: string; targetAudience?: string }) => request<any>(
     '/ai/recommendations',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, graph, ...(opts||{}) }) }
   ),
   search: (q: string) => request<{ trends: any[]; creators: any[]; assets: any[] }>(
     `/search?q=${encodeURIComponent(q)}`
   ),
-  debrief: (concept: string, opts?: { persona?: string; region?: string; projectId?: string }) => request<any>(
+  debrief: (concept: string, opts?: { persona?: string; region?: string; projectId?: string; targetAudience?: string }) => request<any>(
     '/ai/debrief',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(opts||{}) }) }
   ),
-  opportunities: (concept: string, opts?: { persona?: string; region?: string; projectId?: string }) => request<any>(
+  opportunities: (concept: string, opts?: { persona?: string; region?: string; projectId?: string; targetAudience?: string }) => request<any>(
     '/ai/opportunities',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(opts||{}) }) }
   ),

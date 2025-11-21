@@ -125,6 +125,7 @@ export function exportAnalysis(concept: string, persona: string, region: string)
 export function exportProjectFull(concept: string, persona: string, region: string): string {
   const projectId = localStorage.getItem('activeProjectId') || 'local'
   const timestamp = new Date().toLocaleString()
+  const targetAudience = (() => { try { return localStorage.getItem('targetAudience') || '' } catch { return '' } })()
   const debrief = safeJSON(`debrief:${projectId}`)
   const opportunities = safeJSON(`opps:${projectId}`)
   const narrativeBlocks = safeJSON(`nf:${projectId}`) as any[] || []
@@ -133,7 +134,7 @@ export function exportProjectFull(concept: string, persona: string, region: stri
   const wildcard = safeJSON(`wild:${projectId}`)
 
   let md = `# Project Export\n\nGenerated ${timestamp}\n\n---\n\n`
-  md += `## Overview\n\n- Concept: ${concept}\n- Persona: ${persona || '—'}\n- Region: ${region || '—'}\n- Project ID: ${projectId}\n\n`
+  md += `## Overview\n\n- Concept: ${concept}\n- Persona (user role): ${persona || '—'}\n- Target Audience: ${targetAudience || '—'}\n- Region: ${region || '—'}\n- Project ID: ${projectId}\n\n`
 
   // Sources
   if (debrief?.sources) {
@@ -153,6 +154,9 @@ export function exportProjectFull(concept: string, persona: string, region: stri
   // Debrief
   if (debrief) {
     md += `---\n\n## Strategic Debrief\n\n`
+    if (targetAudience) {
+      md += `**Target Audience:** ${targetAudience}\n\n`
+    }
     if (debrief._debug?.prompt) {
       md += `<details><summary>Prompt</summary>\n\n\n\n\n${codeBlock(debrief._debug.prompt)}\n\n</details>\n\n`
     }
@@ -163,6 +167,9 @@ export function exportProjectFull(concept: string, persona: string, region: stri
     }
     if (Array.isArray(debrief.didYouKnow)) {
       md += `### Did You Know\n\n` + debrief.didYouKnow.map((p: string) => `- ${p}`).join('\n') + `\n\n`
+    }
+    if (Array.isArray(debrief.personaNotes) && debrief.personaNotes.length) {
+      md += `### Persona Notes\n\n` + debrief.personaNotes.map((p: string) => `- ${p}`).join('\n') + `\n\n`
     }
   }
 
@@ -178,6 +185,9 @@ export function exportProjectFull(concept: string, persona: string, region: stri
       if (o.why) md += `${o.why}\n\n`
       if (typeof o.impact === 'number') md += `Impact: ${o.impact}/100\n\n`
     })
+    if (Array.isArray(opportunities.personaNotes) && opportunities.personaNotes.length) {
+      md += `### Persona Notes\n\n` + opportunities.personaNotes.map((p: string) => `- ${p}`).join('\n') + `\n\n`
+    }
   }
 
   // Narrative

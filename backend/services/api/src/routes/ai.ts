@@ -61,6 +61,58 @@ router.post('/narrative', async (req, res) => {
 
 export default router
 
+// Generate an AI Concept Overview tailored to persona (author lens) and target audience
+router.post('/concept-overview', async (req, res) => {
+  const { concept, persona, region, debrief, opportunities, narrative, enhancements, targetAudience } = req.body || {}
+  if (!concept) return res.status(400).json({ error: 'concept required' })
+  try {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) return res.json({ overview: concept })
+    const { OpenAI } = await import('openai')
+    const client = new OpenAI({ apiKey })
+    const model = process.env.MODEL_NAME || 'gpt-4o-mini'
+
+    const oppText = Array.isArray(opportunities) && opportunities.length
+      ? opportunities.slice(0, 6).map((o: any, i: number) => `${i+1}. ${o.title}${o.why?` — ${o.why}`:''}`).join('\n')
+      : ''
+    const enhText = Array.isArray(enhancements) && enhancements.length
+      ? enhancements.slice(0, 6).map((t: string) => `- ${t}`).join('\n')
+      : ''
+    const prompt = [
+      `You are a ${persona ? `campaign strategist for ${persona}` : 'campaign strategist'}.`,
+      targetAudience ? `Target audience: ${targetAudience}.` : '',
+      region ? `Region: ${region}.` : '',
+      `\nCreate a concise CONCEPT OVERVIEW for the campaign: "${concept}". Use markdown with these sections:`,
+      `### Campaign Essence`,
+      `One short paragraph summarizing the core ambition and why-now.`,
+      `### Strategic Approach`,
+      `Return 3-5 bullets starting with "- ", focusing on strategy, pacing, and integration.`,
+      `### Execution Highlights`,
+      `Return 3-5 bullets starting with "- ", focusing on formats, cadence, and collaborators.`,
+      `### Next Steps`,
+      `Return 3-5 bullets starting with "- ", clear actions for week 1-4.`,
+      `\nContext to consider:`,
+      debrief ? `Debrief: ${debrief}` : '',
+      narrative ? `Narrative: ${narrative}` : '',
+      oppText ? `Opportunities:\n${oppText}` : '',
+      enhText ? `Enhancements:\n${enhText}` : '',
+      `\nKeep output cleanly formatted with blank lines between sections. Do not number bullets; use "- " bullets.`
+    ].filter(Boolean).join('\n')
+
+    const resp = await client.chat.completions.create({
+      model,
+      messages: [ { role: 'system', content: 'Be specific, structured, and persona-relevant.' }, { role: 'user', content: prompt } ],
+      temperature: 0.5,
+      max_tokens: 600,
+    })
+    const overview = resp.choices?.[0]?.message?.content || concept
+    res.json({ overview, _debug: { prompt, model } })
+  } catch (e: any) {
+    console.error('[AI] concept-overview failed:', e)
+    res.json({ overview: concept })
+  }
+})
+
 router.post('/rewrite-narrative', async (req, res) => {
   const { concept, narrative, enhancements, persona, region, projectId } = req.body || {}
   if (!concept || !narrative) return res.status(400).json({ error: 'concept and narrative required' })
@@ -177,7 +229,8 @@ router.post('/wildcard', async (req, res) => {
         const firstStep = typeof idea.firstStep === 'string' ? idea.firstStep.trim() : null
 
         if (!title || !upside || !firstStep) continue
-        if (evidence.length !== 3) continue
+        // Require exactly 3 citations when we have enough context; otherwise allow 1+
+        if (flat.length >= 6) { if (evidence.length !== 3) continue } else { if (evidence.length === 0) continue }
         // Map sources used
         evidence.forEach((eid: string) => {
           const match = flat.find(f => f.id === eid)
@@ -257,12 +310,12 @@ router.post('/score', async (req, res) => {
 })
 
 router.post('/recommendations', async (req, res) => {
-  const { concept, graph, persona, projectId } = req.body || {}
+  const { concept, graph, persona, projectId, targetAudience } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
     // Extract userId from request if authenticated (added by authMiddleware)
     const userId = (req as any).user?.sub || null
-    const data = await generateRecommendations(concept, graph || { nodes: [], links: [] }, userId, persona || null, projectId || null)
+    const data = await generateRecommendations(concept, graph || { nodes: [], links: [] }, userId, persona || null, projectId || null, targetAudience || null)
     res.json(data)
   } catch (e: any) {
     res.status(500).json({ error: e?.message || 'failed' })
@@ -270,11 +323,11 @@ router.post('/recommendations', async (req, res) => {
 })
 
 router.post('/debrief', async (req, res) => {
-  const { concept, persona, projectId } = req.body || {}
+  const { concept, persona, projectId, targetAudience } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
     const userId = (req as any).user?.sub || null
-    const data = await generateDebrief(concept, userId, persona || null, projectId || null)
+    const data = await generateDebrief(concept, userId, persona || null, projectId || null, targetAudience || null)
     res.json(data)
   } catch (e: any) {
     res.status(500).json({ error: e?.message || 'failed' })
@@ -282,11 +335,11 @@ router.post('/debrief', async (req, res) => {
 })
 
 router.post('/opportunities', async (req, res) => {
-  const { concept, persona, projectId } = req.body || {}
+  const { concept, persona, projectId, targetAudience } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
     const userId = (req as any).user?.sub || null
-    const data = await generateOpportunities(concept, userId, persona || null, projectId || null)
+    const data = await generateOpportunities(concept, userId, persona || null, projectId || null, targetAudience || null)
     res.json(data)
   } catch (e: any) {
     res.status(500).json({ error: e?.message || 'failed' })

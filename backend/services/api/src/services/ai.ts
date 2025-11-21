@@ -64,7 +64,7 @@ export async function narrativeFromTrends(graph: TrendGraph, focusId?: string | 
 }
 
 // Debrief: recap + key points + did-you-know insights
-export async function generateDebrief(concept: string, userId?: string | null, persona?: string | null, projectId?: string | null) {
+export async function generateDebrief(concept: string, userId?: string | null, persona?: string | null, projectId?: string | null, targetAudience?: string | null) {
   try {
     let ctx
     try {
@@ -86,7 +86,7 @@ export async function generateDebrief(concept: string, userId?: string | null, p
         const contextStr = formatContextForPrompt(ctx)
         const prompt = (await import('./promptStore.js')).renderTemplate(
           await (await import('./promptStore.js')).getPrompt('debrief'),
-          { concept, persona, personaOrGeneral: persona || 'General', context: contextStr }
+          { concept, persona, personaOrGeneral: persona || 'General', context: contextStr, targetAudience }
         )
         const resp = await client.chat.completions.create({
           model,
@@ -141,7 +141,7 @@ export async function generateDebrief(concept: string, userId?: string | null, p
       : `Open with an attention-grabbing campaign promise that resonates with target audience interests`
 
     const heuristic = {
-      brief: `"${concept}" aligns with current ${persona ? persona + ' ' : ''}audience interests${hasLiveMetrics ? ' and trending content patterns' : ''}. This ${isCampaignStrategy ? 'campaign strategy' : 'content approach'} should focus on ${platforms.join(' and ')} with authentic storytelling that resonates with platform-native formats and engagement behaviors.`,
+      brief: `"${concept}" aligns with current target audience interests${hasLiveMetrics ? ' and trending content patterns' : ''}. This ${isCampaignStrategy ? 'campaign strategy' : 'content approach'} should focus on ${platforms.join(' and ')} with authentic storytelling that resonates with platform-native formats and engagement behaviors.`,
       summary: isCampaignStrategy
         ? `Develop strategic campaign framework that positions "${concept}" for maximum cultural relevance and audience engagement`
         : `Create ${platforms[0]}-first content that turns "${concept}" into a shareable, participatory ${isShortForm ? 'experience' : 'campaign'}.`,
@@ -157,7 +157,7 @@ export async function generateDebrief(concept: string, userId?: string | null, p
         // Platform-specific insights
         if (platforms.includes('TikTok')) {
           insights.push(hasLiveMetrics
-            ? `Live data shows ${persona || 'target audience'} engagement peaks with TikTok's algorithm-friendly content structures`
+            ? `Live data shows target audience engagement peaks with TikTok's algorithm-friendly content structures`
             : `TikTok's For You Page drives 3x more discovery than follower-based feeds`)
         }
         if (platforms.includes('Instagram') && isShortForm) {
@@ -170,7 +170,7 @@ export async function generateDebrief(concept: string, userId?: string | null, p
         // Content type insights
         if (isVideoContent || isShortForm) {
           insights.push(hasCoreKnowledge
-            ? `RKB data indicates short-form video formats resonate strongly with current ${persona || 'audience'} preferences`
+            ? `RKB data indicates short-form video formats resonate strongly with current target audience preferences`
             : `Vertical video (9:16) drives 90% mobile completion rates vs. 60% for horizontal`)
         }
         if (isCampaignStrategy) {
@@ -202,7 +202,7 @@ export async function generateDebrief(concept: string, userId?: string | null, p
 }
 
 // Opportunities: ranked with impact
-export async function generateOpportunities(concept: string, userId?: string | null, persona?: string | null, projectId?: string | null) {
+export async function generateOpportunities(concept: string, userId?: string | null, persona?: string | null, projectId?: string | null, targetAudience?: string | null) {
   try {
     let ctx
     try {
@@ -224,7 +224,7 @@ export async function generateOpportunities(concept: string, userId?: string | n
         const contextStr = formatContextForPrompt(ctx)
         const prompt = (await import('./promptStore.js')).renderTemplate(
           await (await import('./promptStore.js')).getPrompt('opportunities'),
-          { concept, persona, personaOrGeneral: persona || 'General', context: contextStr }
+          { concept, persona, personaOrGeneral: persona || 'General', context: contextStr, targetAudience }
         )
         const resp = await client.chat.completions.create({
           model,
@@ -422,7 +422,8 @@ export async function generateRecommendations(
   graph: TrendGraph,
   userId?: string | null,
   persona?: string | null,
-  projectId?: string | null
+  projectId?: string | null,
+  targetAudience?: string | null
 ) {
   console.log('[RAG] generateRecommendations called:', { concept, userId, projectId, hasGraph: !!graph })
 
@@ -480,7 +481,7 @@ export async function generateRecommendations(
       const contextStr = formatContextForPrompt(context)
       const prompt = (await import('./promptStore.js')).renderTemplate(
         await (await import('./promptStore.js')).getPrompt('recommendations'),
-        { concept, persona, personaOrGeneral: persona || 'General', context: contextStr }
+        { concept, persona, personaOrGeneral: persona || 'General', context: contextStr, targetAudience }
       )
 
       console.log('[RAG] Calling OpenAI with model:', model)

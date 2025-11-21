@@ -153,8 +153,8 @@ export default function CanvasWorkflow() {
     addActivity('Manual re-evaluation started…', 'ai')
     try {
       const [d, o] = await Promise.all([
-        api.debrief(concept, { persona, region, projectId: projectId || undefined }),
-        api.opportunities(concept, { persona, region, projectId: projectId || undefined })
+        api.debrief(concept, { persona, region, projectId: projectId || undefined, targetAudience }),
+        api.opportunities(concept, { persona, region, projectId: projectId || undefined, targetAudience })
       ])
       console.log('[Debrief] Sources:', d?.sources)
       setDebrief(d)
@@ -390,8 +390,8 @@ export default function CanvasWorkflow() {
         }
         addActivity('Analyzing with RKB + live trends + project context…', 'ai')
         const [d, o] = await Promise.all([
-          api.debrief(concept, { persona, region, projectId: projectId || undefined }),
-          api.opportunities(concept, { persona, region, projectId: projectId || undefined })
+          api.debrief(concept, { persona, region, projectId: projectId || undefined, targetAudience }),
+          api.opportunities(concept, { persona, region, projectId: projectId || undefined, targetAudience })
         ])
         if (!cancel) {
           console.log('[Debrief] Sources:', d?.sources)
@@ -423,6 +423,50 @@ export default function CanvasWorkflow() {
 
     return () => { cancel = true }
   }, [activated, concept, persona, region, processed])
+
+  // Auto re-run when persona changes after initial analysis
+  useEffect(() => {
+    if (!activated || !concept) return
+    if (prevPersonaRef.current === null) { prevPersonaRef.current = persona || ''; return }
+    if (persona === prevPersonaRef.current) return
+    prevPersonaRef.current = persona || ''
+    ;(async () => {
+      try {
+        setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'processing' as const } : n))
+        const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
+        const [d, o] = await Promise.all([
+          api.debrief(concept, { persona, region, projectId: pid, targetAudience }),
+          api.opportunities(concept, { persona, region, projectId: pid, targetAudience })
+        ])
+        setDebrief(d); setOpps(o)
+        try { if (pid) localStorage.setItem(`debrief:${pid}`, JSON.stringify(d)) } catch {}
+        try { if (pid) localStorage.setItem(`opps:${pid}`, JSON.stringify(o)) } catch {}
+        setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'complete' as const } : n))
+        // Refresh Concept Overview if present
+        if (nodes.find(n => n.id === 'concept-overview')) {
+          setOverviewLoading(true)
+          try {
+            const result = await api.conceptOverview(concept, {
+              persona,
+              region,
+              debrief: d?.brief,
+              opportunities: o?.opportunities,
+              narrative: narrative?.text,
+              enhancements: [],
+              projectId: pid,
+              targetAudience
+            })
+            setConceptOverview(result?.overview || null)
+          } catch (e) { console.error('[PersonaSwitch] Overview refresh failed:', e) }
+          finally { setOverviewLoading(false) }
+        }
+      } catch (e) {
+        console.error('[PersonaSwitch] Re-evaluation failed:', e)
+        setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'active' as const } : n))
+      }
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persona])
 
   // Step 1: Add RKB immediately; add Debrief only when uploads are assessed (or there are none)
   useEffect(() => {
@@ -1508,11 +1552,24 @@ export default function CanvasWorkflow() {
 
                     // Fetch creators
                     try {
-                      const rec = await api.recommendations(concept, { nodes: [], links: [] }, { persona, region })
-                      console.log('[Creators] API response:', rec)
+                      const rec = await api.recommendations(concept, { nodes: [], links: [] }, { persona, region, targetAudience })
                       const creators = Array.isArray((rec as any)?.creators) ? (rec as any).creators : []
-                      console.log('[Creators] Extracted creators:', creators)
                       setConceptCreators(creators)
+                      // Build Concept Overview if none
+                      if (!conceptOverview) {
+                        try {
+                          const parts: string[] = []
+                          const essence = debrief?.brief || ''
+                          if (essence) parts.push(`### Campaign Essence\n\n${essence}`)
+                          const strat = Array.isArray((rec as any)?.narrative) ? (rec as any).narrative.slice(0,3) : []
+                          if (strat.length) parts.push(`### Strategic Approach\n\n` + strat.map((s: string) => `- ${s}`).join('\n'))
+                          const exec = Array.isArray((rec as any)?.content) ? (rec as any).content.slice(0,3) : []
+                          if (exec.length) parts.push(`### Execution Highlights\n\n` + exec.map((s: string) => `- ${s}`).join('\n'))
+                          const next = Array.isArray((rec as any)?.platform) ? (rec as any).platform.slice(0,3) : []
+                          if (next.length) parts.push(`### Next Steps\n\n` + next.map((s: string) => `- ${s}`).join('\n'))
+                          if (parts.length) setConceptOverview(parts.join('\n\n'))
+                        } catch {}
+                      }
                     } catch (err) {
                       console.error('[Creators] API failed:', err)
                       setConceptCreators([])

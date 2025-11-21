@@ -29,6 +29,7 @@ export const defaultTemplates: Record<PromptKey, string> = {
 
   debrief:
     `You are a {{personaRole}} creating a strategic brief.
+{{#if targetAudience}}Target audience: {{targetAudience}}. Tailor all insights to this audience.{{/if}}
 
 CAMPAIGN CONCEPT: "{{concept}}"
 
@@ -46,10 +47,16 @@ Create a strategic campaign brief as JSON with these fields:
 
 4. "didYouKnow" (3 contextual insights): Surprising facts or trend insights from the context that support this campaign.
 
-Return ONLY valid JSON with keys: brief, summary, keyPoints, didYouKnow.`,
+Return ONLY valid JSON with keys: brief, summary, keyPoints, didYouKnow, personaNotes.
+
+Persona-specific guidance:
+- If user role contains 'Strategist', personaNotes should include 2 bullets on KPIs, pacing, and measurement.
+- If role contains 'Creative', personaNotes should include 2 bullets on story beats, tone, visual system.
+- If role contains 'Creator', personaNotes should include 2 bullets on formats, scripts, captioning, posting cadence.`,
 
   opportunities:
     `You are a {{personaRole}}. Analyze this campaign concept: "{{concept}}"
+{{#if targetAudience}}Target audience: {{targetAudience}}. Prioritize opportunities that reach and resonate with them.{{/if}}
 
 {{#if context}}# RELEVANT CONTEXT (reference specific trends and data):
 {{context}}
@@ -57,7 +64,8 @@ Return ONLY valid JSON with keys: brief, summary, keyPoints, didYouKnow.`,
 {{/if}}# YOUR TASK:
 Identify 5 HIGH-IMPACT campaign opportunities that are specific to this concept, grounded in the context, and actionable (story beats, formats, creator plays).
 
-Return ONLY JSON: { "opportunities": [{ "title": string, "why": string, "impact": number }], "rationale": string }`,
+Return ONLY JSON: { "opportunities": [{ "title": string, "why": string, "impact": number }], "rationale": string, "personaNotes": string[] }
+personaNotes: 2 bullets tailored to {{personaRole}} explaining which opportunities to prioritize and why.`,
 
   enhancements:
     `You are a {{personaRole}} optimizing this concept: "{{concept}}"
@@ -75,6 +83,7 @@ Return ONLY JSON: { "suggestions": [{ "text": string, "target": string, "deltas"
 
   recommendations:
     `You are a {{personaRole}}. You're creating an execution plan for: "{{concept}}"
+{{#if targetAudience}}Target audience: {{targetAudience}}. Optimize formats, platforms, and hooks for this audience.{{/if}}
 
 {{#if context}}# CONTEXT (for grounding):
 {{context}}
@@ -82,10 +91,12 @@ Return ONLY JSON: { "suggestions": [{ "text": string, "target": string, "deltas"
 {{/if}}# YOUR TASK:
 Provide arrays for: narrative, content, platform, collab (execution bullets) and a framework object { market, narrative, commercial } with { score, why }.
 
-Return ONLY JSON with keys exactly: narrative, content, platform, collab, framework.`,
+Return ONLY JSON with keys exactly: narrative, content, platform, collab, framework, personaNotes.
+personaNotes: 2 bullets of guidance specific to {{personaRole}}.`,
 
   concept_proposal:
     `You are a {{personaRole}} crafting a shareable campaign proposal.
+{{#if targetAudience}}Target audience: {{targetAudience}}. Ensure the pitch resonates with them.{{/if}}
 
 CONCEPT: "{{concept}}"
 
@@ -100,7 +111,9 @@ Resolution: {{resolution}}
 {{#if context}}# CONTEXT (trends/creators/live):
 {{context}}
 
-{{/if}}Write a compelling, specific, narrative-driven proposal that can be shared with partners. Keep it crisp and persuasive.`,
+{{/if}}Write a compelling, specific, narrative-driven proposal that can be shared with partners. Keep it crisp and persuasive.
+
+Add a final section titled "Persona Notes" with 2 bullets tailored to {{personaRole}}.`,
 
   rewrite_narrative:
     `You are a {{personaRole}}. Rewrite the narrative below for the concept "{{concept}}"{{personaRegion}}, integrating these selected enhancements. Keep the same structure (numbered sections) and make it crisp, specific, and actionable.
@@ -178,6 +191,7 @@ export function renderTemplate(tpl: string, vars: Record<string, any>): string {
     .replace(/\{\{persona\}\}/g, String(vars.persona || ''))
     .replace(/\{\{region\}\}/g, String(vars.region || ''))
     .replace(/\{\{context\}\}/g, String(vars.context || ''))
+    .replace(/\{\{targetAudience\}\}/g, String(vars.targetAudience || ''))
     .replace(/\{\{narrative\}\}/g, String(vars.narrative || ''))
     .replace(/\{\{enhancementsList\}\}/g, String(vars.enhancementsList || ''))
     .replace(/\{\{enumerated\}\}/g, String(vars.enumerated || ''))
