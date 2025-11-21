@@ -943,7 +943,7 @@ export default function CanvasWorkflow() {
             value={targetAudience}
             onChange={(e) => { setTargetAudience(e.target.value); try { localStorage.setItem('targetAudience', e.target.value) } catch {} }}
             onMouseDown={(e) => e.stopPropagation()}
-            placeholder="Target audience (e.g., Gen Z parents, guitar enthusiasts, collectors)"
+            placeholder="Target audience (optional, separate with commas)"
             className="w-full bg-charcoal-800/70 border border-white/10 rounded px-3 py-1.5 text-xs"
           />
           <button
