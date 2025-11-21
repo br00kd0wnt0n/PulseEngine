@@ -25,12 +25,24 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [frameworkScores, setFrameworkScores] = useState<Ctx['frameworkScores']>(null)
   const [keyDrivers, setKeyDrivers] = useState<Ctx['keyDrivers']>(null)
   const [recsDensity, setRecsDensity] = useState<Ctx['recsDensity']>(null)
-  const [region, setRegion] = useState<Ctx['region']>(() => {
+  const [region, setRegionState] = useState<Ctx['region']>(() => {
     try { return (JSON.parse(localStorage.getItem('region') || '"Worldwide"')) as Ctx['region'] } catch { return 'Worldwide' }
   })
-  const [persona, setPersona] = useState<Ctx['persona']>(() => {
+  const [persona, setPersonaState] = useState<Ctx['persona']>(() => {
     try { return (JSON.parse(localStorage.getItem('persona') || '"Social Strategist"')) as Ctx['persona'] } catch { return 'Social Strategist' }
   })
+
+  // Wrap setters to persist to localStorage
+  const setRegion = (v: Ctx['region']) => {
+    setRegionState(v)
+    try { localStorage.setItem('region', JSON.stringify(v)) } catch {}
+  }
+
+  const setPersona = (v: Ctx['persona']) => {
+    setPersonaState(v)
+    try { localStorage.setItem('persona', JSON.stringify(v)) } catch {}
+  }
+
   return (
     <DashCtx.Provider value={{ concept, setConcept, activated, setActivated, frameworkScores, setFrameworkScores, keyDrivers, setKeyDrivers, recsDensity, setRecsDensity, region, setRegion, persona, setPersona }}>
       {children}
