@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "start": "serve -s dist",
     "preview": "serve -s dist -l $PORT",
+    "prebuild": "rm -rf node_modules/.vite",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
