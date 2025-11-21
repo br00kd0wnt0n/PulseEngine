@@ -176,8 +176,8 @@ export default function Canvas({ nodes, onNodesChange, renderNodeContent }: Canv
         ))}
       </div>
 
-      {/* Zoom controls */}
-      <div className="absolute bottom-4 right-4 z-50 flex items-center gap-2 p-2 rounded-md bg-white/5 border border-white/10 backdrop-blur">
+      {/* Zoom controls (fixed to viewport) */}
+      <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 p-2 rounded-md bg-white/5 border border-white/10 backdrop-blur">
         <button className="px-2 py-1 text-xs rounded border border-white/10 bg-white/10 hover:bg-white/20" onClick={() => setZoom(scale - 0.1)}>-</button>
         <div className="text-xs w-14 text-center">{Math.round(scale * 100)}%</div>
         <button className="px-2 py-1 text-xs rounded border border-white/10 bg-white/10 hover:bg-white/20" onClick={() => setZoom(scale + 0.1)}>+</button>

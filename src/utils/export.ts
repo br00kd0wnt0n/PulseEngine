@@ -122,6 +122,112 @@ export function exportAnalysis(concept: string, persona: string, region: string)
   return markdown
 }
 
+export function exportProjectFull(concept: string, persona: string, region: string): string {
+  const projectId = localStorage.getItem('activeProjectId') || 'local'
+  const timestamp = new Date().toLocaleString()
+  const debrief = safeJSON(`debrief:${projectId}`)
+  const opportunities = safeJSON(`opps:${projectId}`)
+  const narrativeBlocks = safeJSON(`nf:${projectId}`) as any[] || []
+  const scoring = safeJSON(`score:${projectId}`)
+  const conversation = safeJSON(`conv:${projectId}`) as any[] || []
+  const wildcard = safeJSON(`wild:${projectId}`)
+
+  let md = `# Project Export\n\nGenerated ${timestamp}\n\n---\n\n`
+  md += `## Overview\n\n- Concept: ${concept}\n- Persona: ${persona || '—'}\n- Region: ${region || '—'}\n- Project ID: ${projectId}\n\n`
+
+  // Sources
+  if (debrief?.sources) {
+    md += `## Sources Used (This Pass)\n\n`
+    const s = debrief.sources
+    const list = (label: string, arr?: any[]) => {
+      if (!arr || arr.length === 0) return
+      md += `### ${label} (${arr.length})\n\n`
+      arr.forEach((v: any) => { md += `- ${String(v)}\n` })
+      md += `\n`
+    }
+    list('Project Files', s.project)
+    list('RKB', s.core)
+    list('Live Trends', s.live)
+  }
+
+  // Debrief
+  if (debrief) {
+    md += `---\n\n## Strategic Debrief\n\n`
+    if (debrief._debug?.prompt) {
+      md += `<details><summary>Prompt</summary>\n\n\n\n\n${codeBlock(debrief._debug.prompt)}\n\n</details>\n\n`
+    }
+    if (debrief.brief) md += `${debrief.brief}\n\n`
+    if (debrief.summary) md += `**Core Insight:** ${debrief.summary}\n\n`
+    if (Array.isArray(debrief.keyPoints)) {
+      md += `### Key Points\n\n` + debrief.keyPoints.map((p: string) => `- ${p}`).join('\n') + `\n\n`
+    }
+    if (Array.isArray(debrief.didYouKnow)) {
+      md += `### Did You Know\n\n` + debrief.didYouKnow.map((p: string) => `- ${p}`).join('\n') + `\n\n`
+    }
+  }
+
+  // Opportunities
+  if (opportunities) {
+    md += `---\n\n## Opportunities\n\n`
+    if (opportunities._debug?.prompt) {
+      md += `<details><summary>Prompt</summary>\n\n${codeBlock(opportunities._debug.prompt)}\n\n</details>\n\n`
+    }
+    const list = Array.isArray(opportunities.opportunities) ? opportunities.opportunities : []
+    list.forEach((o: any, i: number) => {
+      md += `### ${i + 1}. ${o.title || 'Opportunity'}\n\n`
+      if (o.why) md += `${o.why}\n\n`
+      if (typeof o.impact === 'number') md += `Impact: ${o.impact}/100\n\n`
+    })
+  }
+
+  // Narrative
+  if (narrativeBlocks.length) {
+    md += `---\n\n## Narrative\n\n`
+    narrativeBlocks.forEach((b: any) => {
+      if (b?.content) {
+        md += `### ${b.title || b.key}\n\n${b.content}\n\n`
+      }
+    })
+  }
+
+  // Scoring
+  if (scoring?.scores) {
+    md += `---\n\n## Scoring\n\n`
+    Object.entries(scoring.scores).forEach(([k, v]: any) => { md += `- ${k}: ${v}\n` })
+    md += `\n`
+  }
+
+  // Wildcard
+  if (wildcard?.ideas) {
+    md += `---\n\n## Wildcard Insight\n\n`
+    if (wildcard._debug?.prompt) md += `<details><summary>Prompt</summary>\n\n${codeBlock(wildcard._debug.prompt)}\n\n</details>\n\n`
+    wildcard.ideas.forEach((idea: any, idx: number) => {
+      md += `### ${idx + 1}. ${idea.title}\n\n`
+      if (Array.isArray(idea.contrarianWhy)) md += `Why Contrarian:\n\n` + idea.contrarianWhy.map((x: string) => `- ${x}`).join('\n') + `\n\n`
+      if (Array.isArray(idea.evidence)) md += `Evidence: ${idea.evidence.join(', ')}\n\n`
+      if (idea.upside) md += `Upside: ${idea.upside}\n\n`
+      if (Array.isArray(idea.risks)) md += `Risks:\n\n` + idea.risks.map((x: string) => `- ${x}`).join('\n') + `\n\n`
+      if (Array.isArray(idea.testPlan)) md += `Test Plan:\n\n` + idea.testPlan.map((x: string) => `- ${x}`).join('\n') + `\n\n`
+      if (idea.firstStep) md += `First Step: ${idea.firstStep}\n\n`
+    })
+  }
+
+  // Conversation (optional)
+  if (conversation.length) {
+    md += `---\n\n## Conversation\n\n`
+    conversation.forEach((msg: any) => { md += `- ${msg.role}: ${msg.content}\n` })
+    md += `\n`
+  }
+
+  md += `\n---\n\n*End of export — ${timestamp}*\n`
+  return md
+}
+
+function codeBlock(s: string): string {
+  const escaped = s.replace(/```/g, '\n\n')
+  return '```\n' + escaped + '\n```'
+}
+
 /**
  * Download Markdown content as a file
  */

@@ -7,6 +7,7 @@ import { useUpload } from '../context/UploadContext'
 import { api } from '../services/api'
 import { CitationToken } from '../components/shared/CitationOverlay'
 import BrandSpinner from '../components/shared/BrandSpinner'
+import { exportProjectFull, downloadMarkdown } from '../utils/export'
 
 function renderMarkdown(md: string): string {
   // Basic safe renderer: escape HTML, then apply minimal markdown transforms
@@ -1565,7 +1566,7 @@ export default function CanvasWorkflow() {
                       const sources = Array.isArray((resp as any)?.sourcesUsed) ? (resp as any).sourcesUsed : []
                       setWildIdeas(ideas)
                       setWildSources(sources)
-                      try { if (pid) localStorage.setItem(`wild:${pid}`, JSON.stringify({ ts: Date.now(), ideas, sources })) } catch {}
+                      try { if (pid) localStorage.setItem(`wild:${pid}`, JSON.stringify({ ts: Date.now(), ...resp })) } catch {}
                       setNodes(prev => prev.map(n => n.id === 'wildcard' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n))
                       addActivity('Rolled Wildcard insight', 'ai')
                     } catch (err) {
@@ -1656,7 +1657,7 @@ export default function CanvasWorkflow() {
                         const sources = Array.isArray((resp as any)?.sourcesUsed) ? (resp as any).sourcesUsed : []
                         setWildIdeas(ideas)
                         setWildSources(sources)
-                        try { if (pid) localStorage.setItem(`wild:${pid}`, JSON.stringify({ ts: Date.now(), ideas, sources })) } catch {}
+                        try { if (pid) localStorage.setItem(`wild:${pid}`, JSON.stringify({ ts: Date.now(), ...resp })) } catch {}
                         addActivity('Regenerated Wildcard insight', 'ai')
                       } catch {
                         setWildIdeas([])
@@ -1779,6 +1780,20 @@ export default function CanvasWorkflow() {
 
   return (
     <div className="relative w-full h-screen">
+      {/* Export Button */}
+      <div className="absolute top-3 right-4 z-50">
+        <button
+          className="px-3 py-1.5 rounded border border-white/10 bg-white/10 hover:bg-white/20 text-xs"
+          onClick={() => {
+            const conceptName = (concept || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+            const md = exportProjectFull(concept || 'Untitled', persona || '', region || '')
+            const ts = new Date().toISOString().replace(/[:.]/g, '-')
+            downloadMarkdown(md, `${conceptName || 'project'}-${ts}.md`)
+          }}
+        >
+          Export Project
+        </button>
+      </div>
       {/* Canvas with Nodes */}
       <Canvas nodes={nodes} onNodesChange={setNodes} renderNodeContent={renderNodeContent} />
 

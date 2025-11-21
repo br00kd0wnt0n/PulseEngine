@@ -87,7 +87,7 @@ router.post('/rewrite-narrative', async (req, res) => {
       max_tokens: 700
     })
     const text = resp.choices?.[0]?.message?.content || narrative
-    res.json({ text })
+    res.json({ text, _debug: { prompt, model: process.env.MODEL_NAME || 'gpt-4o-mini' } })
   } catch (e: any) {
     console.error('[AI] rewrite-narrative failed:', e)
     res.json({ text: narrative })
@@ -216,7 +216,7 @@ router.post('/wildcard', async (req, res) => {
       } catch {}
     }
 
-    const payload = { ideas, sourcesUsed }
+    const payload = { ideas, sourcesUsed, _debug: { prompt, model: process.env.MODEL_NAME || 'gpt-4o-mini' } }
     searchResultCache.set(cacheKey, payload)
     return res.json(payload)
   } catch (e: any) {

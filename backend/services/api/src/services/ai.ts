@@ -97,7 +97,7 @@ export async function generateDebrief(concept: string, userId?: string | null, p
         const raw = resp.choices?.[0]?.message?.content || '{}'
         try {
           const parsed = JSON.parse(raw)
-          const withSources = { ...parsed, sources: ctx.sources }
+          const withSources = { ...parsed, sources: ctx.sources, _debug: { prompt, model } }
           await cacheSet(cacheKey, withSources)
           return withSources
         } catch {}
@@ -235,7 +235,7 @@ export async function generateOpportunities(concept: string, userId?: string | n
         const raw = resp.choices?.[0]?.message?.content || '{}'
         try {
           const parsed = JSON.parse(raw)
-          const withSources = { ...parsed, sources: ctx.sources }
+          const withSources = { ...parsed, sources: ctx.sources, _debug: { prompt, model } }
           await cacheSet(cacheKey, withSources)
           return withSources
         } catch {}
@@ -357,7 +357,7 @@ export async function generateEnhancements(concept: string, graph: TrendGraph, u
         max_tokens: 420,
       })
       const raw = resp.choices?.[0]?.message?.content || '{}'
-      try { const parsed = JSON.parse(raw); return parsed } catch {}
+      try { const parsed = JSON.parse(raw); return { ...parsed, _debug: { prompt, model } } } catch {}
     } catch { /* fallthrough */ }
   }
   // Context-aware heuristic fallback
@@ -500,6 +500,7 @@ export async function generateRecommendations(
         // Attach sources and creators
         result.sources = context.sources
         result.creators = creators
+        result._debug = { prompt, model }
         console.log('[RAG] Successfully parsed OpenAI response, returning with sources and', creators.length, 'creators')
         return result
       } catch (parseErr) {
@@ -650,7 +651,7 @@ export async function generateConceptProposal(
 
         const narrative = resp.choices?.[0]?.message?.content || ''
         await cacheSet(cacheKey, narrative)
-        return { narrative, sources: ctx.sources }
+        return { narrative, sources: ctx.sources, _debug: { prompt, model } }
       } catch (err) {
         console.error('[AI] OpenAI call failed for concept proposal:', err)
       }
