@@ -134,6 +134,14 @@ export default function CanvasWorkflow() {
   // Track if we've already positioned scoring/narrative nodes to prevent repositioning on re-render
   const nodesPositionedRef = useRef(false)
 
+  // Target audience (separate from persona which is the user's role)
+  const [targetAudience, setTargetAudience] = useState<string>(() => {
+    try { return localStorage.getItem('targetAudience') || '' } catch { return '' }
+  })
+
+  // Track previous persona for auto-refresh on change
+  const prevPersonaRef = useRef<string | null>(null)
+
   function focusBrief() {
     setNodes(prev => {
       const maxZ = prev.reduce((m, p) => Math.max(m, p.zIndex), 0)

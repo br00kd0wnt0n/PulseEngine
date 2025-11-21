@@ -37,7 +37,7 @@ export async function buildTrendSummaries(periods: Period[] = ['day','week','mon
         .map((m: any, idx: number) => ({ m, idx, score: scoreMetric(m) }))
         .sort((a: any, b: any) => b.score - a.score)
         .slice(0, perPlatform)
-        .map(({ m }) => simplifyMetric(m))
+        .map(({ m }: any) => simplifyMetric(m))
 
       const payload = { items: ranked, meta: { period: p, platform, windowStart: start.toISOString(), windowEnd: end.toISOString(), updatedAt: new Date().toISOString() } }
       await upsertSummary(p, platform, start, end, payload)
@@ -55,7 +55,7 @@ export async function buildTrendSummaries(periods: Period[] = ['day','week','mon
       .map((m: any) => ({ m, score: scoreMetric(m) }))
       .sort((a: any, b: any) => b.score - a.score)
       .slice(0, perPlatform)
-      .map(({ m }) => simplifyMetric(m))
+      .map(({ m }: any) => simplifyMetric(m))
     const allPayload = { items: rankedAll, meta: { period: p, platform: 'all', windowStart: start.toISOString(), windowEnd: end.toISOString(), updatedAt: new Date().toISOString() } }
     await upsertSummary(p, 'all', start, end, allPayload)
   }
