@@ -20,6 +20,10 @@ function renderMarkdown(md: string): string {
   // Remove standalone ** markers (lines that are just ** or whitespace + **)
   text = text.replace(/^\s*\*\*\s*$/gm, '')
 
+  // Normalize bold-wrapped numbered headings like **1. Title:** to plain numbered heading
+  text = text.replace(/^\s*\*\*(\d+\.\s+[^:\n]+:)\s*\*\*\s*$/gm, '$1')
+  text = text.replace(/^\s*\*\*(\d+\.\s+[^:\n]+:)\s*/gm, '$1')
+
   // Headings ###
   text = text.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>')
   // Numbered sections like `1. Title:` -> <h4>Title</h4>
@@ -262,7 +266,7 @@ export default function CanvasWorkflow() {
       {
         id: 'context-upload',
         type: 'upload',
-        title: 'Upload Files, References & Context',
+        title: 'Additional Context',
         x: 50,
         y: 400,
         width: 400,
@@ -746,37 +750,16 @@ export default function CanvasWorkflow() {
           setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
           } catch (err) {
             if (!cancel) {
-              // Local fallback to keep flow alive
-              const narrativeStrength = Math.min(100, Math.max(50, concept.length % 70 + 30))
-              const timeToPeakWeeks = 4
-              const collaborationOpportunity = 60
-              const ralph = {
-                crossPlatformPotential: 62,
-                culturalRelevance: 58,
-                narrativeAdaptability: 60,
-              }
-              const ttpScore = Math.max(0, Math.min(100, 100 - (timeToPeakWeeks - 1) * 12))
-              const commercial = Math.round(0.6 * collaborationOpportunity + 0.4 * (ralph.culturalRelevance))
-              const overall = Math.round((narrativeStrength + ttpScore + ralph.crossPlatformPotential + commercial) / 4)
-              const approx = {
-                scores: { narrativeStrength, timeToPeakWeeks, collaborationOpportunity },
-                ralph,
-                extended: {
-                  overall,
-                  commercialPotential: commercial,
-                  crossPlatformPotential: ralph.crossPlatformPotential,
-                  timeToPeakScore: ttpScore,
-                  impactMap: { hookClarity: 10, loopMoment: 0, collabPlan: 8 },
-                }
-              }
-              setScores(approx as any)
+              // Do not fake scores; show unavailable state instead
+              setScores(null)
               setEnhancements([
                 { text: `Add YouTube Shorts component to amplify reach`, deltas: { narrative: 8, ttp: 3, cross: 2, commercial: 4 } },
                 { text: `Integrate trending audio library for higher cultural relevance`, deltas: { narrative: 6, ttp: 2, cross: 3, commercial: 2 } },
                 { text: `Extend to Snapchat Spotlight to diversify platforms`, deltas: { narrative: 3, ttp: 2, cross: 4, commercial: 1 } },
               ])
-            setScoringError('Could not fetch scores (CORS blocked or network error).')
-            setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
+              setScoringError('Scores not available (fetch failed).')
+              setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
+            }
           }
         }
       })()
@@ -1888,11 +1871,126 @@ export default function CanvasWorkflow() {
         >
           Export Project
         </button>
+        <button
+          className="ml-2 px-3 py-1.5 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-xs"
+          onClick={() => setShowUnderHood(true)}
+        >
+          Under the Hood
+        </button>
       </div>
       {/* Canvas with Nodes */}
       <Canvas nodes={nodes} onNodesChange={setNodes} renderNodeContent={renderNodeContent} />
 
       {/* Floating assistant removed per new UX */}
+
+      {/* Under the Hood Overlay */}
+      {showUnderHood && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center" onClick={() => setShowUnderHood(false)}>
+          <div className="w-[900px] max-h-[80vh] overflow-auto bg-charcoal-900 border border-white/10 rounded-lg p-4 text-xs text-white/80" onClick={(e)=>e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-white/90 font-medium">Under the Hood</div>
+              <button className="px-2 py-1 rounded border border-white/10 bg-white/10 hover:bg-white/20" onClick={()=>setShowUnderHood(false)}>Close</button>
+            </div>
+            {renderUnderHood()}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function readLS(key: string) { try { return JSON.parse(localStorage.getItem(key) || 'null') } catch { return null } }
+
+function linkList(arr?: any[]) {
+  if (!Array.isArray(arr) || !arr.length) return <span className="text-white/40">—</span>
+  return (
+    <ul className="list-disc pl-4 space-y-0.5">
+      {arr.map((x, i) => <li key={i}>{String(x)}</li>)}
+    </ul>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="panel p-3 bg-white/5 border border-white/10 mb-2">
+      <div className="text-white/70 font-medium mb-1">{title}</div>
+      {children}
+    </div>
+  )
+}
+
+function renderUnderHood() {
+  const pid = (() => { try { return localStorage.getItem('activeProjectId') || 'local' } catch { return 'local' } })()
+  const concept = localStorage.getItem('concept') || ''
+  const persona = localStorage.getItem('persona') || ''
+  const region = localStorage.getItem('region') || ''
+  const audience = localStorage.getItem('targetAudience') || ''
+  const debrief = readLS(`debrief:${pid}`)
+  const opps = readLS(`opps:${pid}`)
+  const recs = readLS(`recs:${pid}`)
+  const wild = readLS(`wild:${pid}`)
+  const overview = readLS(`overview:${pid}`)
+
+  return (
+    <div>
+      <Section title="Project">
+        <div>Concept: {concept || <span className="text-white/40">—</span>}</div>
+        <div>Persona: {persona || <span className="text-white/40">—</span>} • Region: {region || <span className="text-white/40">—</span>} • Audience: {audience || <span className="text-white/40">—</span>}</div>
+      </Section>
+
+      <Section title="Debrief Sources (used in Debrief)">
+        <div className="grid md:grid-cols-3 gap-3">
+          <div><div className="text-white/60 mb-1">Project Files</div>{linkList(debrief?.sources?.project)}</div>
+          <div><div className="text-white/60 mb-1">RKB</div>{linkList(debrief?.sources?.core)}</div>
+          <div><div className="text-white/60 mb-1">Live Trends</div>{linkList(debrief?.sources?.live)}</div>
+        </div>
+      </Section>
+
+      <Section title="Opportunities Sources (used in Opportunities)">
+        <div className="grid md:grid-cols-3 gap-3">
+          <div><div className="text-white/60 mb-1">Project Files</div>{linkList(opps?.sources?.project)}</div>
+          <div><div className="text-white/60 mb-1">RKB</div>{linkList(opps?.sources?.core)}</div>
+          <div><div className="text-white/60 mb-1">Live Trends</div>{linkList(opps?.sources?.live)}</div>
+        </div>
+      </Section>
+
+      <Section title="Recommendations Sources (used in Recommendations)">
+        <div className="grid md:grid-cols-3 gap-3">
+          <div><div className="text-white/60 mb-1">Project Files</div>{linkList(recs?.sources?.project)}</div>
+          <div><div className="text-white/60 mb-1">RKB</div>{linkList(recs?.sources?.core)}</div>
+          <div><div className="text-white/60 mb-1">Live Trends</div>{linkList(recs?.sources?.live)}</div>
+        </div>
+      </Section>
+
+      <Section title="Wildcard Evidence">
+        {Array.isArray(wild?.ideas) && wild.ideas.length ? (
+          <div className="space-y-2">
+            {wild.ideas.map((idea: any, i: number) => (
+              <div key={i} className="p-2 bg-white/5 rounded border border-white/10">
+                <div className="text-white/80 font-medium">{idea.title}</div>
+                <div className="mt-1 text-white/60">Evidence: {Array.isArray(idea.evidence)?idea.evidence.join(', '):'—'}</div>
+              </div>
+            ))}
+          </div>
+        ) : <div className="text-white/40">—</div>}
+      </Section>
+
+      <Section title="Prompts (latest run)">
+        <div className="space-y-2">
+          {debrief?._debug?.prompt && (
+            <details><summary className="cursor-pointer text-white/70">Debrief Prompt</summary><pre className="mt-1 whitespace-pre-wrap text-white/60">{debrief._debug.prompt}</pre></details>
+          )}
+          {opps?._debug?.prompt && (
+            <details><summary className="cursor-pointer text-white/70">Opportunities Prompt</summary><pre className="mt-1 whitespace-pre-wrap text-white/60">{opps._debug.prompt}</pre></details>
+          )}
+          {recs?._debug?.prompt && (
+            <details><summary className="cursor-pointer text-white/70">Recommendations Prompt</summary><pre className="mt-1 whitespace-pre-wrap text-white/60">{recs._debug.prompt}</pre></details>
+          )}
+          {wild?._debug?.prompt && (
+            <details><summary className="cursor-pointer text-white/70">Wildcard Prompt</summary><pre className="mt-1 whitespace-pre-wrap text-white/60">{wild._debug.prompt}</pre></details>
+          )}
+        </div>
+      </Section>
     </div>
   )
 }
