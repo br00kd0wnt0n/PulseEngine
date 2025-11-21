@@ -262,7 +262,7 @@ export default function CanvasWorkflow() {
       {
         id: 'context-upload',
         type: 'upload',
-        title: 'References & Content',
+        title: 'Upload Files, References & Context',
         x: 50,
         y: 400,
         width: 400,
