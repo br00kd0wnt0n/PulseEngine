@@ -134,6 +134,7 @@ export default function CanvasWorkflow() {
 
   const [conceptOverview, setConceptOverview] = useState<string | null>(null)
   const [overviewLoading, setOverviewLoading] = useState<boolean>(false)
+  const [showUnderHood, setShowUnderHood] = useState<boolean>(false)
 
   // Track if we've already positioned scoring/narrative nodes to prevent repositioning on re-render
   const nodesPositionedRef = useRef(false)
@@ -762,7 +763,6 @@ export default function CanvasWorkflow() {
               setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
             }
           }
-        }
       })()
       return () => { cancel = true }
     }
