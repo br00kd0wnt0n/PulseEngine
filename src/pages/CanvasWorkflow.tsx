@@ -254,7 +254,7 @@ export default function CanvasWorkflow() {
       {
         id: 'brief-input',
         type: 'input',
-        title: 'What story do you want to tell?',
+        title: 'What story are you telling?',
         x: 50,
         y: 100,
         width: 400,
