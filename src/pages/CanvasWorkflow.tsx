@@ -469,6 +469,7 @@ export default function CanvasWorkflow() {
               targetAudience
             })
             setConceptOverview(result?.overview || null)
+            addActivity('Concept Overview updated', 'ai')
           } catch (e) { console.error('[PersonaSwitch] Overview refresh failed:', e) }
           finally { setOverviewLoading(false) }
         }
@@ -1563,6 +1564,7 @@ export default function CanvasWorkflow() {
                         projectId: pid
                       })
                       setConceptOverview(result?.overview || null)
+                      addActivity('Concept Overview created', 'ai')
                       console.log('[ConceptOverview] Generated:', result?.overview)
                     } catch (err) {
                       console.error('[ConceptOverview] Failed:', err)
@@ -1691,6 +1693,7 @@ export default function CanvasWorkflow() {
                         projectId: pid
                       })
                       setConceptOverview(result?.overview || null)
+                      addActivity('Concept Overview refreshed', 'ai')
                     } catch (err) {
                       console.error('[ConceptOverview] Refresh failed:', err)
                     } finally {
