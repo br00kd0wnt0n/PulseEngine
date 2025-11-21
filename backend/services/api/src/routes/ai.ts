@@ -195,7 +195,7 @@ router.post('/wildcard', async (req, res) => {
       ]
       const resp = await client.chat.completions.create({
         model: process.env.MODEL_NAME || 'gpt-4o-mini',
-        temperature: 0.9,
+        temperature: 0.85,
         top_p: 0.9,
         presence_penalty: 0.6,
         frequency_penalty: 0.4,
@@ -245,6 +245,15 @@ router.post('/wildcard', async (req, res) => {
     let raw = await callModel()
     let parsed = tryParse(raw)
     let { ideas, sourcesUsed } = validateAndMapIdeas(parsed)
+
+    // If empty, relax constraints and try a second time
+    if (!ideas.length) {
+      raw = await callModel('If citations are insufficient, use 1–2 best ids. Return valid JSON only.')
+      parsed = tryParse(raw)
+      const v2 = validateAndMapIdeas(parsed)
+      ideas = v2.ideas
+      sourcesUsed = v2.sourcesUsed
+    }
 
     // Optional novelty gate against baseline (debrief+narrative, if provided)
     if (baseline && ideas.length) {

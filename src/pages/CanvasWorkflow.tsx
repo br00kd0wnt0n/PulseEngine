@@ -1763,7 +1763,7 @@ export default function CanvasWorkflow() {
                         <div className="mb-1">
                           <div className="text-white/60 text-[10px] mb-0.5">Risks / Failure Modes</div>
                           <ul className="list-disc pl-4 text-[10px] text-white/80">
-                            {idea.risks.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                            {idea.risks.map((r: string, i: number) => <li key={i}>{r.replace(/^['"]|['"]$/g,'')}</li>)}
                           </ul>
                         </div>
                       )}
@@ -1771,7 +1771,7 @@ export default function CanvasWorkflow() {
                         <div className="mb-1">
                           <div className="text-white/60 text-[10px] mb-0.5">How to Test This Week</div>
                           <ul className="list-disc pl-4 text-[10px] text-white/80">
-                            {idea.testPlan.map((t: string, i: number) => <li key={i}>{t}</li>)}
+                            {idea.testPlan.map((t: string, i: number) => <li key={i}>{t.replace(/^['"]|['"]$/g,'')}</li>)}
                           </ul>
                         </div>
                       )}

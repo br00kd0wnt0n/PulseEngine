@@ -74,7 +74,7 @@ export async function generateDebrief(concept: string, userId?: string | null, p
       // Fallback to empty context if retrieval fails
       ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
     }
-    const cacheKey = sha({ t: 'debrief', concept, s: summarySig(ctx, projectId) })
+    const cacheKey = sha({ t: 'debrief', concept, s: summarySig(ctx, projectId), persona, targetAudience })
     const cached = await cacheGet<any>(cacheKey)
     if (cached) return cached
     const apiKey = process.env.OPENAI_API_KEY
@@ -185,6 +185,13 @@ export async function generateDebrief(concept: string, userId?: string | null, p
         return insights.slice(0, 3) // Return top 3 insights
       })(),
       sources: ctx.sources,
+      personaNotes: (() => {
+        const role = (persona || '').toLowerCase()
+        if (role.includes('strategist')) return [ 'Add KPI targets and cadence checkpoints for weeks 1–4', 'Define measurement plan: view-through, saves, shares, sentiment' ]
+        if (role.includes('creative')) return [ 'Clarify story spine + tone: hook, arc, resolution', 'Define visual system: typography, color, motion motifs' ]
+        if (role.includes('creator')) return [ 'Specify short-form formats: hooks, b-roll, captions', 'Outline posting cadence and cross-posting plan' ]
+        return []
+      })()
     }
     await cacheSet(cacheKey, heuristic)
     return heuristic
@@ -212,7 +219,7 @@ export async function generateOpportunities(concept: string, userId?: string | n
       // Fallback to empty context if retrieval fails
       ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
     }
-    const cacheKey = sha({ t: 'opps', concept, s: summarySig(ctx, projectId) })
+    const cacheKey = sha({ t: 'opps', concept, s: summarySig(ctx, projectId), persona, targetAudience })
     const cached = await cacheGet<any>(cacheKey)
     if (cached) return cached
     const apiKey = process.env.OPENAI_API_KEY
@@ -289,7 +296,14 @@ export async function generateOpportunities(concept: string, userId?: string | n
     const heuristic = {
       opportunities,
       rationale: `Strategic campaign opportunities tailored for "${concept}"${hasLiveMetrics ? ' based on trending content patterns' : ''}.`,
-      sources: ctx.sources
+      sources: ctx.sources,
+      personaNotes: (() => {
+        const role = (persona || '').toLowerCase()
+        if (role.includes('strategist')) return [ 'Prioritize opportunities with clear KPI lift', 'Sequence bets for early signal then scale' ]
+        if (role.includes('creative')) return [ 'Elevate ideas with distinctive visual hooks', 'Ensure each opportunity ladders to the story arc' ]
+        if (role.includes('creator')) return [ 'Focus on formats you can produce weekly', 'Leverage duet/remix to invite audience participation' ]
+        return []
+      })()
     }
     await cacheSet(cacheKey, heuristic)
     return heuristic
@@ -514,7 +528,13 @@ export async function generateRecommendations(
     }
   }
   console.log('[RAG] Using heuristic fallback')
-  const heuristic = buildHeuristicRecs(concept)
+  const heuristic = { ...buildHeuristicRecs(concept), personaNotes: (() => {
+    const role = (persona || '').toLowerCase()
+    if (role.includes('strategist')) return [ 'Balance channel mix by KPI sensitivity and cost', 'Stage tests: hook variants → format variants → creator collabs' ]
+    if (role.includes('creative')) return [ 'Define motif library for recognizability', 'Maintain story cadence: teaser → arc → payoff' ]
+    if (role.includes('creator')) return [ 'Batch scripting and shotlists to ship weekly', 'Optimize captions and CTA for saves/shares' ]
+    return []
+  })() }
   // Attach empty sources and creators for heuristic mode
   return { ...heuristic, sources: { user: [], core: [], live: [], predictive: [] }, creators }
 }

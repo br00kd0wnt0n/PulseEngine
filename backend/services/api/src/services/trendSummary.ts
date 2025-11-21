@@ -32,14 +32,21 @@ export async function buildTrendSummaries(periods: Period[] = ['day','week','mon
         ORDER BY engagement DESC, velocity DESC
         LIMIT 2000
       `, [platform, start, end])
-
-      const ranked = rows
+      // Deduplicate similar items by (platform,type,label bucketed by hour)
+      const seen = new Set<string>()
+      const ranked = [] as any[]
+      rows
         .map((m: any, idx: number) => ({ m, idx, score: scoreMetric(m) }))
         .sort((a: any, b: any) => b.score - a.score)
-        .slice(0, perPlatform)
-        .map(({ m }: any) => simplifyMetric(m))
+        .forEach(({ m }: any) => {
+          const s = simplifyMetric(m)
+          const bucket = s.createdAt ? new Date(s.createdAt).toISOString().slice(0, 13) : 'na'
+          const sig = `${(s.platform||'').toLowerCase()}|${(s.type||'').toLowerCase()}|${(s.label||'').toLowerCase().slice(0,48)}|${bucket}`
+          if (!seen.has(sig)) { seen.add(sig); ranked.push(s) }
+        })
+      const top = ranked.slice(0, perPlatform)
 
-      const payload = { items: ranked, meta: { period: p, platform, windowStart: start.toISOString(), windowEnd: end.toISOString(), updatedAt: new Date().toISOString() } }
+      const payload = { items: top, meta: { period: p, platform, windowStart: start.toISOString(), windowEnd: end.toISOString(), updatedAt: new Date().toISOString() } }
       await upsertSummary(p, platform, start, end, payload)
     }
 
@@ -51,11 +58,18 @@ export async function buildTrendSummaries(periods: Period[] = ['day','week','mon
       ORDER BY engagement DESC, velocity DESC
       LIMIT 4000
     `, [start, end])
-    const rankedAll = allRows
+    const seenAll = new Set<string>()
+    const dedupAll: any[] = []
+    allRows
       .map((m: any) => ({ m, score: scoreMetric(m) }))
       .sort((a: any, b: any) => b.score - a.score)
-      .slice(0, perPlatform)
-      .map(({ m }: any) => simplifyMetric(m))
+      .forEach(({ m }: any) => {
+        const s = simplifyMetric(m)
+        const bucket = s.createdAt ? new Date(s.createdAt).toISOString().slice(0, 13) : 'na'
+        const sig = `${(s.platform||'').toLowerCase()}|${(s.type||'').toLowerCase()}|${(s.label||'').toLowerCase().slice(0,48)}|${bucket}`
+        if (!seenAll.has(sig)) { seenAll.add(sig); dedupAll.push(s) }
+      })
+    const rankedAll = dedupAll.slice(0, perPlatform)
     const allPayload = { items: rankedAll, meta: { period: p, platform: 'all', windowStart: start.toISOString(), windowEnd: end.toISOString(), updatedAt: new Date().toISOString() } }
     await upsertSummary(p, 'all', start, end, allPayload)
   }
@@ -87,4 +101,3 @@ export async function getTrendSummary(period: Period, platform: string) {
   const row = await repo.findOne({ where: { period, platform }, order: { windowStart: 'DESC' as any } })
   return row?.payload || { items: [], meta: {} }
 }
-
