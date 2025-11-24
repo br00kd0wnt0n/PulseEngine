@@ -256,6 +256,13 @@ export default function CanvasWorkflow() {
   const [scores, setScores] = useState<{ narrative?: number; ttpWeeks?: number; cross?: number; commercial?: number; overall?: number } | null>(null)
   const [rawScore, setRawScore] = useState<any | null>(null)
   const [debugScore, setDebugScore] = useState<boolean>(() => { try { return localStorage.getItem('debug:score-canvas') === '1' } catch { return false } })
+
+  // If user turns on Debug after scores have loaded, dump the current payload once.
+  useEffect(() => {
+    if (debugScore && rawScore) {
+      try { console.log('[Canvas Score] current payload:', rawScore) } catch {}
+    }
+  }, [debugScore, rawScore])
   const [enhancements, setEnhancements] = useState<{ text: string; target?: string; deltas?: { narrative?: number; ttp?: number; cross?: number; commercial?: number } }[]>([])
   const [selectedEnhancements, setSelectedEnhancements] = useState<Set<number>>(new Set())
   const [scoringError, setScoringError] = useState<string | null>(null)
@@ -1523,10 +1530,31 @@ export default function CanvasWorkflow() {
               <div className="panel p-2 bg-white/5">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-white/70 font-medium text-[11px]">CAMPAIGN SCORING</div>
-                  <label className="text-[10px] flex items-center gap-1 text-white/50">
-                    <input type="checkbox" className="align-middle" checked={debugScore} onChange={(e)=>{ setDebugScore(e.target.checked); try { localStorage.setItem('debug:score-canvas', e.target.checked ? '1':'0') } catch {} }} />
-                    Debug
-                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[10px] flex items-center gap-1 text-white/50">
+                      <input type="checkbox" className="align-middle" checked={debugScore} onChange={(e)=>{ setDebugScore(e.target.checked); try { localStorage.setItem('debug:score-canvas', e.target.checked ? '1':'0') } catch {} }} />
+                      Debug
+                    </label>
+                    <button
+                      className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 hover:bg-white/10"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'processing' as const } : n))
+                        try {
+                          const graph: any = { concept, persona, region, debrief: debrief?.brief }
+                          const sc = await api.score(concept, graph, { persona, region })
+                          setRawScore(sc)
+                          try { if (debugScore) console.log('[Canvas Score] payload (manual refresh):', sc) } catch {}
+                          setScores(compactScore(sc))
+                          setScoringError(null)
+                        } catch {
+                          setScoringError('Scores not available (refresh failed).')
+                        } finally {
+                          setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as const } : n))
+                        }
+                      }}
+                    >Refresh</button>
+                  </div>
                 </div>
                 {scoringError && (
                   <div className="mb-2 text-[10px] text-amber-300 bg-amber-500/10 border border-amber-400/30 rounded px-2 py-1">
@@ -1659,26 +1687,11 @@ export default function CanvasWorkflow() {
                       setOverviewLoading(false)
                     }
 
-                    // Fetch creators
+                    // Fetch creators (non-blocking for overview)
                     try {
                       const rec = await api.recommendations(concept, { nodes: [], links: [] }, { persona, region, targetAudience })
                       const creators = Array.isArray((rec as any)?.creators) ? (rec as any).creators : []
                       setConceptCreators(creators)
-                      // Build Concept Overview if none
-                      if (!conceptOverview) {
-                        try {
-                          const parts: string[] = []
-                          const essence = debrief?.brief || ''
-                          if (essence) parts.push(`### Campaign Essence\n\n${essence}`)
-                          const strat = Array.isArray((rec as any)?.narrative) ? (rec as any).narrative.slice(0,3) : []
-                          if (strat.length) parts.push(`### Strategic Approach\n\n` + strat.map((s: string) => `- ${s}`).join('\n'))
-                          const exec = Array.isArray((rec as any)?.content) ? (rec as any).content.slice(0,3) : []
-                          if (exec.length) parts.push(`### Execution Highlights\n\n` + exec.map((s: string) => `- ${s}`).join('\n'))
-                          const next = Array.isArray((rec as any)?.platform) ? (rec as any).platform.slice(0,3) : []
-                          if (next.length) parts.push(`### Next Steps\n\n` + next.map((s: string) => `- ${s}`).join('\n'))
-                          if (parts.length) setConceptOverview(parts.join('\n\n'))
-                        } catch {}
-                      }
                     } catch (err) {
                       console.error('[Creators] API failed:', err)
                       setConceptCreators([])
