@@ -9,6 +9,21 @@ import { CitationToken } from '../components/shared/CitationOverlay'
 import BrandSpinner from '../components/shared/BrandSpinner'
 import { exportProjectFull, downloadMarkdown } from '../utils/export'
 
+function compactScore(sc: any): { narrative?: number; ttpWeeks?: number; cross?: number; commercial?: number; overall?: number } | null {
+  try {
+    if (!sc || typeof sc !== 'object') return null
+    const narrative = typeof sc?.scores?.narrativeStrength === 'number' ? sc.scores.narrativeStrength : undefined
+    const ttpWeeks = typeof sc?.scores?.timeToPeakWeeks === 'number' ? sc.scores.timeToPeakWeeks : undefined
+    const cross = typeof sc?.extended?.crossPlatformPotential === 'number'
+      ? sc.extended.crossPlatformPotential
+      : (typeof sc?.ralph?.crossPlatformPotential === 'number' ? sc.ralph.crossPlatformPotential : undefined)
+    const commercial = typeof sc?.extended?.commercialPotential === 'number' ? sc.extended.commercialPotential : undefined
+    const overall = typeof sc?.extended?.overall === 'number' ? sc.extended.overall : undefined
+    if ([narrative, ttpWeeks, cross, commercial, overall].every(v => typeof v !== 'number')) return null
+    return { narrative, ttpWeeks, cross, commercial, overall }
+  } catch { return null }
+}
+
 function renderMarkdown(md: string): string {
   // Basic safe renderer: escape HTML, then apply minimal markdown transforms
   const esc = (s: string) => s
@@ -239,6 +254,8 @@ export default function CanvasWorkflow() {
   const [narrativeChatInput, setNarrativeChatInput] = useState('')
   // Scores and enhancements
   const [scores, setScores] = useState<{ narrative?: number; ttpWeeks?: number; cross?: number; commercial?: number; overall?: number } | null>(null)
+  const [rawScore, setRawScore] = useState<any | null>(null)
+  const [debugScore, setDebugScore] = useState<boolean>(() => { try { return localStorage.getItem('debug:score-canvas') === '1' } catch { return false } })
   const [enhancements, setEnhancements] = useState<{ text: string; target?: string; deltas?: { narrative?: number; ttp?: number; cross?: number; commercial?: number } }[]>([])
   const [selectedEnhancements, setSelectedEnhancements] = useState<Set<number>>(new Set())
   const [scoringError, setScoringError] = useState<string | null>(null)
@@ -746,7 +763,9 @@ export default function CanvasWorkflow() {
             api.enhancements(concept, graph, { persona, region })
           ])
           if (cancel) return
-          setScores(sc || null)
+          setRawScore(sc)
+          try { if (debugScore) console.log('[Canvas Score] payload:', sc) } catch {}
+          setScores(compactScore(sc))
           let list = Array.isArray(eh?.suggestions) ? eh.suggestions : []
           if (!list.length) {
             // Fallback suggestions if API returns nothing
@@ -763,6 +782,7 @@ export default function CanvasWorkflow() {
             if (!cancel) {
               // Do not fake scores; show unavailable state instead
               setScores(null)
+              setRawScore(null)
               setEnhancements([
                 { text: `Add YouTube Shorts component to amplify reach`, deltas: { narrative: 8, ttp: 3, cross: 2, commercial: 4 } },
                 { text: `Integrate trending audio library for higher cultural relevance`, deltas: { narrative: 6, ttp: 2, cross: 3, commercial: 2 } },
@@ -1501,7 +1521,13 @@ export default function CanvasWorkflow() {
           ) : (
             <>
               <div className="panel p-2 bg-white/5">
-                <div className="text-white/70 font-medium mb-2 text-[11px]">CAMPAIGN SCORING</div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-white/70 font-medium text-[11px]">CAMPAIGN SCORING</div>
+                  <label className="text-[10px] flex items-center gap-1 text-white/50">
+                    <input type="checkbox" className="align-middle" checked={debugScore} onChange={(e)=>{ setDebugScore(e.target.checked); try { localStorage.setItem('debug:score-canvas', e.target.checked ? '1':'0') } catch {} }} />
+                    Debug
+                  </label>
+                </div>
                 {scoringError && (
                   <div className="mb-2 text-[10px] text-amber-300 bg-amber-500/10 border border-amber-400/30 rounded px-2 py-1">
                     {scoringError}
@@ -1559,7 +1585,9 @@ export default function CanvasWorkflow() {
                     try {
                       const graph: any = { concept, persona, region, debrief: debrief?.brief }
                       const sc = await api.score(concept, graph, { persona, region })
-                      setScores(sc || null)
+                      setRawScore(sc)
+                      try { if (debugScore) console.log('[Canvas Score] payload (after apply):', sc) } catch {}
+                      setScores(compactScore(sc))
                     } catch {}
                     setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
 

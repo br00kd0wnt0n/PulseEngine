@@ -133,44 +133,50 @@ export async function generateScoresAI(
   const scores = parsed.scores
   const ralph = parsed.ralph
 
-  // Baseline from heuristic MVP (guards against degenerate model outputs)
-  const baseline = scoreConceptMvp(concept, graph || { nodes: [], links: [] })
+  // Model-only by default. Optional baseline fallback behind env flag.
+  const useBaseline = (process.env.SCORE_BASELINE_FALLBACK === '1')
+  const baseline = useBaseline ? scoreConceptMvp(concept, graph || { nodes: [], links: [] }) : null
 
-  // Merge strategy: prefer model when > 0, else fall back to baseline
-  const choose = (aiVal: number | undefined, baseVal: number): number => {
+  const pick = (aiVal: number | undefined, baseVal?: number): number | null => {
     const a = Number(aiVal)
-    if (Number.isFinite(a) && a > 0) return Math.round(a)
-    return Math.round(baseVal)
+    if (Number.isFinite(a) && a >= 0) return Math.round(a)
+    if (useBaseline && typeof baseVal === 'number') return Math.round(baseVal)
+    return null
   }
 
-  const ttpWeeks = Math.max(1, Math.min(12, Number(parsed.scores.timeToPeakWeeks || baseline.scores.timeToPeakWeeks)))
+  const ttpWeeksRaw = pick(parsed.scores.timeToPeakWeeks as unknown as number, baseline?.scores.timeToPeakWeeks)
+  const ttpWeeks = Math.max(1, Math.min(12, Number(ttpWeeksRaw ?? 8)))
   const timeToPeakScore = Math.max(0, Math.min(100, 100 - (ttpWeeks - 1) * 12))
+  const collab = pick(parsed.scores.collaborationOpportunity, baseline?.scores.collaborationOpportunity)
+  const narr = pick(parsed.scores.narrativeStrength, baseline?.scores.narrativeStrength)
+  const cross = pick(parsed.ralph.crossPlatformPotential, baseline?.ralph.crossPlatformPotential)
+  const cult = pick(parsed.ralph.culturalRelevance, baseline?.ralph.culturalRelevance)
+  const adapt = pick(parsed.ralph.narrativeAdaptability, baseline?.ralph.narrativeAdaptability)
+
+  // If model produced degenerate output (all null/zero-ish) and no baseline allowed, signal failure
+  const allZeroish = [narr, collab, cross, cult].every(v => v === null || v === 0)
+  if (!useBaseline && allZeroish) throw new Error('degenerate_scores')
+
   const commercialPotential = Math.round(
-    0.6 * choose(parsed.scores.collaborationOpportunity, baseline.scores.collaborationOpportunity) +
-    0.4 * choose(parsed.ralph.culturalRelevance, baseline.ralph.culturalRelevance)
+    0.6 * Number(collab ?? 0) + 0.4 * Number(cult ?? 0)
   )
-  const overall = Math.round((
-    choose(parsed.scores.narrativeStrength, baseline.scores.narrativeStrength) +
-    timeToPeakScore +
-    choose(parsed.ralph.crossPlatformPotential, baseline.ralph.crossPlatformPotential) +
-    commercialPotential
-  ) / 4)
+  const overall = Math.round(((narr ?? 0) + timeToPeakScore + (cross ?? 0) + commercialPotential) / 4)
 
   const result = {
     scores: {
-      narrativeStrength: choose(parsed.scores.narrativeStrength, baseline.scores.narrativeStrength),
+      narrativeStrength: narr ?? 0,
       timeToPeakWeeks: ttpWeeks,
-      collaborationOpportunity: choose(parsed.scores.collaborationOpportunity, baseline.scores.collaborationOpportunity),
+      collaborationOpportunity: collab ?? 0,
     },
     ralph: {
-      narrativeAdaptability: choose(parsed.ralph.narrativeAdaptability, baseline.ralph.narrativeAdaptability),
-      crossPlatformPotential: choose(parsed.ralph.crossPlatformPotential, baseline.ralph.crossPlatformPotential),
-      culturalRelevance: choose(parsed.ralph.culturalRelevance, baseline.ralph.culturalRelevance),
+      narrativeAdaptability: adapt ?? 0,
+      crossPlatformPotential: cross ?? 0,
+      culturalRelevance: cult ?? 0,
     },
     extended: {
       overall,
       commercialPotential,
-      crossPlatformPotential: choose(parsed.ralph.crossPlatformPotential, baseline.ralph.crossPlatformPotential),
+      crossPlatformPotential: cross ?? 0,
       timeToPeakScore,
       impactMap: undefined as any,
     },
