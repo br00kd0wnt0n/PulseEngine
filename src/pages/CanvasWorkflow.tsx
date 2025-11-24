@@ -1618,7 +1618,8 @@ export default function CanvasWorkflow() {
                         opportunities: opps?.opportunities,
                         narrative: narrative?.text,
                         enhancements: appliedEnhancements,
-                        projectId: pid
+                        projectId: pid,
+                        targetAudience
                       })
                       setConceptOverview(result?.overview || null)
                       addActivity('Concept Overview created', 'ai')
@@ -1747,7 +1748,8 @@ export default function CanvasWorkflow() {
                         opportunities: opps?.opportunities,
                         narrative: narrative?.text,
                         enhancements: appliedEnhancements,
-                        projectId: pid
+                        projectId: pid,
+                        targetAudience
                       })
                       setConceptOverview(result?.overview || null)
                       addActivity('Concept Overview refreshed', 'ai')
