@@ -14,6 +14,9 @@ export default function ScoringEnhancements() {
   const [enh, setEnh] = useState<{ suggestions: { text: string; target: string; impact: number }[] } | null>(null)
   const graph = useMemo(() => snapshot(), [snapshot])
   const [error, setError] = useState<string | null>(null)
+  const [debugScore, setDebugScore] = useState<boolean>(() => {
+    try { return localStorage.getItem('debug:score') === '1' } catch { return false }
+  })
 
   useEffect(() => {
     let cancel = false
@@ -34,6 +37,7 @@ export default function ScoringEnhancements() {
         if (!cancel) {
           setScore(s); setEnh(e)
           setError(null)
+          try { if (debugScore) console.log('[Score] payload:', s) } catch {}
           logActivity('Scores updated')
           // persist compact score snapshot for co‑pilot guidance
           try {
@@ -85,6 +89,7 @@ export default function ScoringEnhancements() {
           const pid = localStorage.getItem('activeProjectId') || undefined
           const s = await api.score(concept, graph, { persona, region, projectId: pid, targetAudience })
           setScore(s)
+          try { if (debugScore) console.log('[Score] payload (after apply):', s) } catch {}
           logActivity('Scores recalculated after enhancement')
           try {
             const pid = localStorage.getItem('activeProjectId') || 'local'
@@ -109,6 +114,10 @@ export default function ScoringEnhancements() {
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold">SCORING <span className="text-white/30">|</span> ENHANCEMENTS</div>
         <div className="flex items-center gap-2">
+          <label className="text-[10px] flex items-center gap-1 text-white/50">
+            <input type="checkbox" className="align-middle" checked={debugScore} onChange={(e)=>{ setDebugScore(e.target.checked); try { localStorage.setItem('debug:score', e.target.checked ? '1':'0') } catch {} }} />
+            Debug
+          </label>
           {updatedAfterApply && (
             <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-white/60">Updated after apply</span>
           )}

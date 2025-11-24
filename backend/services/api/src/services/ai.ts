@@ -131,7 +131,21 @@ export async function generateScoresAI(
       return null
     }
   }
-  const parsed = tryParse(raw)
+  let parsed = tryParse(raw)
+  if (!parsed) {
+    // Retry once with stricter instruction
+    const resp2 = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: 'Return only JSON with keys: scores, ralph, rationales, evidence. Be concise and evidence-based.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.2,
+      max_tokens: 500,
+    })
+    const raw2 = resp2.choices?.[0]?.message?.content || '{}'
+    parsed = tryParse(raw2)
+  }
   if (!parsed || !parsed.scores || !parsed.ralph) throw new Error('parse_failed')
 
   const scores = parsed.scores || {}
