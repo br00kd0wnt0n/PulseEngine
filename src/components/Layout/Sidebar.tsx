@@ -80,7 +80,7 @@ export default function Sidebar() {
                 })
 
                 // Clear global project settings
-                const globalKeys = ['activeProjectId', 'concept', 'persona', 'region']
+                const globalKeys = ['activeProjectId', 'concept', 'persona', 'region', 'targetAudience']
                 globalKeys.forEach(key => {
                   try { localStorage.removeItem(key) } catch {}
                 })
