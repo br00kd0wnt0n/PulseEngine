@@ -1756,9 +1756,32 @@ export default function CanvasWorkflow() {
                   }}
                 >Refresh</button>
               </div>
-              <div className="panel p-4 bg-white/5">
-                <div className="prose prose-invert max-w-none text-[11px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(conceptOverview) }} />
-              </div>
+              {/* Parse and display sections like narrative node */}
+              {(() => {
+                const parsed = extractNarrativeSections(conceptOverview || '')
+                if (!parsed.sections.length) {
+                  return (
+                    <div className="panel p-3 bg-white/5">
+                      <div className="prose prose-invert max-w-none text-[10px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(conceptOverview) }} />
+                    </div>
+                  )
+                }
+                return (
+                  <div className="space-y-2">
+                    {parsed.header && (
+                      <div className="panel p-3 bg-white/5">
+                        <div className="text-white/70 font-semibold text-[11px]">{parsed.header}</div>
+                      </div>
+                    )}
+                    {parsed.sections.map((sec, i) => (
+                      <div key={i} className="panel p-3 bg-white/5">
+                        <div className="text-white/80 font-medium mb-1.5 text-[11px]">{sec.title}</div>
+                        <div className="prose prose-invert max-w-none text-[10px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(cleanSectionBody(sec.body, sec.title)) }} />
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
             </>
           ) : (
             <div className="text-white/50 text-[11px]">
