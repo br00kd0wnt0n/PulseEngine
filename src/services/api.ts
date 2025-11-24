@@ -15,6 +15,7 @@ export type StatusOverview = {
 }
 
 export const api = {
+  statusVersion: () => request<any>('/status/version'),
   statusOverview: () => request<StatusOverview>('/status/overview'),
   narrative: (graph: any, focusId?: string | null) => request<{ text: string }>(
     '/ai/narrative',

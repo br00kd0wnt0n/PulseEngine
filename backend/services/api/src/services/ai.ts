@@ -685,17 +685,26 @@ export async function generateRecommendations(
       const raw = resp.choices?.[0]?.message?.content || '{}'
       console.log('[RAG] OpenAI response length:', raw.length, 'characters')
 
-      try {
-        const result = JSON.parse(raw)
+      const tryParse = (s: string) => { try { return JSON.parse(s) } catch { const m = s.match(/\{[\s\S]*\}/); if (m) { try { return JSON.parse(m[0]) } catch {} } return null } }
+      let result = tryParse(raw)
+      if (!result) {
+        // Retry once with stricter JSON-only instruction; handle ```json fences
+        const resp2 = await client.chat.completions.create({
+          model,
+          messages: [ { role: 'system', content: 'Return only JSON with keys: opportunities, rationale, personaNotes. No backticks.' }, { role: 'user', content: prompt } ],
+          temperature: 0.6,
+          max_tokens: 500,
+        })
+        const raw2 = resp2.choices?.[0]?.message?.content || '{}'
+        result = tryParse(raw2)
+      }
+      if (result && typeof result === 'object') {
         // Attach sources and creators
         result.sources = context.sources
         result.creators = creators
         result._debug = { prompt, model }
         console.log('[RAG] Successfully parsed OpenAI response, returning with sources and', creators.length, 'creators')
         return result
-      } catch (parseErr) {
-        console.error('[RAG] Failed to parse OpenAI JSON response:', parseErr)
-        /* fallthrough */
       }
     } catch (e) {
       console.error('[RAG] OpenAI call failed:', e)

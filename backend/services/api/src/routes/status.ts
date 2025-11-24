@@ -1,7 +1,61 @@
 import { Router } from 'express'
 import { AppDataSource } from '../db/data-source.js'
+import fs from 'fs'
+import path from 'path'
+import { execSync } from 'child_process'
 
 const router = Router()
+const STARTED_AT = new Date().toISOString()
+
+function resolveGitSha(): { sha: string | null; source: string } {
+  // Prefer explicit envs set by CI/CD
+  const envSha = process.env.GIT_SHA
+    || process.env.RAILWAY_GIT_COMMIT_SHA
+    || process.env.VERCEL_GIT_COMMIT_SHA
+    || process.env.COMMIT_SHA
+    || ''
+  if (envSha) return { sha: envSha, source: 'env' }
+  // Try local git (may not exist in production image)
+  try {
+    const sha = execSync('git rev-parse --short HEAD', { stdio: ['ignore','pipe','ignore'] }).toString().trim()
+    if (sha) return { sha, source: 'git' }
+  } catch {}
+  // Try version file placed at build time (optional)
+  try {
+    const file = path.join(process.cwd(), 'dist', 'version.json')
+    if (fs.existsSync(file)) {
+      const parsed = JSON.parse(fs.readFileSync(file, 'utf-8'))
+      if (parsed?.sha) return { sha: String(parsed.sha), source: 'file' }
+    }
+  } catch {}
+  return { sha: null, source: 'unknown' }
+}
+
+function resolvePkgVersion(): string | null {
+  try {
+    const pkgPath = path.join(process.cwd(), 'package.json')
+    const raw = fs.readFileSync(pkgPath, 'utf-8')
+    const j = JSON.parse(raw)
+    return j?.version || null
+  } catch { return null }
+}
+
+router.get('/version', async (_req, res) => {
+  const { sha, source } = resolveGitSha()
+  const buildTime = process.env.BUILD_TIME || process.env.RAILWAY_BUILD_TIME || null
+  const version = resolvePkgVersion()
+  return res.json({
+    service: 'pulse-api',
+    version,
+    git: { sha, source },
+    buildTime,
+    startedAt: STARTED_AT,
+    node: process.version,
+    env: process.env.NODE_ENV || 'development',
+    model: process.env.MODEL_NAME || 'gpt-4o-mini',
+    openai: !!process.env.OPENAI_API_KEY,
+  })
+})
 
 router.get('/overview', async (_req, res) => {
   const db = AppDataSource

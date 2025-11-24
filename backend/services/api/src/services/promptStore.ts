@@ -258,6 +258,7 @@ export function renderTemplate(tpl: string, vars: Record<string, any>): string {
     .replace(/\{\{pivots\}\}/g, String(vars.pivots || ''))
     .replace(/\{\{evidence\}\}/g, String(vars.evidence || ''))
     .replace(/\{\{resolution\}\}/g, String(vars.resolution || ''))
+    .replace(/\{\{ralphLens\}\}/g, String(vars.ralphLens || ''))
     .replace(/\{\{narrativeScore\}\}/g, String(vars.narrativeScore ?? ''))
     .replace(/\{\{ttpScore\}\}/g, String(vars.ttpScore ?? ''))
     .replace(/\{\{crossScore\}\}/g, String(vars.crossScore ?? ''))
