@@ -30,6 +30,12 @@ function renderMarkdown(md: string): string {
   text = text.replace(/^\s*\d+\.\s+([^:\n]+):/gm, '<h4>$1</h4>')
   // Subsection labels like `Content Pillars:` or `Story Arc:` -> <h5>
   text = text.replace(/^\s*([A-Z][A-Za-z ]+):$/gm, '<h5>$1</h5>')
+  // Common subtitles (case-insensitive): Platform Strategy, Success Metrics, Content Pillars, How .* Integrates, Opening Hook
+  text = text.replace(/^\s*(platform strategy.*)\s*:?\s*$/gim, (_, p1) => `<h5>${p1.trim()}</h5>`)
+  text = text.replace(/^\s*(success metrics.*)\s*:?\s*$/gim,  (_, p1) => `<h5>${p1.trim()}</h5>`)
+  text = text.replace(/^\s*(content pillars.*)\s*:?\s*$/gim,  (_, p1) => `<h5>${p1.trim()}</h5>`)
+  text = text.replace(/^\s*(opening hook.*)\s*:?\s*$/gim,     (_, p1) => `<h5>${p1.trim()}</h5>`)
+  text = text.replace(/^\s*(how .* integrates)\s*:?\s*$/gim,    (_, p1) => `<h5>${p1.trim()}</h5>`)
   // Bold **text** (non-greedy, single line)
   text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
   // Bullet lists: lines starting with - or *
@@ -781,6 +787,54 @@ export default function CanvasWorkflow() {
       }
       return n
     }))
+  }
+
+  async function ensureConceptOverviewNode() {
+    setNodes(prev => {
+      const exists = prev.find(n => n.id === 'concept-overview')
+      if (exists) return prev.map(n => n.id === 'concept-overview' ? { ...n, minimized: false, status: 'processing' as NodeData['status'] } : n)
+      return [
+        ...prev,
+        {
+          id: 'concept-overview',
+          type: 'ai-content',
+          title: 'Concept Overview',
+          x: 1650,
+          y: 100,
+          width: 450,
+          height: 260,
+          minimized: false,
+          zIndex: 6,
+          status: 'processing' as NodeData['status'],
+          connectedTo: ['scoring']
+        }
+      ]
+    })
+  }
+
+  async function refreshConceptOverview(appliedEnhancements: string[] = []) {
+    try {
+      setOverviewLoading(true)
+      await ensureConceptOverviewNode()
+      const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
+      const result = await api.conceptOverview(concept, {
+        persona,
+        region,
+        debrief: debrief?.brief,
+        opportunities: opps?.opportunities,
+        narrative: narrative?.text,
+        enhancements: appliedEnhancements,
+        projectId: pid,
+        targetAudience
+      })
+      setConceptOverview(result?.overview || null)
+      try { if (pid) localStorage.setItem(`overview:${pid}`, JSON.stringify(result)) } catch {}
+      setNodes(prev => prev.map(n => n.id === 'concept-overview' ? { ...n, status: 'active' as NodeData['status'] } : n))
+    } catch (err) {
+      console.error('[ConceptOverview] Failed:', err)
+    } finally {
+      setOverviewLoading(false)
+    }
   }
 
   // File upload helper
@@ -1804,6 +1858,8 @@ export default function CanvasWorkflow() {
                             const updated = current + block
                             setNodes(prev => prev.map(n => n.id === 'wildcard' ? { ...n, status: 'processing' as NodeData['status'] } : n))
                             try { setNarrative({ text: updated }) } catch {}
+                            // Refresh concept overview when narrative changes via wildcard
+                            try { refreshConceptOverview([]) } catch {}
                             setTimeout(() => setNodes(prev => prev.map(n => n.id === 'wildcard' ? { ...n, status: 'active' as NodeData['status'] } : n)), 400)
                             addActivity('Applied Wildcard to narrative', 'ai')
                           }}
