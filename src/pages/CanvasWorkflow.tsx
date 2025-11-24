@@ -71,7 +71,10 @@ function extractNarrativeSections(text: string): { header?: string; sections: { 
   let match: RegExpExecArray | null
   const indices: { idx: number; title: string }[] = []
   while ((match = pattern.exec(src)) !== null) {
-    indices.push({ idx: match.index + match[0].length, title: match[1].trim() })
+    // Strip markdown bold syntax from title
+    const rawTitle = match[1].trim()
+    const cleanTitle = rawTitle.replace(/^\*\*|\*\*$/g, '').trim()
+    indices.push({ idx: match.index + match[0].length, title: cleanTitle })
   }
   if (indices.length === 0) return { header, sections: [] }
   for (let i = 0; i < indices.length; i++) {
