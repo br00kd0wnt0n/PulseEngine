@@ -77,7 +77,8 @@ export async function generateScoresAI(
   userId?: string | null,
   persona?: string | null,
   projectId?: string | null,
-  targetAudience?: string | null
+  targetAudience?: string | null,
+  graph?: TrendGraph | null,
 ) {
   // Retrieve context
   let ctx: RetrievalContext
@@ -131,31 +132,45 @@ export async function generateScoresAI(
 
   const scores = parsed.scores
   const ralph = parsed.ralph
-  // Compute extended metrics
-  const ttpWeeks = Math.max(1, Math.min(12, Number(scores.timeToPeakWeeks || 8)))
+
+  // Baseline from heuristic MVP (guards against degenerate model outputs)
+  const baseline = scoreConceptMvp(concept, graph || { nodes: [], links: [] })
+
+  // Merge strategy: prefer model when > 0, else fall back to baseline
+  const choose = (aiVal: number | undefined, baseVal: number): number => {
+    const a = Number(aiVal)
+    if (Number.isFinite(a) && a > 0) return Math.round(a)
+    return Math.round(baseVal)
+  }
+
+  const ttpWeeks = Math.max(1, Math.min(12, Number(parsed.scores.timeToPeakWeeks || baseline.scores.timeToPeakWeeks)))
   const timeToPeakScore = Math.max(0, Math.min(100, 100 - (ttpWeeks - 1) * 12))
   const commercialPotential = Math.round(
-    0.6 * Number(scores.collaborationOpportunity || 0) + 0.4 * Number(ralph.culturalRelevance || 0)
+    0.6 * choose(parsed.scores.collaborationOpportunity, baseline.scores.collaborationOpportunity) +
+    0.4 * choose(parsed.ralph.culturalRelevance, baseline.ralph.culturalRelevance)
   )
   const overall = Math.round((
-    Number(scores.narrativeStrength || 0) + timeToPeakScore + Number(ralph.crossPlatformPotential || 0) + commercialPotential
+    choose(parsed.scores.narrativeStrength, baseline.scores.narrativeStrength) +
+    timeToPeakScore +
+    choose(parsed.ralph.crossPlatformPotential, baseline.ralph.crossPlatformPotential) +
+    commercialPotential
   ) / 4)
 
   const result = {
     scores: {
-      narrativeStrength: Number(scores.narrativeStrength || 0),
+      narrativeStrength: choose(parsed.scores.narrativeStrength, baseline.scores.narrativeStrength),
       timeToPeakWeeks: ttpWeeks,
-      collaborationOpportunity: Number(scores.collaborationOpportunity || 0),
+      collaborationOpportunity: choose(parsed.scores.collaborationOpportunity, baseline.scores.collaborationOpportunity),
     },
     ralph: {
-      narrativeAdaptability: Number(ralph.narrativeAdaptability || 0),
-      crossPlatformPotential: Number(ralph.crossPlatformPotential || 0),
-      culturalRelevance: Number(ralph.culturalRelevance || 0),
+      narrativeAdaptability: choose(parsed.ralph.narrativeAdaptability, baseline.ralph.narrativeAdaptability),
+      crossPlatformPotential: choose(parsed.ralph.crossPlatformPotential, baseline.ralph.crossPlatformPotential),
+      culturalRelevance: choose(parsed.ralph.culturalRelevance, baseline.ralph.culturalRelevance),
     },
     extended: {
       overall,
       commercialPotential,
-      crossPlatformPotential: Number(ralph.crossPlatformPotential || 0),
+      crossPlatformPotential: choose(parsed.ralph.crossPlatformPotential, baseline.ralph.crossPlatformPotential),
       timeToPeakScore,
       impactMap: undefined as any,
     },

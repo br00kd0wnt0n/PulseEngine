@@ -300,7 +300,7 @@ router.post('/score', async (req, res) => {
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
     const userId = (req as any).user?.sub || null
-    const data = await generateScoresAI(concept, userId, persona || null, projectId || null, targetAudience || null)
+    const data = await generateScoresAI(concept, userId, persona || null, projectId || null, targetAudience || null, graph || { nodes: [], links: [] })
     res.json(data)
   } catch (e: any) {
     // Explicitly signal unavailability so UI can show 'Scores not available'
