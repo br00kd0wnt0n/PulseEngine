@@ -3,6 +3,8 @@ import { AppDataSource } from '../db/data-source.js'
 import { AICache } from '../db/entities/AICache.js'
 import { Creator } from '../db/entities/Creator.js'
 import { retrieveContext, formatContextForPrompt, type RetrievalContext } from './retrieval.js'
+import { callJSON } from './llm.js'
+import { OpportunitiesResultSchema, ScoresSchema } from './schemas.js'
 
 export type TrendGraph = { nodes: { id: string; label: string; kind: 'trend'|'creator'|'content' }[]; links: { source: string; target: string }[] }
 
@@ -11,7 +13,13 @@ function sha(input: any) { return crypto.createHash('sha1').update(JSON.stringif
 async function cacheGet<T>(key: string): Promise<T | null> {
   const repo = AppDataSource.getRepository(AICache)
   const row = await repo.findOne({ where: { key } })
-  return row ? (row.value as T) : null
+  if (!row) return null
+  const ttlMin = parseInt(process.env.AI_CACHE_TTL_MINUTES || '4320', 10) // default 3 days
+  if (Number.isFinite(ttlMin) && ttlMin > 0) {
+    const ageMs = Date.now() - new Date(row.createdAt).getTime()
+    if (ageMs > ttlMin * 60 * 1000) return null
+  }
+  return row.value as T
 }
 async function cacheSet<T>(key: string, value: T) {
   const repo = AppDataSource.getRepository(AICache)
@@ -88,11 +96,6 @@ export async function generateScoresAI(
   push(ctx.liveMetrics)
   const enumerated = flat.map(it => `${it.id}: ${it.text}`).join('\n')
 
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('no-openai')
-
-  const { OpenAI } = await import('openai')
-  const client = new OpenAI({ apiKey })
   const model = process.env.MODEL_NAME || 'gpt-4o-mini'
 
   const personaRole = persona ? `campaign strategist for ${persona}` : 'campaign strategist'
@@ -117,39 +120,17 @@ export async function generateScoresAI(
 
   const prompt = parts.join('\n\n')
 
-  const resp = await client.chat.completions.create({
-    model,
-    messages: [ { role: 'system', content: 'Return only valid JSON. Be concise and evidence-based.' }, { role: 'user', content: prompt } ],
-    temperature: 0.2,
-    max_tokens: 500,
-  })
-  const raw = resp.choices?.[0]?.message?.content || '{}'
-  const tryParse = (s: string) => {
-    try { return JSON.parse(s) } catch {
-      const m = s.match(/\{[\s\S]*\}/)
-      if (m) { try { return JSON.parse(m[0]) } catch {} }
-      return null
-    }
-  }
-  let parsed = tryParse(raw)
-  if (!parsed) {
-    // Retry once with stricter instruction
-    const resp2 = await client.chat.completions.create({
-      model,
-      messages: [
-        { role: 'system', content: 'Return only JSON with keys: scores, ralph, rationales, evidence. Be concise and evidence-based.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.2,
-      max_tokens: 500,
-    })
-    const raw2 = resp2.choices?.[0]?.message?.content || '{}'
-    parsed = tryParse(raw2)
-  }
-  if (!parsed || !parsed.scores || !parsed.ralph) throw new Error('parse_failed')
+  const parsed = await callJSON(
+    [
+      { role: 'system', content: 'Return only valid JSON. Be concise and evidence-based.' },
+      { role: 'user', content: prompt },
+    ],
+    ScoresSchema,
+    { model, maxTokens: 600, temperature: 0.25, allowExtract: true, retries: 1 }
+  )
 
-  const scores = parsed.scores || {}
-  const ralph = parsed.ralph || {}
+  const scores = parsed.scores
+  const ralph = parsed.ralph
   // Compute extended metrics
   const ttpWeeks = Math.max(1, Math.min(12, Number(scores.timeToPeakWeeks || 8)))
   const timeToPeakScore = Math.max(0, Math.min(100, 100 - (ttpWeeks - 1) * 12))
@@ -198,14 +179,16 @@ export async function generateDebrief(concept: string, userId?: string | null, p
       // Fallback to empty context if retrieval fails
       ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
     }
-    const cacheKey = sha({ t: 'debrief', concept, s: summarySig(ctx, projectId), persona, targetAudience })
+    // Include prompt version hash in cache key
+    const { getPrompt } = await import('./promptStore.js')
+    const tpl = await getPrompt('debrief')
+    const lens = await getPrompt('ralph_lens')
+    const cacheKey = sha({ t: 'debrief', concept, s: summarySig(ctx, projectId), persona, targetAudience, v: sha(tpl + '|' + lens) })
     const cached = await cacheGet<any>(cacheKey)
     if (cached) return cached
     const apiKey = process.env.OPENAI_API_KEY
     if (apiKey) {
       try {
-        const { OpenAI } = await import('openai')
-        const client = new OpenAI({ apiKey })
         const model = process.env.MODEL_NAME || 'gpt-4o-mini'
         const contextStr = formatContextForPrompt(ctx)
         const { getPrompt, renderTemplate } = await import('./promptStore.js')
@@ -214,37 +197,15 @@ export async function generateDebrief(concept: string, userId?: string | null, p
           await getPrompt('debrief'),
           { concept, persona, personaOrGeneral: persona || 'General', context: contextStr, targetAudience, ralphLens }
         )
-        const resp = await client.chat.completions.create({
-          model,
-          messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
-          temperature: 0.5,
-          max_tokens: 350,
-        })
-        let raw = resp.choices?.[0]?.message?.content || '{}'
-        const tryParse = (s: string) => {
-          try { return JSON.parse(s) } catch {
-            const m = s.match(/\{[\s\S]*\}/)
-            if (m) { try { return JSON.parse(m[0]) } catch {} }
-            return null
-          }
-        }
-        let parsed = tryParse(raw)
-        // If parse fails, re‑try once with a stronger instruction
-        if (!parsed) {
-          const resp2 = await client.chat.completions.create({
-            model,
-            messages: [ { role: 'system', content: 'Return only JSON with keys: brief, summary, keyPoints, didYouKnow, personaNotes.' }, { role: 'user', content: prompt } ],
-            temperature: 0.5,
-            max_tokens: 350,
-          })
-          raw = resp2.choices?.[0]?.message?.content || '{}'
-          parsed = tryParse(raw)
-        }
-        try {
-          const withSources = { ...parsed, sources: ctx.sources, _debug: { prompt, model } }
-          await cacheSet(cacheKey, withSources)
-          return withSources
-        } catch {}
+        const { DebriefSchema } = await import('./schemas.js')
+        const parsed = await callJSON(
+          [ { role: 'system', content: 'Return only JSON matching the requested schema.' }, { role: 'user', content: prompt } ],
+          DebriefSchema,
+          { model, maxTokens: 380, temperature: 0.5, allowExtract: true, retries: 1 }
+        )
+        const withSources = { ...parsed, sources: ctx.sources, _debug: { prompt, model } }
+        await cacheSet(cacheKey, withSources)
+        return withSources
       } catch {}
     }
     // If strict mode, avoid heuristic placeholders when there is insufficient signal only
@@ -379,8 +340,6 @@ export async function generateOpportunities(concept: string, userId?: string | n
     const apiKey = process.env.OPENAI_API_KEY
     if (apiKey) {
       try {
-        const { OpenAI } = await import('openai')
-        const client = new OpenAI({ apiKey })
         const model = process.env.MODEL_NAME || 'gpt-4o-mini'
         const contextStr = formatContextForPrompt(ctx)
         const { getPrompt, renderTemplate } = await import('./promptStore.js')
@@ -389,37 +348,21 @@ export async function generateOpportunities(concept: string, userId?: string | n
           await getPrompt('opportunities'),
           { concept, persona, personaOrGeneral: persona || 'General', context: contextStr, targetAudience, ralphLens }
         )
-        const resp = await client.chat.completions.create({
-          model,
-          messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
-          temperature: 0.6,
-          max_tokens: 380,
-        })
-        let raw = resp.choices?.[0]?.message?.content || '{}'
-        const tryParse = (s: string) => {
-          try { return JSON.parse(s) } catch {
-            const m = s.match(/\{[\s\S]*\}/)
-            if (m) { try { return JSON.parse(m[0]) } catch {} }
-            return null
-          }
-        }
-        let parsed = tryParse(raw)
-        if (!parsed) {
-          const resp2 = await client.chat.completions.create({
-            model,
-            messages: [ { role: 'system', content: 'Return only JSON with keys: opportunities, rationale, personaNotes.' }, { role: 'user', content: prompt } ],
-            temperature: 0.6,
-            max_tokens: 380,
-          })
-          raw = resp2.choices?.[0]?.message?.content || '{}'
-          parsed = tryParse(raw)
-        }
-        try {
-          const withSources = { ...parsed, sources: ctx.sources, _debug: { prompt, model } }
-          await cacheSet(cacheKey, withSources)
-          return withSources
-        } catch {}
-      } catch {}
+        const parsed = await callJSON(
+          [
+            { role: 'system', content: 'Return only JSON matching the requested schema.' },
+            { role: 'user', content: prompt },
+          ],
+          OpportunitiesResultSchema,
+          { model, maxTokens: 500, temperature: 0.6, allowExtract: true, retries: 1 }
+        )
+        const withSources = { ...parsed, sources: ctx.sources, _debug: { prompt, model } }
+        await cacheSet(cacheKey, withSources)
+        return withSources
+      } catch (e) {
+        console.error('[AI] opportunities parse/validation failed:', e)
+        if (STRICT_AI_ONLY) throw e
+      }
     }
     // If strict mode, avoid heuristic placeholders when there is insufficient signal only
     const noContextSignal = (!ctx.projectContent?.length && !ctx.coreKnowledge?.length && !ctx.liveMetrics?.length && !ctx.predictiveTrends?.length)
@@ -482,18 +425,7 @@ export async function generateOpportunities(concept: string, userId?: string | n
     return heuristic
   } catch (err) {
     console.error('[AI] generateOpportunities failed:', err)
-    // Return minimal fallback response if everything fails
-    return {
-      opportunities: [
-        { title: 'Define the core hook', why: 'Clear messaging drives engagement', impact: 75 },
-        { title: 'Platform-specific format', why: 'Native content performs better', impact: 70 },
-        { title: 'Collaboration strategy', why: 'Expands reach and authenticity', impact: 72 },
-        { title: 'Engagement loops', why: 'Increases completion and sharing', impact: 68 },
-        { title: 'Multi-platform distribution', why: 'Maximizes audience reach', impact: 65 },
-      ],
-      rationale: 'Core opportunities for content optimization.',
-      sources: { project: [], core: [], live: [], predictive: [] },
-    }
+    throw err
   }
 }
 
@@ -522,8 +454,6 @@ export async function generateEnhancements(concept: string, graph: TrendGraph, u
   const apiKey = process.env.OPENAI_API_KEY
   if (apiKey) {
     try {
-      const { OpenAI } = await import('openai')
-      const client = new OpenAI({ apiKey })
       const model = process.env.MODEL_NAME || 'gpt-4o-mini'
       const prompt = (await import('./promptStore.js')).renderTemplate(
         await (await import('./promptStore.js')).getPrompt('enhancements'),
@@ -537,14 +467,13 @@ export async function generateEnhancements(concept: string, graph: TrendGraph, u
           commercialScore: commercial,
         }
       )
-      const resp = await client.chat.completions.create({
-        model,
-        messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
-        temperature: 0.6,
-        max_tokens: 420,
-      })
-      const raw = resp.choices?.[0]?.message?.content || '{}'
-      try { const parsed = JSON.parse(raw); return { ...parsed, _debug: { prompt, model } } } catch {}
+      const { EnhancementsSchema } = await import('./schemas.js')
+      const parsed = await callJSON(
+        [ { role: 'system', content: 'Return only JSON matching the requested schema.' }, { role: 'user', content: prompt } ],
+        EnhancementsSchema,
+        { model, maxTokens: 500, temperature: 0.6, allowExtract: true, retries: 1 }
+      )
+      return { ...parsed, _debug: { prompt, model } }
     } catch { /* fallthrough */ }
   }
   // Context-aware heuristic fallback
@@ -660,11 +589,7 @@ export async function generateRecommendations(
 
   if (apiKey) {
     try {
-      const { OpenAI } = await import('openai')
-      const client = new OpenAI({ apiKey })
       const model = process.env.MODEL_NAME || 'gpt-4o-mini'
-
-      // Format context for prompt
       const contextStr = formatContextForPrompt(context)
       const { getPrompt, renderTemplate } = await import('./promptStore.js')
       const ralphLens = await getPrompt('ralph_lens')
@@ -673,42 +598,16 @@ export async function generateRecommendations(
         { concept, persona, personaOrGeneral: persona || 'General', context: contextStr, targetAudience, ralphLens }
       )
 
-      console.log('[RAG] Calling OpenAI with model:', model)
-      console.log('[RAG] Prompt length:', prompt.length, 'characters')
-
-      const resp = await client.chat.completions.create({
-        model,
-        messages: [ { role: 'system', content: 'Return only JSON.' }, { role: 'user', content: prompt } ],
-        temperature: 0.7,
-        max_tokens: 500, // Increased for richer context
-      })
-      const raw = resp.choices?.[0]?.message?.content || '{}'
-      console.log('[RAG] OpenAI response length:', raw.length, 'characters')
-
-      const tryParse = (s: string) => { try { return JSON.parse(s) } catch { const m = s.match(/\{[\s\S]*\}/); if (m) { try { return JSON.parse(m[0]) } catch {} } return null } }
-      let result = tryParse(raw)
-      if (!result) {
-        // Retry once with stricter JSON-only instruction; handle ```json fences
-        const resp2 = await client.chat.completions.create({
-          model,
-          messages: [ { role: 'system', content: 'Return only JSON with keys: opportunities, rationale, personaNotes. No backticks.' }, { role: 'user', content: prompt } ],
-          temperature: 0.6,
-          max_tokens: 500,
-        })
-        const raw2 = resp2.choices?.[0]?.message?.content || '{}'
-        result = tryParse(raw2)
-      }
-      if (result && typeof result === 'object') {
-        // Attach sources and creators
-        result.sources = context.sources
-        result.creators = creators
-        result._debug = { prompt, model }
-        console.log('[RAG] Successfully parsed OpenAI response, returning with sources and', creators.length, 'creators')
-        return result
-      }
+      const { RecommendationsSchema } = await import('./schemas.js')
+      const result = await callJSON(
+        [ { role: 'system', content: 'Return only JSON matching the requested schema.' }, { role: 'user', content: prompt } ],
+        RecommendationsSchema,
+        { model, maxTokens: 500, temperature: 0.6, allowExtract: true, retries: 1 }
+      )
+      const withSources = { ...result, sources: context.sources, creators, _debug: { prompt, model } }
+      return withSources
     } catch (e) {
-      console.error('[RAG] OpenAI call failed:', e)
-      /* fallthrough */
+      console.error('[RAG] Recommendations parse/validation failed:', e)
     }
   }
   console.log('[RAG] Using heuristic fallback')
@@ -816,8 +715,6 @@ export async function generateConceptProposal(
     const apiKey = process.env.OPENAI_API_KEY
     if (apiKey) {
       try {
-        const { OpenAI } = await import('openai')
-        const client = new OpenAI({ apiKey })
         const model = process.env.MODEL_NAME || 'gpt-4o-mini'
         const contextStr = formatContextForPrompt(ctx)
 
@@ -829,8 +726,9 @@ export async function generateConceptProposal(
         const evidence = narrativeBlocks.find(b => b.key === 'evidence')?.content || ''
         const resolution = narrativeBlocks.find(b => b.key === 'resolution')?.content || ''
 
-        const prompt = (await import('./promptStore.js')).renderTemplate(
-          await (await import('./promptStore.js')).getPrompt('concept_proposal'),
+        const { getPrompt, renderTemplate } = await import('./promptStore.js')
+        const prompt = renderTemplate(
+          await getPrompt('concept_proposal'),
           {
             personaOrGeneral: persona || 'General',
             concept,
@@ -844,17 +742,14 @@ export async function generateConceptProposal(
           }
         )
 
-        const resp = await client.chat.completions.create({
-          model,
-          messages: [
-            { role: 'system', content: 'You are a creative campaign strategist. Write compelling, specific, narrative-driven pitch decks.' },
-            { role: 'user', content: ((p:string)=>{ try { return p } catch { return '' } })(prompt as any) },
-          ],
-          temperature: 0.8,
-          max_tokens: 400,
-        })
+        const { ConceptProposalSchema } = await import('./schemas.js')
+        const parsed = await callJSON(
+          [ { role: 'system', content: 'Return only JSON matching the requested schema.' }, { role: 'user', content: prompt } ],
+          ConceptProposalSchema,
+          { model, maxTokens: 700, temperature: 0.7, allowExtract: true, retries: 1 }
+        )
 
-        const narrative = resp.choices?.[0]?.message?.content || ''
+        const narrative = parsed.narrative
         await cacheSet(cacheKey, narrative)
         return { narrative, sources: ctx.sources, _debug: { prompt, model } }
       } catch (err) {

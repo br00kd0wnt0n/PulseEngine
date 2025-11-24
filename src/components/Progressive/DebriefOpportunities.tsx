@@ -9,6 +9,8 @@ export default function DebriefOpportunities() {
   // tabs removed; show both sections
   const [debrief, setDebrief] = useState<{ brief: string; summary: string; keyPoints: string[]; didYouKnow: string[]; sources?: any } | null>(null)
   const [opps, setOpps] = useState<{ opportunities: { title: string; why: string; impact: number }[]; rationale?: string; sources?: any } | null>(null)
+  const [oppError, setOppError] = useState<string | null>(null)
+  const [debugOpps, setDebugOpps] = useState<boolean>(() => { try { return localStorage.getItem('debug:opps') === '1' } catch { return false } })
   const [loading, setLoading] = useState(false)
   const [asOf, setAsOf] = useState<string>('')
   const [integrated, setIntegrated] = useState<Set<string>>(new Set())
@@ -22,14 +24,15 @@ export default function DebriefOpportunities() {
         const pid = localStorage.getItem('activeProjectId') || 'local'
         const [d, o] = await Promise.all([
           api.debrief(concept, { persona, region, projectId: pid }),
-          api.opportunities(concept, { persona, region, projectId: pid })
+          api.opportunities(concept, { persona, region, projectId: pid }).catch(async (e) => { setOppError('Opportunities not available'); throw e })
         ])
         if (!cancel) {
-          setDebrief(d); setOpps(o); setAsOf(new Date().toLocaleString())
+          setDebrief(d); setOpps(o); setAsOf(new Date().toLocaleString()); setOppError(null)
           try {
             localStorage.setItem(`debrief:${pid}`, JSON.stringify(d || {}))
             localStorage.setItem(`opps:${pid}`, JSON.stringify(o || {}))
           } catch {}
+          try { if (debugOpps) console.log('[Opps] payload:', o) } catch {}
         }
       } catch {}
       finally { if (!cancel) setLoading(false) }
@@ -44,6 +47,10 @@ export default function DebriefOpportunities() {
       <div className="flex items-center justify-between mb-2">
         <div className="font-semibold">DEBRIEF <span className="text-white/30">|</span> OPPORTUNITIES</div>
         <div className="text-[11px] text-white/50 flex items-center gap-2">
+          <label className="text-[10px] flex items-center gap-1">
+            <input type="checkbox" className="align-middle" checked={debugOpps} onChange={(e)=>{ setDebugOpps(e.target.checked); try { localStorage.setItem('debug:opps', e.target.checked ? '1':'0') } catch {} }} />
+            Debug
+          </label>
           {asOf && <span>As of {asOf}</span>}
           {/* Persona attribution */}
           {(() => { try { const p = JSON.parse(localStorage.getItem('persona')||'""'); return p ? <span>Persona considered: {p}</span> : null } catch { return null } })()}
@@ -93,6 +100,11 @@ export default function DebriefOpportunities() {
           <Attribution sources={debrief?.sources} />
         </div>
         <div className="space-y-2 text-sm">
+          {oppError && (
+            <div className="panel p-2 border border-red-400/20 bg-red-400/10 text-[11px] text-red-200">
+              {oppError} <button className="underline ml-1" onClick={()=>{ try { localStorage.removeItem(`opps:${localStorage.getItem('activeProjectId')||'local'}`) } catch {}; window.location.reload() }}>Retry</button>
+            </div>
+          )}
           {opps?.opportunities?.map((o,i)=>{
             const isIntegrated = integrated.has(o.title)
             return (

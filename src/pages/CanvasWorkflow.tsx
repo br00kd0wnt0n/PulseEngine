@@ -1756,8 +1756,8 @@ export default function CanvasWorkflow() {
                   }}
                 >Refresh</button>
               </div>
-              <div className="panel p-3 bg-white/5">
-                <div className="prose prose-invert max-w-none text-[10px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(conceptOverview) }} />
+              <div className="panel p-4 bg-white/5">
+                <div className="prose prose-invert max-w-none text-[11px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(conceptOverview) }} />
               </div>
             </>
           ) : (

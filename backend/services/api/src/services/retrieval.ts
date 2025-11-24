@@ -647,23 +647,31 @@ async function retrievePredictiveTrends(
  * Format retrieval context into a prompt-ready string
  */
 export function formatContextForPrompt(context: RetrievalContext): string {
-  const sections: string[] = []
-
-  if (context.projectContent.length > 0) {
-    sections.push(`## Project Contextual Files:\n${context.projectContent.join('\n')}`)
+  // Bound the context so we never blow the model context window
+  const clampLines = (items: string[], maxItems: number, maxLen: number) => {
+    return items.slice(0, maxItems).map(s => s.length > maxLen ? (s.slice(0, maxLen - 1) + '…') : s)
   }
+  const sec = (title: string, items: string[]) => items.length ? `## ${title}:\n${items.join('\n')}` : ''
 
-  if (context.coreKnowledge.length > 0) {
-    sections.push(`## Ralph Knowledge Base (RKB):\n${context.coreKnowledge.join('\n')}`)
+  const proj = clampLines(context.projectContent || [], 6, 220)
+  const core = clampLines(context.coreKnowledge || [], 6, 220)
+  const live = clampLines(context.liveMetrics || [], 6, 220)
+  const pred = clampLines(context.predictiveTrends || [], 6, 220)
+
+  const sections = [
+    sec('Project Contextual Files', proj),
+    sec('Ralph Knowledge Base (RKB)', core),
+    sec('Live Social Trends (Last 7 Days)', live),
+    sec('Predicted Trend Forecasts', pred),
+  ].filter(Boolean)
+
+  // Hard budget ~1800 chars; drop least-critical sections last
+  let out = sections.join('\n\n')
+  const dropOrder = ['Predicted Trend Forecasts', 'Project Contextual Files']
+  let i = 0
+  while (out.length > 1800 && i < dropOrder.length) {
+    const title = dropOrder[i++]
+    out = out.replace(new RegExp(`## ${title}:[\s\S]*?(?=\n\n## |$)`, 'm'), '').trim()
   }
-
-  if (context.liveMetrics.length > 0) {
-    sections.push(`## Live Social Trends (Last 7 Days):\n${context.liveMetrics.join('\n')}`)
-  }
-
-  if (context.predictiveTrends.length > 0) {
-    sections.push(`## Predicted Trend Forecasts:\n${context.predictiveTrends.join('\n')}`)
-  }
-
-  return sections.join('\n\n')
+  return out
 }

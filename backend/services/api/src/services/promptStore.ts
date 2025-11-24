@@ -7,6 +7,7 @@ export type PromptKey =
   | 'opportunities'
   | 'enhancements'
   | 'recommendations'
+  | 'concept_overview'
   | 'concept_proposal'
   | 'rewrite_narrative'
   | 'wildcard'
@@ -18,6 +19,7 @@ export const promptMeta: Record<PromptKey, { label: string; trigger: string }> =
   opportunities: { label: 'Opportunities (Ranked)', trigger: '/ai/opportunities' },
   enhancements: { label: 'Enhancements (Targeted)', trigger: '/ai/enhancements' },
   recommendations: { label: 'Recommendations (Framework)', trigger: '/ai/recommendations' },
+  concept_overview: { label: 'Concept Overview', trigger: '/ai/concept-overview' },
   concept_proposal: { label: 'Concept Proposal', trigger: '/ai/concept-proposal' },
   rewrite_narrative: { label: 'Rewrite Narrative (Apply Enhancements)', trigger: '/ai/rewrite-narrative' },
   wildcard: { label: 'Wildcard Insight', trigger: '/ai/wildcard' },
@@ -105,6 +107,44 @@ Provide arrays for: narrative, content, platform, collab (execution bullets) and
 Return ONLY JSON with keys exactly: narrative, content, platform, collab, framework, personaNotes.
 personaNotes: 2 bullets of guidance specific to {{personaRole}}.`,
 
+  concept_overview:
+    `You are a {{personaRole}} crafting a single, shareable CONCEPT OVERVIEW for: "{{concept}}"
+{{#if targetAudience}}Target audience: {{targetAudience}}. Optimize tone and examples accordingly.{{/if}}
+{{#if region}}Region: {{region}}.{{/if}}
+
+# Inputs to synthesize (do not repeat verbatim):
+{{#if debrief}}Debrief (summary): {{debrief}}
+{{/if}}{{#if narrative}}Narrative (key beats): {{narrative}}
+{{/if}}{{#if opportunitiesList}}Opportunities (top):
+{{opportunitiesList}}
+{{/if}}{{#if enhancementsList}}Enhancements (applied/considered):
+{{enhancementsList}}
+{{/if}}
+
+# Ralph Philosophy & Lens (weigh ideas against this):
+{{ralphLens}}
+
+# OUTPUT — Markdown only, structured with these sections:
+### Campaign Essence
+- 2–3 sentences that stitch the concept, strongest opportunity and narrative "why-now" into a single POV tailored to {{personaOrGeneral}}.
+
+### Core Story & Pillars
+- 3–5 bullets. Each bullet = a pillar with a short descriptor and an example beat. Tie at least two bullets to items from Opportunities/Enhancements.
+
+### Platform & Format Plan
+- 3–5 bullets, each names a platform + primary format + timing (e.g., TikTok — 30–45s hook + stitch, weekly mini-arcs).
+
+### Creator/Partner Angle
+- 2–4 bullets on collaboration types and selection criteria (not specific names), grounded in the concept’s culture.
+
+### Next Steps to Finalize Concept (not production)
+- 5–7 checklist items (start each with "- [ ] ") focused on concept development: sharpen logline, define POV + tone, lock 3 pillars + sample segments, draft 1-page treatment, align brand fit & guardrails, define success criteria & learning loop, identify proof-of-concept pilot.
+
+### Risks & Mitigations
+- 3 bullets: one creative risk, one audience/fit risk, one operational risk — each with a mitigation.
+
+Keep it specific, non-generic, and avoid repeating the inputs. Use compact, scannable bullets.`,
+
   concept_proposal:
     `You are a {{personaRole}} crafting a shareable campaign proposal.
 {{#if targetAudience}}Target audience: {{targetAudience}}. Ensure the pitch resonates with them.{{/if}}
@@ -127,7 +167,7 @@ Resolution: {{resolution}}
 
 Write a compelling, specific, narrative-driven proposal that can be shared with partners. Keep it crisp and persuasive.
 
-Add a final section titled "Persona Notes" with 2 bullets tailored to {{personaRole}}.`,
+Return ONLY JSON: { "narrative": string, "personaNotes": string[] }`,
 
   rewrite_narrative:
     `You are a {{personaRole}}. Rewrite the narrative below for the concept "{{concept}}"{{personaRegion}}, integrating these selected enhancements. Keep the same structure (numbered sections) and make it crisp, specific, and actionable.

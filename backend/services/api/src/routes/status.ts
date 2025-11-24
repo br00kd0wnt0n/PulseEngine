@@ -57,6 +57,28 @@ router.get('/version', async (_req, res) => {
   })
 })
 
+// Simple self-test: validates schemas via mock JSON without hitting OpenAI
+router.get('/self-test', async (_req, res) => {
+  try {
+    const { OpportunitiesResultSchema, ScoresSchema } = await import('../services/schemas.js')
+    // Minimal valid payloads
+    const opps = OpportunitiesResultSchema.parse({
+      opportunities: [ { title: 'Hook-first teaser', why: 'Drives discovery and shares', impact: 80 } ],
+      rationale: 'High-impact opportunities synthesized.',
+      personaNotes: [ 'Prioritize hook tests', 'Stage creator pilots' ]
+    })
+    const scores = ScoresSchema.parse({
+      scores: { narrativeStrength: 70, timeToPeakWeeks: 6, collaborationOpportunity: 75 },
+      ralph: { narrativeAdaptability: 72, crossPlatformPotential: 78, culturalRelevance: 65 },
+      rationales: { narrative: ['Clear story arc'], timing: ['Seasonal tie-in'], cross: ['Shorts/Reels fit'], commercial: ['Creator-friendly'] },
+      evidence: ['ctx1','ctx2']
+    })
+    res.json({ ok: true, opps, scores })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || 'self_test_failed' })
+  }
+})
+
 router.get('/overview', async (_req, res) => {
   const db = AppDataSource
   // Counts

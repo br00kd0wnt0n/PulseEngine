@@ -63,7 +63,7 @@ export default router
 
 // Generate an AI Concept Overview tailored to persona (author lens) and target audience
 router.post('/concept-overview', async (req, res) => {
-  const { concept, persona, region, debrief, opportunities, narrative, enhancements, targetAudience } = req.body || {}
+  const { concept, persona, region, debrief, opportunities, narrative, enhancements, targetAudience, projectId } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
     const apiKey = process.env.OPENAI_API_KEY
@@ -78,32 +78,31 @@ router.post('/concept-overview', async (req, res) => {
     const enhText = Array.isArray(enhancements) && enhancements.length
       ? enhancements.slice(0, 6).map((t: string) => `- ${t}`).join('\n')
       : ''
-    const prompt = [
-      `You are a ${persona ? `campaign strategist for ${persona}` : 'campaign strategist'}.`,
-      targetAudience ? `Target audience: ${targetAudience}.` : '',
-      region ? `Region: ${region}.` : '',
-      `\nCreate a concise CONCEPT OVERVIEW for the campaign: "${concept}". Use markdown with these sections:`,
-      `### Campaign Essence`,
-      `One short paragraph summarizing the core ambition and why-now.`,
-      `### Strategic Approach`,
-      `Return 3-5 bullets starting with "- ", focusing on strategy, pacing, and integration.`,
-      `### Execution Highlights`,
-      `Return 3-5 bullets starting with "- ", focusing on formats, cadence, and collaborators.`,
-      `### Next Steps`,
-      `Return 3-5 bullets starting with "- ", clear actions for week 1-4.`,
-      `\nContext to consider:`,
-      debrief ? `Debrief: ${debrief}` : '',
-      narrative ? `Narrative: ${narrative}` : '',
-      oppText ? `Opportunities:\n${oppText}` : '',
-      enhText ? `Enhancements:\n${enhText}` : '',
-      `\nKeep output cleanly formatted with blank lines between sections. Do not number bullets; use "- " bullets.`
-    ].filter(Boolean).join('\n')
+    // Use centralized prompt template for richer, integrated overviews
+    const { getPrompt, renderTemplate } = await import('../services/promptStore.js')
+    const ralphLens = await getPrompt('ralph_lens')
+    const prompt = renderTemplate(
+      await getPrompt('concept_overview'),
+      {
+        persona,
+        personaOrGeneral: persona || 'General',
+        targetAudience,
+        region,
+        concept,
+        debrief,
+        narrative,
+        opportunitiesList: oppText,
+        enhancementsList: enhText,
+        ralphLens,
+        projectId,
+      }
+    )
 
     const resp = await client.chat.completions.create({
       model,
-      messages: [ { role: 'system', content: 'Be specific, structured, and persona-relevant.' }, { role: 'user', content: prompt } ],
-      temperature: 0.5,
-      max_tokens: 600,
+      messages: [ { role: 'system', content: 'Be specific, integrated, and persona-relevant. Return markdown only.' }, { role: 'user', content: prompt } ],
+      temperature: 0.6,
+      max_tokens: 700,
     })
     const overview = resp.choices?.[0]?.message?.content || concept
     res.json({ overview, _debug: { prompt, model } })
@@ -342,7 +341,8 @@ router.post('/opportunities', async (req, res) => {
     const data = await generateOpportunities(concept, userId, persona || null, projectId || null, targetAudience || null)
     res.json(data)
   } catch (e: any) {
-    res.status(500).json({ error: e?.message || 'failed' })
+    // Signal unavailability clearly so UI can show an explicit message
+    res.status(503).json({ error: 'opportunities_unavailable' })
   }
 })
 
