@@ -1189,55 +1189,6 @@ export default function CanvasWorkflow() {
 
       let citationIndex = 1
 
-      if (rolloutEditMode) {
-        const pid = (() => { try { return localStorage.getItem('activeProjectId') || 'local' } catch { return 'local' } })()
-        const months = rollout?.months || Array.from({length:12},(_,i)=>({ m:i, followers: monthlyData[i] }))
-        return (
-          <div className="space-y-2 text-xs max-h-full overflow-auto">
-            <div className="flex items-center justify-between">
-              <div className="text-white/70 font-medium text-[11px]">DATA BACKEND</div>
-              <button className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={()=>setRolloutEditMode(false)}>Close</button>
-            </div>
-            <div className="panel p-2 bg-white/5">
-              <div className="text-white/60 text-[10px] mb-2">Enter known follower counts (historical) and projections. Months left blank will be filled by the model.</div>
-              <div className="grid grid-cols-4 gap-2">
-                {months.map((row,i)=> (
-                  <div key={i} className="flex items-center gap-1">
-                    <label className="w-8 text-[10px] text-white/60">M{i+1}</label>
-                    <input
-                      type="number"
-                      defaultValue={row.followers}
-                      onChange={(e)=>{
-                        const val = Number(e.target.value)
-                        setRollout(prev => {
-                          const base = prev?.months ? [...prev.months] : months
-                          base[i] = { m: i, followers: isFinite(val) && val>0 ? val : 0 }
-                          return { months: base, moments: prev?.moments || [], notes: prev?.notes || [] }
-                        })
-                      }}
-                      className="flex-1 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-[10px] outline-none"
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <button
-                  className="text-[10px] px-2 py-0.5 rounded border border-ralph-cyan/40 bg-ralph-cyan/10 hover:bg-ralph-cyan/20"
-                  onClick={()=>{
-                    try { localStorage.setItem(`rollout:${pid}`, JSON.stringify({ months: (rollout?.months || months) })) } catch {}
-                    setRolloutEditMode(false)
-                  }}
-                >Save</button>
-                <button
-                  className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 hover:bg-white/10"
-                  onClick={()=>setRolloutEditMode(false)}
-                >Cancel</button>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
           {loading ? (
@@ -1596,41 +1547,6 @@ export default function CanvasWorkflow() {
                   Create Overview
                 </button>
                 <button
-                  className="mt-2 w-full px-3 py-2 rounded border border-ralph-pink/40 bg-ralph-pink/10 hover:bg-ralph-pink/20 text-xs font-medium"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    // spawn model-rollout node
-                    setNodes(prev => {
-                      if (prev.find(n => n.id === 'model-rollout')) return prev
-                      const vw = typeof window !== 'undefined' ? window.innerWidth : 1800
-                      const vh = typeof window !== 'undefined' ? window.innerHeight : 1000
-                      const nodeWidth = 520
-                      const nodeHeight = 500
-                      const margin = 60
-                      const rolloutX = Math.max(margin, Math.min(vw - nodeWidth - margin, vw * 0.58))
-                      const rolloutY = Math.max(margin, Math.min(vh - nodeHeight - margin, 500))
-                      return [
-                        ...prev,
-                        {
-                          id: 'model-rollout',
-                          type: 'ai-content',
-                          title: 'Model Rollout',
-                          x: rolloutX,
-                          y: rolloutY,
-                          width: nodeWidth,
-                          height: nodeHeight,
-                          minimized: false,
-                          zIndex: 6,
-                          status: 'active' as NodeData['status'],
-                          connectedTo: ['scoring']
-                        }
-                      ]
-                    })
-                  }}
-                >
-                  Model Rollout
-                </button>
-                <button
                   className="mt-2 w-full px-3 py-2 rounded border border-yellow-400/40 bg-yellow-400/10 hover:bg-yellow-400/20 text-xs font-medium"
                   onClick={async (e) => {
                     e.stopPropagation()
@@ -1728,13 +1644,13 @@ export default function CanvasWorkflow() {
                       setOverviewLoading(false)
                       // Auto-update rollout if node exists
                       const hasRollout = nodes.some(n => n.id === 'model-rollout')
-                      if (hasRollout) {
+                      if (hasRollout && conceptOverview) {
                         try {
                           setRolloutLoading(true)
                           const pid = localStorage.getItem('activeProjectId') || 'local'
                           const snapScores = (()=>{ try { return JSON.parse(localStorage.getItem(`score:${pid}`) || '{}') } catch { return {} } })()
                           const snapOpps = opps?.opportunities?.slice(0,6).map((o:any)=>({ title: o.title, impact: o.impact })) || []
-                          const resp = await api.modelRollout(concept, result?.overview || '', { scores: snapScores, opportunities: snapOpps }, { persona, region, targetAudience, projectId: pid })
+                          const resp = await api.modelRollout(concept, conceptOverview, { scores: snapScores, opportunities: snapOpps }, { persona, region, targetAudience, projectId: pid })
                           setRollout({ months: resp.months || [], moments: resp.moments || [], notes: resp.notes || [] })
                         } catch (e) { console.error('[ModelRollout] Auto-refresh failed:', e) }
                         finally { setRolloutLoading(false) }
@@ -2027,6 +1943,55 @@ export default function CanvasWorkflow() {
       // Generate path for line chart
       const linePath = monthlyData.map((f, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i + 1)} ${yScale(f)}`).join(' ')
 
+      // Edit mode - data table view
+      if (rolloutEditMode) {
+        const months = rollout?.months || Array.from({length:12},(_,i)=>({ m:i, followers: monthlyData[i] }))
+        return (
+          <div className="space-y-2 text-xs max-h-full overflow-auto">
+            <div className="flex items-center justify-between">
+              <div className="text-white/70 font-medium text-[11px]">DATA BACKEND</div>
+              <button className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={()=>setRolloutEditMode(false)}>Close</button>
+            </div>
+            <div className="panel p-2 bg-white/5">
+              <div className="text-white/60 text-[10px] mb-2">Enter known follower counts (historical) and projections. Months left blank will be filled by the model.</div>
+              <div className="grid grid-cols-4 gap-2">
+                {months.map((row,i)=> (
+                  <div key={i} className="flex items-center gap-1">
+                    <label className="w-8 text-[10px] text-white/60">M{i+1}</label>
+                    <input
+                      type="number"
+                      defaultValue={row.followers}
+                      onChange={(e)=>{
+                        const val = Number(e.target.value)
+                        setRollout(prev => {
+                          const base = prev?.months ? [...prev.months] : months
+                          base[i] = { m: i, followers: isFinite(val) && val>0 ? val : 0 }
+                          return { months: base, moments: prev?.moments || [], notes: prev?.notes || [] }
+                        })
+                      }}
+                      className="flex-1 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-[10px] outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  className="text-[10px] px-2 py-0.5 rounded border border-ralph-cyan/40 bg-ralph-cyan/10 hover:bg-ralph-cyan/20"
+                  onClick={()=>{
+                    try { localStorage.setItem(`rollout:${pid}`, JSON.stringify({ months: (rollout?.months || months) })) } catch {}
+                    setRolloutEditMode(false)
+                  }}
+                >Save</button>
+                <button
+                  className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 hover:bg-white/10"
+                  onClick={()=>setRolloutEditMode(false)}
+                >Cancel</button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
           <div className="flex items-center justify-between mb-2">
@@ -2088,7 +2053,7 @@ export default function CanvasWorkflow() {
             <path d={monthlyData.slice(2).map((f,i)=>`${i===0?'M':'L'} ${xScale(i+3)} ${yScale(f)}`).join(' ')} stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeDasharray="4 3" fill="none" />
 
             {/* Strategic moment markers (AI-driven if present) */}
-            {(rollout?.moments && rollout.moments.length>0 ? rollout.moments.map(mo => ({ month: mo.m+1, label: mo.label, color: mo.color || (mo.kind==='risk'?'#FB923C': mo.kind==='pivot'?'#22C55E': mo.kind==='push'?'#EF4444': mo.kind==='strategy'?'#00D9FF':'#FF1B6D') })) : moments).map((m, i) => (
+            {(rollout?.moments && rollout.moments.length>0 ? rollout.moments.map(mo => ({ month: mo.m+1, label: mo.label, color: mo.color || (mo.kind==='risk'?'#FB923C': mo.kind==='pivot'?'#22C55E': mo.kind==='push'?'#EF4444': mo.kind==='strategy'?'#00D9FF':'#FF1B6D'), y: monthlyData[mo.m] || 0 })) : moments).map((m, i) => (
               <g key={`moment-${i}`}>
                 <circle
                   cx={xScale(m.month)}
