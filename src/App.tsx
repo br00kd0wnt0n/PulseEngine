@@ -37,7 +37,7 @@ export default function App() {
           <CitationOverlay />
         </CitationProvider>
         <footer className="px-6 md:px-8 py-4 text-xs text-white/40 border-t border-white/5 text-center">
-          Ralph 2025 · Storytelling Intelligence · Prototype v2 · Vers {apiVersion || pkg.version || '0.0.0'}
+          Ralph 2025 · Storytelling Intelligence · Prototype v2.1 · Vers {apiVersion || pkg.version || '0.0.0'}
         </footer>
       </div>
     </div>
