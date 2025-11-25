@@ -238,8 +238,6 @@ export default function CanvasWorkflow() {
   const [opps, setOpps] = useState<{ opportunities: { title: string; why: string; impact: number }[]; rationale?: string; sources?: any } | null>(null)
   const [loading, setLoading] = useState(false)
   const [debriefAccepted, setDebriefAccepted] = useState(false)
-  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([])
-  const [chatInput, setChatInput] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -250,8 +248,6 @@ export default function CanvasWorkflow() {
   const [narrative, setNarrative] = useState<{ text: string } | null>(null)
   const [narrativeLoading, setNarrativeLoading] = useState(false)
   const [narrativeApproved, setNarrativeApproved] = useState(false)
-  const [narrativeChatMessages, setNarrativeChatMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([])
-  const [narrativeChatInput, setNarrativeChatInput] = useState('')
   // Scores and enhancements
   const [scores, setScores] = useState<{ narrative?: number; ttpWeeks?: number; cross?: number; commercial?: number; overall?: number } | null>(null)
   const [rawScore, setRawScore] = useState<any | null>(null)
@@ -1358,76 +1354,6 @@ export default function CanvasWorkflow() {
                 </button>
               </div>
 
-              {/* Chatbot Field */}
-              <div className="panel p-2 bg-white/5">
-                <div className="text-white/70 font-medium mb-2 text-[10px]">DISCUSS & REFINE</div>
-                <div className="space-y-2 max-h-32 overflow-auto mb-2">
-                  {chatMessages.map((msg, i) => (
-                    <div key={i} className={`text-[10px] p-2 rounded ${msg.role === 'user' ? 'bg-ralph-cyan/10 border border-ralph-cyan/20 text-white/90' : 'bg-white/5 text-white/70'}`}>
-                      {msg.text}
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onKeyDown={async (e) => {
-                      if (e.key === 'Enter') {
-                        e.stopPropagation()
-                        const msg = chatInput.trim()
-                        if (!msg) return
-                        setChatMessages(prev => [...prev, { role: 'user', text: msg }])
-                        setChatInput('')
-                        try {
-                          setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'processing' as NodeData['status'] } : n))
-                          const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
-                          const refined = await api.refineDebrief(concept, debrief, msg, { persona, projectId: pid, targetAudience })
-                          setDebrief(refined)
-                          setChatMessages(prev => [...prev, { role: 'ai', text: 'Updated the debrief based on your instruction.' }])
-                          await ensureConceptOverviewNode()
-                          await refreshConceptOverview([])
-                        } catch {
-                          setChatMessages(prev => [...prev, { role: 'ai', text: 'Could not refine the debrief right now.' }])
-                        } finally {
-                          setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'active' as NodeData['status'] } : n))
-                        }
-                      }
-                    }}
-                    placeholder="Ask questions or refine opportunities..."
-                    className="flex-1 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-[10px] outline-none"
-                  />
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      const msg = chatInput.trim()
-                      if (!msg) return
-                      setChatMessages(prev => [...prev, { role: 'user', text: msg }])
-                      setChatInput('')
-                      try {
-                        setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'processing' as NodeData['status'] } : n))
-                        const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
-                        const refined = await api.refineDebrief(concept, debrief, msg, { persona, projectId: pid, targetAudience })
-                        setDebrief(refined)
-                        setChatMessages(prev => [...prev, { role: 'ai', text: 'Updated the debrief based on your instruction.' }])
-                        await ensureConceptOverviewNode()
-                        await refreshConceptOverview([])
-                      } catch {
-                        setChatMessages(prev => [...prev, { role: 'ai', text: 'Could not refine the debrief right now.' }])
-                      } finally {
-                        setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'active' as NodeData['status'] } : n))
-                      }
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    className="px-2 py-1 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-[10px]"
-                  >
-                    Send
-                  </button>
-                </div>
-              </div>
-
               {/* Accept Button */}
               <button
                 onClick={(e) => {
@@ -1494,70 +1420,6 @@ export default function CanvasWorkflow() {
                   </div>
                 </div>
               )}
-
-              {/* Chatbot Field */}
-              <div className="panel p-2 bg-white/5">
-                <div className="text-white/70 font-medium mb-2 text-[10px]">DISCUSS & REFINE</div>
-                <div className="space-y-2 max-h-32 overflow-auto mb-2">
-                  {narrativeChatMessages.map((msg, i) => (
-                    <div key={i} className={`text-[10px] p-2 rounded ${msg.role === 'user' ? 'bg-ralph-cyan/10 border border-ralph-cyan/20 text-white/90' : 'bg-white/5 text-white/70'}`}>
-                      {msg.text}
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    value={narrativeChatInput}
-                    onChange={(e) => setNarrativeChatInput(e.target.value)}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onKeyDown={async (e) => {
-                      if (e.key === 'Enter') {
-                        e.stopPropagation()
-                        if (!narrative || !narrativeChatInput.trim()) return
-                        const msg = narrativeChatInput.trim()
-                        setNarrativeChatMessages(prev => [...prev, { role: 'user', text: msg }])
-                        setNarrativeChatInput('')
-                        // Use rewrite-narrative for free-form refinement
-                        try {
-                          const rewritten = await api.applyEnhancements(concept, narrative.text, [msg], { persona, region })
-                          if (rewritten?.text) {
-                            setNarrative({ text: rewritten.text })
-                            setNarrativeChatMessages(prev => [...prev, { role: 'ai', text: 'Applied refinement to the narrative.' }])
-                            // Auto-refresh Concept Overview
-                            await ensureConceptOverviewNode()
-                            await refreshConceptOverview([])
-                          }
-                        } catch { setNarrativeChatMessages(prev => [...prev, { role: 'ai', text: 'Could not apply refinement right now.' }]) }
-                      }
-                    }}
-                    placeholder="Describe the change you want (Enter to apply)"
-                    className="flex-1 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-[10px] outline-none"
-                  />
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      if (!narrative || !narrativeChatInput.trim()) return
-                      const msg = narrativeChatInput.trim()
-                      setNarrativeChatMessages(prev => [...prev, { role: 'user', text: msg }])
-                      setNarrativeChatInput('')
-                      try {
-                        const rewritten = await api.applyEnhancements(concept, narrative.text, [msg], { persona, region })
-                        if (rewritten?.text) {
-                          setNarrative({ text: rewritten.text })
-                          setNarrativeChatMessages(prev => [...prev, { role: 'ai', text: 'Applied refinement to the narrative.' }])
-                          await ensureConceptOverviewNode()
-                          await refreshConceptOverview([])
-                        }
-                      } catch { setNarrativeChatMessages(prev => [...prev, { role: 'ai', text: 'Could not apply refinement right now.' }]) }
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    className="px-2 py-1 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-[10px]"
-                  >
-                    Apply
-                  </button>
-                </div>
-              </div>
 
               {/* Approve Button */}
               <button
