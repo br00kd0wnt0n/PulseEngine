@@ -7,7 +7,7 @@ import { useUpload } from '../context/UploadContext'
 import { api } from '../services/api'
 import { CitationToken } from '../components/shared/CitationOverlay'
 import BrandSpinner from '../components/shared/BrandSpinner'
-import { exportProjectFull, downloadMarkdown } from '../utils/export'
+import { exportProjectFull, downloadMarkdown, exportOverviewPdf } from '../utils/export'
 
 function compactScore(sc: any): { narrative?: number; ttpWeeks?: number; cross?: number; commercial?: number; overall?: number } | null {
   try {
@@ -1853,7 +1853,6 @@ export default function CanvasWorkflow() {
                               const overview = conceptOverview || ''
                               // Export a print‑ready PDF of the Concept Overview + extras
                               ;(window as any).scrollTo(0,0)
-                              const { exportOverviewPdf } = require('../utils/export')
                               exportOverviewPdf(concept || 'Untitled', overview, { persona, region })
                             } catch (e) {
                               // Fallback: export full markdown
