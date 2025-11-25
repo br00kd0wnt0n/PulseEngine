@@ -181,7 +181,7 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, scale = 1, 
             (data.status === 'active' && data.type === 'wildcard') ? 'bg-yellow-400' :
             data.status === 'active' ? 'bg-ralph-cyan' :
             data.status === 'complete' ? 'bg-ralph-pink' :
-            data.status === 'processing' ? 'bg-orange-400 animate-pulse' :
+            data.status === 'processing' ? 'bg-ralph-pink animate-pulse' :
             'bg-white/40'
           }`} />
           <div className="text-sm font-medium">{data.title}</div>

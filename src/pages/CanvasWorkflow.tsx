@@ -1727,14 +1727,14 @@ export default function CanvasWorkflow() {
                   Apply Enhancements
                 </button>
                 <button
-                  className="mt-2 w-full px-3 py-2 rounded border border-white/10 bg-white/10 hover:bg-white/20 text-xs"
+                  className="mt-2 w-full px-3 py-2 rounded border border-ralph-cyan/40 bg-ralph-cyan/10 hover:bg-ralph-cyan/20 text-xs font-medium"
                   onClick={async (e) => {
                     e.stopPropagation()
                     await ensureConceptOverviewNode()
                     await refreshConceptOverview([])
                   }}
                 >
-                  CREATE OVERVIEW
+                  Create Overview
                 </button>
                 <button
                   className="mt-2 w-full px-3 py-2 rounded border border-yellow-400/40 bg-yellow-400/10 hover:bg-yellow-400/20 text-xs font-medium"
@@ -1847,15 +1847,24 @@ export default function CanvasWorkflow() {
                       </div>
                       <div>
                         <button
-                          className="w-full px-3 py-1.5 rounded border border-white/10 bg-white/10 hover:bg-white/20 text-[11px]"
+                          className="w-full px-3 py-1.5 rounded border border-ralph-cyan/40 bg-ralph-cyan/10 hover:bg-ralph-cyan/20 text-[11px] font-medium"
                           onClick={() => {
-                            const conceptName = (concept || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-                            const md = exportProjectFull(concept || 'Untitled', persona || '', region || '')
-                            const ts = new Date().toISOString().replace(/[:.]/g, '-')
-                            downloadMarkdown(md, `${conceptName || 'project'}-${ts}.md`)
+                            try {
+                              const overview = conceptOverview || ''
+                              // Export a print‑ready PDF of the Concept Overview + extras
+                              ;(window as any).scrollTo(0,0)
+                              const { exportOverviewPdf } = require('../utils/export')
+                              exportOverviewPdf(concept || 'Untitled', overview, { persona, region })
+                            } catch (e) {
+                              // Fallback: export full markdown
+                              const conceptName = (concept || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+                              const md = exportProjectFull(concept || 'Untitled', persona || '', region || '')
+                              const ts = new Date().toISOString().replace(/[:.]/g, '-')
+                              downloadMarkdown(md, `${conceptName || 'project'}-${ts}.md`)
+                            }
                           }}
                         >
-                          Export Project
+                          Export PDF
                         </button>
                       </div>
                     </div>

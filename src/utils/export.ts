@@ -254,6 +254,93 @@ export function downloadMarkdown(content: string, filename: string) {
 }
 
 /**
+ * Export Concept Overview as a formatted PDF via print
+ * Collects concept overview, key scores and top opportunities.
+ */
+export function exportOverviewPdf(concept: string, overviewMarkdown: string, opts?: { persona?: string; region?: string }) {
+  const projectId = localStorage.getItem('activeProjectId') || 'local'
+  const persona = opts?.persona || (localStorage.getItem('persona') || '').replace(/\"/g,'')
+  const region = opts?.region || (localStorage.getItem('region') || '').replace(/\"/g,'')
+  const targetAudience = (localStorage.getItem('targetAudience') || '').replace(/\"/g,'')
+  const scores = safeJSON(`score:${projectId}`) || {}
+  const opps = safeJSON(`opps:${projectId}`)
+
+  // Minimal Markdown -> HTML conversion for the overview block
+  const mdToHtml = (md: string): string => {
+    let t = (md || '')
+    t = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    t = t.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>')
+    t = t.replace(/^(?:- |\* )(.*)$/gm, '<li>$1</li>')
+    t = t.replace(/(?:(<li>[^<]*<\/li>)\n?)+/g, (m) => `<ul>${m}\n</ul>`) 
+    t = t.replace(/\n\n+/g, '</p><p>')
+    return `<p>${t}</p>`
+  }
+
+  const overviewHtml = mdToHtml(overviewMarkdown)
+  const scoreHtml = (() => {
+    const items: string[] = []
+    if (typeof scores?.narrative === 'number') items.push(`<li>Cultural Relevance: ${scores.narrative}/100</li>`)
+    if (typeof scores?.cross === 'number') items.push(`<li>Engagement Potential: ${scores.cross}/100</li>`)
+    if (typeof scores?.ttpWeeks === 'number') items.push(`<li>Platform Fit (TTP): ${scores.ttpWeeks} weeks</li>`)
+    if (typeof scores?.commercial === 'number') items.push(`<li>Commercial Viability: ${scores.commercial}/100</li>`)
+    if (!items.length) return ''
+    return `<h3>Key Scores</h3><ul>${items.join('')}</ul>`
+  })()
+  const oppHtml = (() => {
+    const list = Array.isArray(opps?.opportunities) ? opps.opportunities.slice(0,5) : []
+    if (!list.length) return ''
+    return `<h3>Top Opportunities</h3><ul>${list.map((o:any)=>`<li>${o.title || ''}${o.impact?` — Impact ${o.impact}/100`:''}</li>`).join('')}</ul>`
+  })()
+
+  const html = `<!doctype html>
+  <html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Concept Overview — ${escapeHtml(concept)}</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #111; }
+      .container { max-width: 760px; margin: 0 auto; padding: 24px; }
+      h1 { font-size: 20px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .04em; }
+      h2 { font-size: 16px; margin: 18px 0 8px; text-transform: uppercase; letter-spacing: .04em; }
+      h3 { font-size: 13px; margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+      p { line-height: 1.5; margin: 8px 0; }
+      ul { margin: 6px 0 10px 20px; }
+      .meta { font-size: 12px; color: #666; margin-bottom: 16px; }
+      .divider { border-top: 1px solid #eee; margin: 16px 0; }
+      @media print { .no-print { display: none } }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Concept Overview</h1>
+      <div class="meta">
+        <div><strong>Concept:</strong> ${escapeHtml(concept)}</div>
+        ${persona?`<div><strong>Persona:</strong> ${escapeHtml(persona)}</div>`:''}
+        ${targetAudience?`<div><strong>Target Audience:</strong> ${escapeHtml(targetAudience)}</div>`:''}
+        ${region?`<div><strong>Region:</strong> ${escapeHtml(region)}</div>`:''}
+        <div><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
+      </div>
+      <div class="divider"></div>
+      ${overviewHtml}
+      ${scoreHtml}
+      ${oppHtml}
+    </div>
+    <script>
+      window.onload = () => { setTimeout(()=>{ window.print() }, 300) }
+    </script>
+  </body>
+  </html>`
+
+  const w = window.open('', '_blank')
+  if (!w) return
+  w.document.open()
+  w.document.write(html)
+  w.document.close()
+}
+
+function escapeHtml(s: string) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+/**
  * Copy Markdown to clipboard
  */
 export async function copyToClipboard(content: string): Promise<boolean> {
