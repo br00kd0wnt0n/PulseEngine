@@ -1544,6 +1544,41 @@ export default function CanvasWorkflow() {
                   Create Overview
                 </button>
                 <button
+                  className="mt-2 w-full px-3 py-2 rounded border border-ralph-pink/40 bg-ralph-pink/10 hover:bg-ralph-pink/20 text-xs font-medium"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    // spawn model-rollout node
+                    setNodes(prev => {
+                      if (prev.find(n => n.id === 'model-rollout')) return prev
+                      const vw = typeof window !== 'undefined' ? window.innerWidth : 1800
+                      const vh = typeof window !== 'undefined' ? window.innerHeight : 1000
+                      const nodeWidth = 520
+                      const nodeHeight = 500
+                      const margin = 60
+                      const rolloutX = Math.max(margin, Math.min(vw - nodeWidth - margin, vw * 0.58))
+                      const rolloutY = Math.max(margin, Math.min(vh - nodeHeight - margin, 500))
+                      return [
+                        ...prev,
+                        {
+                          id: 'model-rollout',
+                          type: 'ai-content',
+                          title: 'Model Rollout',
+                          x: rolloutX,
+                          y: rolloutY,
+                          width: nodeWidth,
+                          height: nodeHeight,
+                          minimized: false,
+                          zIndex: 6,
+                          status: 'active' as NodeData['status'],
+                          connectedTo: ['scoring']
+                        }
+                      ]
+                    })
+                  }}
+                >
+                  Model Rollout
+                </button>
+                <button
                   className="mt-2 w-full px-3 py-2 rounded border border-yellow-400/40 bg-yellow-400/10 hover:bg-yellow-400/20 text-xs font-medium"
                   onClick={async (e) => {
                     e.stopPropagation()
@@ -1854,6 +1889,204 @@ export default function CanvasWorkflow() {
           ) : (
             <div className="text-white/60 text-[10px]">No recommendations available.</div>
           )}
+        </div>
+      )
+    }
+
+    if (node.id === 'model-rollout') {
+      // Get score snapshot from localStorage
+      const pid = (() => { try { return localStorage.getItem('activeProjectId') || '' } catch { return '' } })()
+      const scSnap = (() => { try { return JSON.parse(localStorage.getItem(`score:${pid}`) || '{}') } catch { return {} } })()
+
+      // Score-aware modeling parameters
+      const baseFollowers = 5000
+      const overallScore = scSnap?.overall || scores?.overall || 50
+      const growthRate = 0.05 + (overallScore / 100) * 0.15 // 5-20% based on score
+
+      // Simple noise function for variance
+      const noise = (m: number) => 1 + (Math.sin(m * 2.3) * 0.08) + (Math.cos(m * 1.7) * 0.05)
+
+      // Calculate 12-month follower projection
+      const monthlyData = Array.from({ length: 12 }, (_, i) => {
+        const month = i + 1
+        const base = baseFollowers * Math.pow(1 + growthRate, month)
+        return Math.round(base * noise(month))
+      })
+
+      // Strategic moments with color coding
+      const moments = [
+        { month: 1, label: 'Launch', color: '#FF1B6D', y: monthlyData[0] },
+        { month: 2, label: 'Hook A/B', color: '#00D9FF', y: monthlyData[1] },
+        { month: 4, label: 'Collab Burst', color: '#A855F7', y: monthlyData[3] },
+        { month: 6, label: 'Oversaturation Risk', color: '#FB923C', y: monthlyData[5] },
+        { month: 8, label: 'Pivot KPIs', color: '#22C55E', y: monthlyData[7] },
+        { month: 10, label: 'Seasonal Push', color: '#EF4444', y: monthlyData[9] }
+      ]
+
+      // SVG dimensions
+      const chartWidth = 460
+      const chartHeight = 280
+      const padding = { top: 20, right: 20, bottom: 40, left: 60 }
+      const plotWidth = chartWidth - padding.left - padding.right
+      const plotHeight = chartHeight - padding.top - padding.bottom
+
+      // Scales
+      const maxFollowers = Math.max(...monthlyData) * 1.1
+      const xScale = (month: number) => padding.left + ((month - 1) / 11) * plotWidth
+      const yScale = (followers: number) => padding.top + plotHeight - (followers / maxFollowers) * plotHeight
+
+      // Generate path for line chart
+      const linePath = monthlyData.map((f, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i + 1)} ${yScale(f)}`).join(' ')
+
+      return (
+        <div className="space-y-3 text-xs max-h-full overflow-auto">
+          <div className="text-white/70 font-medium text-[11px] mb-2">12-MONTH FOLLOWER PROJECTION</div>
+
+          {/* SVG Chart */}
+          <svg width={chartWidth} height={chartHeight} className="bg-white/5 rounded">
+            {/* Grid lines */}
+            {[0, 0.25, 0.5, 0.75, 1].map((pct, i) => (
+              <line
+                key={`grid-${i}`}
+                x1={padding.left}
+                x2={chartWidth - padding.right}
+                y1={padding.top + plotHeight * (1 - pct)}
+                y2={padding.top + plotHeight * (1 - pct)}
+                stroke="rgba(255,255,255,0.1)"
+                strokeWidth="1"
+              />
+            ))}
+
+            {/* Y-axis labels */}
+            {[0, 0.25, 0.5, 0.75, 1].map((pct, i) => {
+              const value = Math.round(maxFollowers * pct)
+              const displayValue = value >= 1000 ? `${Math.round(value / 1000)}k` : value.toString()
+              return (
+                <text
+                  key={`y-label-${i}`}
+                  x={padding.left - 10}
+                  y={padding.top + plotHeight * (1 - pct) + 4}
+                  fill="rgba(255,255,255,0.5)"
+                  fontSize="9"
+                  textAnchor="end"
+                >
+                  {displayValue}
+                </text>
+              )
+            })}
+
+            {/* X-axis labels */}
+            {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+              <text
+                key={`x-label-${month}`}
+                x={xScale(month)}
+                y={chartHeight - padding.bottom + 15}
+                fill="rgba(255,255,255,0.5)"
+                fontSize="9"
+                textAnchor="middle"
+              >
+                M{month}
+              </text>
+            ))}
+
+            {/* Historic line (M1-M3, solid) */}
+            <path
+              d={monthlyData.slice(0, 3).map((f, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i + 1)} ${yScale(f)}`).join(' ')}
+              stroke="rgba(255,255,255,0.9)"
+              strokeWidth="2"
+              fill="none"
+            />
+
+            {/* Predictive line (M3-M12, dashed) */}
+            <path
+              d={monthlyData.slice(2).map((f, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i + 3)} ${yScale(f)}`).join(' ')}
+              stroke="rgba(255,255,255,0.7)"
+              strokeWidth="2"
+              strokeDasharray="4 3"
+              fill="none"
+            />
+
+            {/* Strategic moment markers */}
+            {moments.map((m, i) => (
+              <g key={`moment-${i}`}>
+                <circle
+                  cx={xScale(m.month)}
+                  cy={yScale(m.y)}
+                  r="4"
+                  fill={m.color}
+                  stroke="white"
+                  strokeWidth="1.5"
+                />
+                <text
+                  x={xScale(m.month)}
+                  y={yScale(m.y) - 10}
+                  fill={m.color}
+                  fontSize="8"
+                  fontWeight="600"
+                  textAnchor="middle"
+                >
+                  {m.label.split(' ')[0]}
+                </text>
+              </g>
+            ))}
+
+            {/* Axis lines */}
+            <line
+              x1={padding.left}
+              x2={chartWidth - padding.right}
+              y1={chartHeight - padding.bottom}
+              y2={chartHeight - padding.bottom}
+              stroke="rgba(255,255,255,0.3)"
+              strokeWidth="1"
+            />
+            <line
+              x1={padding.left}
+              x2={padding.left}
+              y1={padding.top}
+              y2={chartHeight - padding.bottom}
+              stroke="rgba(255,255,255,0.3)"
+              strokeWidth="1"
+            />
+          </svg>
+
+          {/* Legend */}
+          <div className="panel p-2 bg-white/5">
+            <div className="text-white/60 text-[10px] font-medium mb-1.5">LEGEND</div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-[2px] bg-white/90" />
+                <span className="text-[9px] text-white/60">Historic (M1-M3)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-[2px] bg-white/70" style={{ backgroundImage: 'repeating-linear-gradient(to right, rgba(255,255,255,0.7) 0px, rgba(255,255,255,0.7) 4px, transparent 4px, transparent 7px)' }} />
+                <span className="text-[9px] text-white/60">Predictive (M4-M12)</span>
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+              {moments.map((m, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: m.color }} />
+                  <span className="text-[9px] text-white/60">{m.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Annotations */}
+          <div className="panel p-2 bg-white/5">
+            <div className="text-white/60 text-[10px] font-medium mb-1.5">KEY INSIGHTS</div>
+            <ul className="space-y-1 text-[9px] text-white/70">
+              <li>• Projected {Math.round(growthRate * 100)}% monthly growth (score-driven)</li>
+              <li>• Peak momentum expected M{moments.find(m => m.y === Math.max(...moments.map(x => x.y)))?.month || 10}</li>
+              <li>• Collab timing optimized for M4 audience scale</li>
+              <li>• Monitor oversaturation signals at M6 checkpoint</li>
+            </ul>
+          </div>
+
+          {/* Model Parameters */}
+          <div className="text-[9px] text-white/40 mt-2">
+            Model: Base {new Intl.NumberFormat().format(baseFollowers)} • Growth {Math.round(growthRate * 100)}%/mo • Score {Math.round(overallScore)}
+          </div>
         </div>
       )
     }
