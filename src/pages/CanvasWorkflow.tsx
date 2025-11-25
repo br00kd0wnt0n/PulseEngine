@@ -159,6 +159,7 @@ export default function CanvasWorkflow() {
   const [conceptOverview, setConceptOverview] = useState<string | null>(null)
   const [rollout, setRollout] = useState<{ months: { m:number; followers:number }[]; moments: { m:number; label:string; kind?:string; color?:string }[]; notes?: string[] } | null>(null)
   const [rolloutLoading, setRolloutLoading] = useState<boolean>(false)
+  const [rolloutEditMode, setRolloutEditMode] = useState<boolean>(false)
   const [overviewLoading, setOverviewLoading] = useState<boolean>(false)
   const [showUnderHood, setShowUnderHood] = useState<boolean>(false)
 
@@ -1188,6 +1189,55 @@ export default function CanvasWorkflow() {
 
       let citationIndex = 1
 
+      if (rolloutEditMode) {
+        const pid = (() => { try { return localStorage.getItem('activeProjectId') || 'local' } catch { return 'local' } })()
+        const months = rollout?.months || Array.from({length:12},(_,i)=>({ m:i, followers: monthlyData[i] }))
+        return (
+          <div className="space-y-2 text-xs max-h-full overflow-auto">
+            <div className="flex items-center justify-between">
+              <div className="text-white/70 font-medium text-[11px]">DATA BACKEND</div>
+              <button className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={()=>setRolloutEditMode(false)}>Close</button>
+            </div>
+            <div className="panel p-2 bg-white/5">
+              <div className="text-white/60 text-[10px] mb-2">Enter known follower counts (historical) and projections. Months left blank will be filled by the model.</div>
+              <div className="grid grid-cols-4 gap-2">
+                {months.map((row,i)=> (
+                  <div key={i} className="flex items-center gap-1">
+                    <label className="w-8 text-[10px] text-white/60">M{i+1}</label>
+                    <input
+                      type="number"
+                      defaultValue={row.followers}
+                      onChange={(e)=>{
+                        const val = Number(e.target.value)
+                        setRollout(prev => {
+                          const base = prev?.months ? [...prev.months] : months
+                          base[i] = { m: i, followers: isFinite(val) && val>0 ? val : 0 }
+                          return { months: base, moments: prev?.moments || [], notes: prev?.notes || [] }
+                        })
+                      }}
+                      className="flex-1 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-[10px] outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  className="text-[10px] px-2 py-0.5 rounded border border-ralph-cyan/40 bg-ralph-cyan/10 hover:bg-ralph-cyan/20"
+                  onClick={()=>{
+                    try { localStorage.setItem(`rollout:${pid}`, JSON.stringify({ months: (rollout?.months || months) })) } catch {}
+                    setRolloutEditMode(false)
+                  }}
+                >Save</button>
+                <button
+                  className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 hover:bg-white/10"
+                  onClick={()=>setRolloutEditMode(false)}
+                >Cancel</button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
           {loading ? (
@@ -1979,7 +2029,12 @@ export default function CanvasWorkflow() {
 
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
-          <div className="text-white/70 font-medium text-[11px] mb-2">12-MONTH FOLLOWER PROJECTION</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-white/70 font-medium text-[11px]">12-MONTH FOLLOWER PROJECTION</div>
+            <button className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 hover:bg-white/10" onClick={()=>{
+              setRolloutEditMode(true)
+            }}>View/edit data</button>
+          </div>
 
           {/* SVG Chart */}
           <svg width={chartWidth} height={chartHeight} className="bg-white/5 rounded">
