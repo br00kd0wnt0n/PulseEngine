@@ -1506,10 +1506,10 @@ export default function CanvasWorkflow() {
                             if (e.deltas && scores) {
                               const delta = ev.target.checked ? 1 : -1
                               setScores(prev => prev ? {
-                                narrative: (prev.narrative || 0) + (e.deltas.narrative || 0) * delta,
-                                ttpWeeks: (prev.ttpWeeks || 0) + (e.deltas.ttp || 0) * delta,
-                                cross: (prev.cross || 0) + (e.deltas.cross || 0) * delta,
-                                commercial: (prev.commercial || 0) + (e.deltas.commercial || 0) * delta,
+                                narrative: (prev.narrative || 0) + ((e.deltas?.narrative || 0) * delta),
+                                ttpWeeks: (prev.ttpWeeks || 0) + ((e.deltas?.ttp || 0) * delta),
+                                cross: (prev.cross || 0) + ((e.deltas?.cross || 0) * delta),
+                                commercial: (prev.commercial || 0) + ((e.deltas?.commercial || 0) * delta),
                                 overall: prev.overall
                               } : prev)
                             }
