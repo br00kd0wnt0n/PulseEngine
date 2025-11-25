@@ -385,7 +385,7 @@ export async function refineDebrief(
   const parsed = await callJSON(
     [ { role: 'system', content: 'Return only JSON matching the requested schema.' }, { role: 'user', content: prompt } ],
     DebriefSchema,
-    { model, maxTokens: 420, temperature: 0.5, allowExtract: true, retries: 1 }
+    { model, maxTokens: 600, temperature: 0.5, allowExtract: true, retries: 1 }
   )
   return { ...parsed, sources: ctx.sources, _debug: { model, prompt } }
 }

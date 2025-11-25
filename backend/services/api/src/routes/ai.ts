@@ -154,6 +154,7 @@ router.post('/refine-debrief', async (req, res) => {
     const data = await refineDebrief(concept, currentDebrief || null, message, userId, persona || null, projectId || null, targetAudience || null)
     res.json(data)
   } catch (e: any) {
+    console.error('[refine-debrief] Error:', e?.message, e?.stack)
     res.status(500).json({ error: e?.message || 'failed' })
   }
 })
