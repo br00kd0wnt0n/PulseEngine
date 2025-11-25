@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements, generateConceptProposal, generateScoresAI, refineDebrief } from '../services/ai.js'
+import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements, generateConceptProposal, generateScoresAI, refineDebrief, generateModelRollout } from '../services/ai.js'
 import { retrieveContext, formatContextForPrompt } from '../services/retrieval.js'
 import { getPrompt as getTpl, renderTemplate } from '../services/promptStore.js'
 import { generateEmbedding } from '../services/embeddings.js'
@@ -155,6 +155,19 @@ router.post('/refine-debrief', async (req, res) => {
     res.json(data)
   } catch (e: any) {
     console.error('[refine-debrief] Error:', e?.message, e?.stack)
+    res.status(500).json({ error: e?.message || 'failed' })
+  }
+})
+
+// Model Rollout
+router.post('/model-rollout', async (req, res) => {
+  const { concept, overview, snapshot, persona, targetAudience, region, projectId } = req.body || {}
+  if (!concept || !overview) return res.status(400).json({ error: 'concept and overview required' })
+  try {
+    const userId = (req as any).user?.sub || null
+    const data = await generateModelRollout(concept, overview, snapshot || null, persona || null, targetAudience || null, region || null, userId, projectId || null)
+    res.json(data)
+  } catch (e: any) {
     res.status(500).json({ error: e?.message || 'failed' })
   }
 })

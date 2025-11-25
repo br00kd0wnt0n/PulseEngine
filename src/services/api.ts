@@ -52,6 +52,10 @@ export const api = {
     '/ai/concept-overview',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(opts||{}) }) }
   ),
+  modelRollout: (concept: string, overview: string, snapshot?: any, opts?: { persona?: string; region?: string; targetAudience?: string; projectId?: string }) => request<any>(
+    '/ai/model-rollout',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, overview, snapshot, ...(opts||{}) }) }
+  ),
   conceptProposal: (concept: string, narrativeBlocks: { key: string; content: string }[], recommendedCreators: any[], opts?: { persona?: string; projectId?: string }) => request<any>(
     '/ai/concept-proposal',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, narrativeBlocks, recommendedCreators, ...(opts||{}) }) }

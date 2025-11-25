@@ -157,6 +157,8 @@ export default function CanvasWorkflow() {
   const [wildLoading, setWildLoading] = useState<boolean>(false)
 
   const [conceptOverview, setConceptOverview] = useState<string | null>(null)
+  const [rollout, setRollout] = useState<{ months: { m:number; followers:number }[]; moments: { m:number; label:string; kind?:string; color?:string }[]; notes?: string[] } | null>(null)
+  const [rolloutLoading, setRolloutLoading] = useState<boolean>(false)
   const [overviewLoading, setOverviewLoading] = useState<boolean>(false)
   const [showUnderHood, setShowUnderHood] = useState<boolean>(false)
 
@@ -1674,9 +1676,46 @@ export default function CanvasWorkflow() {
                       console.error('[ConceptOverview] Refresh failed:', err)
                     } finally {
                       setOverviewLoading(false)
+                      // Auto-update rollout if node exists
+                      const hasRollout = nodes.some(n => n.id === 'model-rollout')
+                      if (hasRollout) {
+                        try {
+                          setRolloutLoading(true)
+                          const pid = localStorage.getItem('activeProjectId') || 'local'
+                          const snapScores = (()=>{ try { return JSON.parse(localStorage.getItem(`score:${pid}`) || '{}') } catch { return {} } })()
+                          const snapOpps = opps?.opportunities?.slice(0,6).map((o:any)=>({ title: o.title, impact: o.impact })) || []
+                          const resp = await api.modelRollout(concept, result?.overview || '', { scores: snapScores, opportunities: snapOpps }, { persona, region, targetAudience, projectId: pid })
+                          setRollout({ months: resp.months || [], moments: resp.moments || [], notes: resp.notes || [] })
+                        } catch (e) { console.error('[ModelRollout] Auto-refresh failed:', e) }
+                        finally { setRolloutLoading(false) }
+                      }
                     }
                   }}
                 >Refresh</button>
+              </div>
+              <div className="mb-2">
+                <button
+                  className="text-[10px] px-2 py-0.5 rounded border border-ralph-pink/40 bg-ralph-pink/10 hover:bg-ralph-pink/20 mr-2"
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    try {
+                      setRolloutLoading(true)
+                      const pid = localStorage.getItem('activeProjectId') || 'local'
+                      const snapScores = (()=>{ try { return JSON.parse(localStorage.getItem(`score:${pid}`) || '{}') } catch { return {} } })()
+                      const snapOpps = opps?.opportunities?.slice(0,6).map((o:any)=>({ title: o.title, impact: o.impact })) || []
+                      const resp = await api.modelRollout(concept, conceptOverview || '', { scores: snapScores, opportunities: snapOpps }, { persona, region, targetAudience, projectId: pid })
+                      setRollout({ months: resp.months || [], moments: resp.moments || [], notes: resp.notes || [] })
+                      setNodes(prev => {
+                        const exists = prev.find(n => n.id === 'model-rollout')
+                        if (exists) return prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n)
+                        const baseX = Math.max(100, Math.min(window.innerWidth - 520 - 100, window.innerWidth * 0.60))
+                        return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Model Rollout', x: baseX, y: 480, width: 520, height: 360, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: ['concept-overview'] } ]
+                      })
+                    } catch (err) { console.error('[ModelRollout] Failed:', err) }
+                    finally { setRolloutLoading(false) }
+                  }}
+                >Model Rollout</button>
+                {rolloutLoading && <span className="text-[10px] text-white/60">Generating…</span>}
               </div>
               {/* Parse and display sections like narrative node */}
               {(() => {
@@ -1923,9 +1962,9 @@ export default function CanvasWorkflow() {
         { month: 10, label: 'Seasonal Push', color: '#EF4444', y: monthlyData[9] }
       ]
 
-      // SVG dimensions
-      const chartWidth = 460
-      const chartHeight = 280
+      // SVG dimensions responsive to node size
+      const chartWidth = Math.max(360, node.width - 24)
+      const chartHeight = Math.max(220, node.height - 80)
       const padding = { top: 20, right: 20, bottom: 40, left: 60 }
       const plotWidth = chartWidth - padding.left - padding.right
       const plotHeight = chartHeight - padding.top - padding.bottom
@@ -1989,25 +2028,12 @@ export default function CanvasWorkflow() {
               </text>
             ))}
 
-            {/* Historic line (M1-M3, solid) */}
-            <path
-              d={monthlyData.slice(0, 3).map((f, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i + 1)} ${yScale(f)}`).join(' ')}
-              stroke="rgba(255,255,255,0.9)"
-              strokeWidth="2"
-              fill="none"
-            />
+            {/* Line paths (historic first 3 solid, predictive rest dashed) */}
+            <path d={monthlyData.slice(0,3).map((f,i)=>`${i===0?'M':'L'} ${xScale(i+1)} ${yScale(f)}`).join(' ')} stroke="rgba(255,255,255,0.9)" strokeWidth="2" fill="none" />
+            <path d={monthlyData.slice(2).map((f,i)=>`${i===0?'M':'L'} ${xScale(i+3)} ${yScale(f)}`).join(' ')} stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeDasharray="4 3" fill="none" />
 
-            {/* Predictive line (M3-M12, dashed) */}
-            <path
-              d={monthlyData.slice(2).map((f, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i + 3)} ${yScale(f)}`).join(' ')}
-              stroke="rgba(255,255,255,0.7)"
-              strokeWidth="2"
-              strokeDasharray="4 3"
-              fill="none"
-            />
-
-            {/* Strategic moment markers */}
-            {moments.map((m, i) => (
+            {/* Strategic moment markers (AI-driven if present) */}
+            {(rollout?.moments && rollout.moments.length>0 ? rollout.moments.map(mo => ({ month: mo.m+1, label: mo.label, color: mo.color || (mo.kind==='risk'?'#FB923C': mo.kind==='pivot'?'#22C55E': mo.kind==='push'?'#EF4444': mo.kind==='strategy'?'#00D9FF':'#FF1B6D') })) : moments).map((m, i) => (
               <g key={`moment-${i}`}>
                 <circle
                   cx={xScale(m.month)}

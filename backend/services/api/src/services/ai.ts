@@ -4,7 +4,7 @@ import { AICache } from '../db/entities/AICache.js'
 import { Creator } from '../db/entities/Creator.js'
 import { retrieveContext, formatContextForPrompt, type RetrievalContext } from './retrieval.js'
 import { callJSON } from './llm.js'
-import { OpportunitiesResultSchema, ScoresSchema } from './schemas.js'
+import { OpportunitiesResultSchema, ScoresSchema, ModelRolloutSchema } from './schemas.js'
 
 export type TrendGraph = { nodes: { id: string; label: string; kind: 'trend'|'creator'|'content' }[]; links: { source: string; target: string }[] }
 
@@ -838,4 +838,51 @@ ${narrativeBlocks.find(b => b.key === 'resolution')?.content || 'Expected outcom
     console.error('[AI] generateConceptProposal failed:', err)
     throw err
   }
+}
+
+// Model Rollout: 12‑month projection and key moments
+export async function generateModelRollout(
+  concept: string,
+  overview: string,
+  snapshot: { scores?: any; opportunities?: { title: string; impact?: number }[] } | null,
+  persona?: string | null,
+  targetAudience?: string | null,
+  region?: string | null,
+  userId?: string | null,
+  projectId?: string | null,
+) {
+  // Build compact context
+  const parts: string[] = []
+  try {
+    if (snapshot?.scores) {
+      const s = snapshot.scores
+      parts.push(`Scores: narrative=${s.narrative ?? '-'}, cross=${s.cross ?? '-'}, ttpWeeks=${s.ttpWeeks ?? '-'}, commercial=${s.commercial ?? '-'}`)
+    }
+  } catch {}
+  try {
+    const list = Array.isArray(snapshot?.opportunities) ? snapshot!.opportunities!.slice(0,5).map(o => `- ${o.title}${typeof o.impact==='number'?` (impact ${o.impact})`:''}`).join('\n') : ''
+    if (list) parts.push(`Top Opportunities:\n${list}`)
+  } catch {}
+  const context = parts.join('\n')
+
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error('no-openai')
+  const model = process.env.MODEL_NAME || 'gpt-4o-mini'
+
+  const sys = 'Return only valid JSON matching the requested schema. Be precise and realistic.'
+  const user = [
+    `You are a growth strategist for ${persona || 'General'}${region?` in ${region}`:''}.`,
+    targetAudience ? `Target audience: ${targetAudience}.` : '',
+    `\nCreate a 12‑month follower projection and rollout plan. Concept Overview below:`,
+    overview,
+    context ? `\nContext:\n${context}` : '',
+    `\nReturn JSON with months (m:0..11, followers), moments (m,label,kind), notes (bullets).`
+  ].filter(Boolean).join('\n')
+
+  const parsed = await callJSON(
+    [ { role: 'system', content: sys }, { role: 'user', content: user } ],
+    ModelRolloutSchema,
+    { model, maxTokens: 600, temperature: 0.4, allowExtract: true, retries: 1 }
+  )
+  return { ...parsed, _debug: { model } }
 }

@@ -13,6 +13,7 @@ export type PromptKey =
   | 'rewrite_narrative'
   | 'wildcard'
   | 'ralph_lens'
+  | 'model_rollout'
 
 export const promptMeta: Record<PromptKey, { label: string; trigger: string }> = {
   narrative_from_trends: { label: 'Narrative from Trends', trigger: '/ai/narrative (TrendGraph mode)' },
@@ -26,6 +27,7 @@ export const promptMeta: Record<PromptKey, { label: string; trigger: string }> =
   rewrite_narrative: { label: 'Rewrite Narrative (Apply Enhancements)', trigger: '/ai/rewrite-narrative' },
   wildcard: { label: 'Wildcard Insight', trigger: '/ai/wildcard' },
   ralph_lens: { label: 'Ralph Philosophy & Lens', trigger: 'Injected into prompts' },
+  model_rollout: { label: 'Model Rollout (12 months)', trigger: '/ai/model-rollout' },
 }
 
 // Default templates with {{variables}}
