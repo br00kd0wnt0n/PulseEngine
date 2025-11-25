@@ -40,29 +40,29 @@ function renderMarkdown(md: string): string {
   text = text.replace(/^\s*\*\*(\d+\.\s+[^:\n]+:)\s*/gm, '$1')
 
   // Headings ###
-  text = text.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>')
+  text = text.replace(/^###\s+(.*)$/gm, (_m, t) => `<h3 class="mt-2 mb-1 uppercase tracking-wide text-white/70">${String(t).trim()}</h3>`)
   // Numbered sections like `1. Title:` -> <h4>Title</h4>
-  text = text.replace(/^\s*\d+\.\s+([^:\n]+):/gm, '<h4>$1</h4>')
+  text = text.replace(/^\s*\d+\.\s+([^:\n]+):/gm, (_m, t) => `<h4 class="mt-2 mb-1 uppercase tracking-wide text-white/60">${String(t).trim()}</h4>`)
   // Subsection labels like `Content Pillars:` or `Story Arc:` -> <h5>
-  text = text.replace(/^\s*([A-Z][A-Za-z ]+):$/gm, '<h5>$1</h5>')
+  text = text.replace(/^\s*([A-Z][A-Za-z &/]+):$/gm, (_m, t) => `<h5 class="mt-2 mb-1 uppercase tracking-wide text-white/60">${String(t).trim()}</h5>`)
   // Common subtitles (case-insensitive): Platform Strategy, Success Metrics, Content Pillars, How .* Integrates, Opening Hook
-  text = text.replace(/^\s*(platform strategy.*)\s*:?\s*$/gim, (_, p1) => `<h5>${p1.trim()}</h5>`)
-  text = text.replace(/^\s*(success metrics.*)\s*:?\s*$/gim,  (_, p1) => `<h5>${p1.trim()}</h5>`)
-  text = text.replace(/^\s*(content pillars.*)\s*:?\s*$/gim,  (_, p1) => `<h5>${p1.trim()}</h5>`)
-  text = text.replace(/^\s*(opening hook.*)\s*:?\s*$/gim,     (_, p1) => `<h5>${p1.trim()}</h5>`)
-  text = text.replace(/^\s*(how .* integrates)\s*:?\s*$/gim,    (_, p1) => `<h5>${p1.trim()}</h5>`)
+  text = text.replace(/^\s*(platform strategy.*)\s*:?\s*$/gim,  (_, p1) => `<h5 class="mt-2 mb-1 uppercase tracking-wide text-white/60">${p1.trim()}</h5>`)
+  text = text.replace(/^\s*(success metrics.*)\s*:?\s*$/gim,    (_, p1) => `<h5 class="mt-2 mb-1 uppercase tracking-wide text-white/60">${p1.trim()}</h5>`)
+  text = text.replace(/^\s*(content pillars.*)\s*:?\s*$/gim,    (_, p1) => `<h5 class="mt-2 mb-1 uppercase tracking-wide text-white/60">${p1.trim()}</h5>`)
+  text = text.replace(/^\s*(opening hook.*)\s*:?\s*$/gim,       (_, p1) => `<h5 class="mt-2 mb-1 uppercase tracking-wide text-white/60">${p1.trim()}</h5>`)
+  text = text.replace(/^\s*(how .* integrates)\s*:?\s*$/gim,     (_, p1) => `<h5 class="mt-2 mb-1 uppercase tracking-wide text-white/60">${p1.trim()}</h5>`)
   // Bold **text** (non-greedy, single line)
   text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
   // Bullet lists: lines starting with - or *
-  text = text.replace(/^(?:- |\* )(.*)$/gm, '<li>$1</li>')
+  text = text.replace(/^(?:- |\* )(.*)$/gm, '<li class="ml-4">$1</li>')
   // Lines that look like `Label: content` - split into heading + content with paragraph breaks preserved
   text = text.replace(/^([A-Z][A-Za-z\s]+):\s+(.+)$/gm, '<h5 class="mt-3 mb-1">$1</h5>\n<p>$2')
-  // Wrap consecutive <li> blocks into <ul>
-  text = text.replace(/(?:<li>[^<]*<\/li>\n?)+/g, (m) => `<ul>${m}\n</ul>`)
+  // Wrap consecutive <li> blocks into <ul> with styling
+  text = text.replace(/(?:(<li[^>]*>[^<]*<\/li>)\n?)+/g, (m) => `<ul class="list-disc pl-5 mb-2">${m}\n</ul>`)
   // Paragraphs: double newlines
-  text = text.replace(/\n\n+/g, '</p>\n<p>')
+  text = text.replace(/\n\n+/g, '</p>\n<p class="mb-2">')
   // Close any unclosed <p> tags
-  text = text.replace(/<p>([^<]*?)(?=<(?:h[345]|ul|$))/g, '<p>$1</p>')
+  text = text.replace(/<p>([^<]*?)(?=<(?:h[345]|ul|$))/g, '<p class="mb-2">$1</p>')
   return `<div>${text}</div>`
 }
 
@@ -1807,8 +1807,23 @@ export default function CanvasWorkflow() {
                 const parsed = extractNarrativeSections(conceptOverview || '')
                 if (!parsed.sections.length) {
                   return (
-                    <div className="panel p-3 bg-white/5">
-                      <div className="prose prose-invert max-w-none text-[10px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(conceptOverview) }} />
+                    <div className="space-y-2">
+                      <div className="panel p-3 bg-white/5">
+                        <div className="prose prose-invert max-w-none text-[11px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(conceptOverview) }} />
+                      </div>
+                      <div>
+                        <button
+                          className="w-full px-3 py-1.5 rounded border border-white/10 bg-white/10 hover:bg-white/20 text-[11px]"
+                          onClick={() => {
+                            const conceptName = (concept || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+                            const md = exportProjectFull(concept || 'Untitled', persona || '', region || '')
+                            const ts = new Date().toISOString().replace(/[:.]/g, '-')
+                            downloadMarkdown(md, `${conceptName || 'project'}-${ts}.md`)
+                          }}
+                        >
+                          Export Project
+                        </button>
+                      </div>
                     </div>
                   )
                 }
@@ -1822,9 +1837,22 @@ export default function CanvasWorkflow() {
                     {parsed.sections.map((sec, i) => (
                       <div key={i} className="panel p-3 bg-white/5">
                         <div className="text-white/80 font-medium mb-1.5 text-[11px]">{sec.title}</div>
-                        <div className="prose prose-invert max-w-none text-[10px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(cleanSectionBody(sec.body, sec.title)) }} />
+                        <div className="prose prose-invert max-w-none text-[11px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(cleanSectionBody(sec.body, sec.title)) }} />
                       </div>
                     ))}
+                    <div>
+                      <button
+                        className="w-full px-3 py-1.5 rounded border border-white/10 bg-white/10 hover:bg-white/20 text-[11px]"
+                        onClick={() => {
+                          const conceptName = (concept || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+                          const md = exportProjectFull(concept || 'Untitled', persona || '', region || '')
+                          const ts = new Date().toISOString().replace(/[:.]/g, '-')
+                          downloadMarkdown(md, `${conceptName || 'project'}-${ts}.md`)
+                        }}
+                      >
+                        Export Project
+                      </button>
+                    </div>
                   </div>
                 )
               })()}
@@ -1986,26 +2014,6 @@ export default function CanvasWorkflow() {
 
   return (
     <div className="relative w-full h-screen">
-      {/* Export Button */}
-      <div className="absolute top-3 right-4 z-50">
-        <button
-          className="px-3 py-1.5 rounded border border-white/10 bg-white/10 hover:bg-white/20 text-xs"
-          onClick={() => {
-            const conceptName = (concept || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-            const md = exportProjectFull(concept || 'Untitled', persona || '', region || '')
-            const ts = new Date().toISOString().replace(/[:.]/g, '-')
-            downloadMarkdown(md, `${conceptName || 'project'}-${ts}.md`)
-          }}
-        >
-          Export Project
-        </button>
-        <button
-          className="ml-2 px-3 py-1.5 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-xs"
-          onClick={() => setShowUnderHood(true)}
-        >
-          Under the Hood
-        </button>
-      </div>
       {/* Canvas with Nodes */}
       <Canvas nodes={nodes} onNodesChange={setNodes} renderNodeContent={renderNodeContent} />
 
