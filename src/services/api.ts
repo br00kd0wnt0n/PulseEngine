@@ -60,6 +60,10 @@ export const api = {
     '/ai/rewrite-narrative',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, narrative, enhancements, ...(opts||{}) }) }
   ),
+  refineDebrief: (concept: string, currentDebrief: any, message: string, opts?: { persona?: string; projectId?: string; targetAudience?: string }) => request<any>(
+    '/ai/refine-debrief',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, currentDebrief, message, ...(opts||{}) }) }
+  ),
   createProject: (payload: { concept: string; persona?: string; platforms?: string[]; areasOfInterest?: string[]; graph?: any; focusId?: string | null }) =>
     request<any>('/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
   createPublicProject: (payload: any) =>

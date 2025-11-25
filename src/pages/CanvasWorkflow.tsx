@@ -1374,16 +1374,25 @@ export default function CanvasWorkflow() {
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     onMouseDown={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => {
+                    onKeyDown={async (e) => {
                       if (e.key === 'Enter') {
                         e.stopPropagation()
-                        if (chatInput.trim()) {
-                          setChatMessages(prev => [...prev, { role: 'user', text: chatInput }])
-                          setChatInput('')
-                          // Simulate AI response
-                          setTimeout(() => {
-                            setChatMessages(prev => [...prev, { role: 'ai', text: 'I understand your feedback. Let me help refine these opportunities based on your input.' }])
-                          }, 500)
+                        const msg = chatInput.trim()
+                        if (!msg) return
+                        setChatMessages(prev => [...prev, { role: 'user', text: msg }])
+                        setChatInput('')
+                        try {
+                          setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'processing' as NodeData['status'] } : n))
+                          const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
+                          const refined = await api.refineDebrief(concept, debrief, msg, { persona, projectId: pid, targetAudience })
+                          setDebrief(refined)
+                          setChatMessages(prev => [...prev, { role: 'ai', text: 'Updated the debrief based on your instruction.' }])
+                          await ensureConceptOverviewNode()
+                          await refreshConceptOverview([])
+                        } catch {
+                          setChatMessages(prev => [...prev, { role: 'ai', text: 'Could not refine the debrief right now.' }])
+                        } finally {
+                          setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'active' as NodeData['status'] } : n))
                         }
                       }
                     }}
@@ -1391,14 +1400,24 @@ export default function CanvasWorkflow() {
                     className="flex-1 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-[10px] outline-none"
                   />
                   <button
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation()
-                      if (chatInput.trim()) {
-                        setChatMessages(prev => [...prev, { role: 'user', text: chatInput }])
-                        setChatInput('')
-                        setTimeout(() => {
-                          setChatMessages(prev => [...prev, { role: 'ai', text: 'I understand your feedback. Let me help refine these opportunities based on your input.' }])
-                        }, 500)
+                      const msg = chatInput.trim()
+                      if (!msg) return
+                      setChatMessages(prev => [...prev, { role: 'user', text: msg }])
+                      setChatInput('')
+                      try {
+                        setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'processing' as NodeData['status'] } : n))
+                        const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
+                        const refined = await api.refineDebrief(concept, debrief, msg, { persona, projectId: pid, targetAudience })
+                        setDebrief(refined)
+                        setChatMessages(prev => [...prev, { role: 'ai', text: 'Updated the debrief based on your instruction.' }])
+                        await ensureConceptOverviewNode()
+                        await refreshConceptOverview([])
+                      } catch {
+                        setChatMessages(prev => [...prev, { role: 'ai', text: 'Could not refine the debrief right now.' }])
+                      } finally {
+                        setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'active' as NodeData['status'] } : n))
                       }
                     }}
                     onMouseDown={(e) => e.stopPropagation()}
@@ -1492,36 +1511,50 @@ export default function CanvasWorkflow() {
                     value={narrativeChatInput}
                     onChange={(e) => setNarrativeChatInput(e.target.value)}
                     onMouseDown={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => {
+                    onKeyDown={async (e) => {
                       if (e.key === 'Enter') {
                         e.stopPropagation()
-                        if (narrativeChatInput.trim()) {
-                          setNarrativeChatMessages(prev => [...prev, { role: 'user', text: narrativeChatInput }])
-                          setNarrativeChatInput('')
-                          setTimeout(() => {
-                            setNarrativeChatMessages(prev => [...prev, { role: 'ai', text: 'I can help you refine the narrative structure. What aspects would you like to adjust?' }])
-                          }, 500)
-                        }
+                        if (!narrative || !narrativeChatInput.trim()) return
+                        const msg = narrativeChatInput.trim()
+                        setNarrativeChatMessages(prev => [...prev, { role: 'user', text: msg }])
+                        setNarrativeChatInput('')
+                        // Use rewrite-narrative for free-form refinement
+                        try {
+                          const rewritten = await api.applyEnhancements(concept, narrative.text, [msg], { persona, region })
+                          if (rewritten?.text) {
+                            setNarrative({ text: rewritten.text })
+                            setNarrativeChatMessages(prev => [...prev, { role: 'ai', text: 'Applied refinement to the narrative.' }])
+                            // Auto-refresh Concept Overview
+                            await ensureConceptOverviewNode()
+                            await refreshConceptOverview([])
+                          }
+                        } catch { setNarrativeChatMessages(prev => [...prev, { role: 'ai', text: 'Could not apply refinement right now.' }]) }
                       }
                     }}
-                    placeholder="Ask questions or request changes..."
+                    placeholder="Describe the change you want (Enter to apply)"
                     className="flex-1 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-[10px] outline-none"
                   />
                   <button
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation()
-                      if (narrativeChatInput.trim()) {
-                        setNarrativeChatMessages(prev => [...prev, { role: 'user', text: narrativeChatInput }])
-                        setNarrativeChatInput('')
-                        setTimeout(() => {
-                          setNarrativeChatMessages(prev => [...prev, { role: 'ai', text: 'I can help you refine the narrative structure. What aspects would you like to adjust?' }])
-                        }, 500)
-                      }
+                      if (!narrative || !narrativeChatInput.trim()) return
+                      const msg = narrativeChatInput.trim()
+                      setNarrativeChatMessages(prev => [...prev, { role: 'user', text: msg }])
+                      setNarrativeChatInput('')
+                      try {
+                        const rewritten = await api.applyEnhancements(concept, narrative.text, [msg], { persona, region })
+                        if (rewritten?.text) {
+                          setNarrative({ text: rewritten.text })
+                          setNarrativeChatMessages(prev => [...prev, { role: 'ai', text: 'Applied refinement to the narrative.' }])
+                          await ensureConceptOverviewNode()
+                          await refreshConceptOverview([])
+                        }
+                      } catch { setNarrativeChatMessages(prev => [...prev, { role: 'ai', text: 'Could not apply refinement right now.' }]) }
                     }}
                     onMouseDown={(e) => e.stopPropagation()}
                     className="px-2 py-1 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-[10px]"
                   >
-                    Send
+                    Apply
                   </button>
                 </div>
               </div>

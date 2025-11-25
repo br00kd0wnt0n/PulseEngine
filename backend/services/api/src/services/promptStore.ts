@@ -4,6 +4,7 @@ import { AICache } from '../db/entities/AICache.js'
 export type PromptKey =
   | 'narrative_from_trends'
   | 'debrief'
+  | 'refine_debrief'
   | 'opportunities'
   | 'enhancements'
   | 'recommendations'
@@ -17,6 +18,7 @@ export const promptMeta: Record<PromptKey, { label: string; trigger: string }> =
   narrative_from_trends: { label: 'Narrative from Trends', trigger: '/ai/narrative (TrendGraph mode)' },
   debrief: { label: 'Debrief (Strategic Brief)', trigger: '/ai/debrief' },
   opportunities: { label: 'Opportunities (Ranked)', trigger: '/ai/opportunities' },
+  refine_debrief: { label: 'Refine Debrief', trigger: '/ai/refine-debrief' },
   enhancements: { label: 'Enhancements (Targeted)', trigger: '/ai/enhancements' },
   recommendations: { label: 'Recommendations (Framework)', trigger: '/ai/recommendations' },
   concept_overview: { label: 'Concept Overview', trigger: '/ai/concept-overview' },
@@ -76,6 +78,29 @@ Identify 5 HIGH-IMPACT campaign opportunities that are specific to this concept,
 
 Return ONLY JSON: { "opportunities": [{ "title": string, "why": string, "impact": number }], "rationale": string, "personaNotes": string[] }
 personaNotes: 2 bullets tailored to {{personaRole}} explaining which opportunities to prioritize and why.`,
+
+  refine_debrief:
+    `You are a {{personaRole}}. Refine the existing strategic debrief below based on the user's instruction.
+{{#if targetAudience}}Target audience: {{targetAudience}}. Reflect nuances for this audience.{{/if}}
+
+CONCEPT: "{{concept}}"
+
+CURRENT DEBRIEF:
+- brief: {{brief}}
+- summary: {{summary}}
+- keyPoints: {{keyPoints}}
+- didYouKnow: {{didYouKnow}}
+
+USER INSTRUCTION:
+"""
+{{message}}
+"""
+
+{{#if context}}# CONTEXT (selected):
+{{context}}
+{{/if}}
+
+Return ONLY JSON with keys: brief, summary, keyPoints, didYouKnow, personaNotes. Keep changes tight and specific.`,
 
   enhancements:
     `You are a {{personaRole}} optimizing this concept: "{{concept}}"

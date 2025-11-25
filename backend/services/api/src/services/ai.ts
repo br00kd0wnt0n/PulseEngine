@@ -344,6 +344,52 @@ export async function generateDebrief(concept: string, userId?: string | null, p
   }
 }
 
+// Refine Debrief with a user instruction
+export async function refineDebrief(
+  concept: string,
+  current: { brief?: string; summary?: string; keyPoints?: string[]; didYouKnow?: string[] } | null,
+  message: string,
+  userId?: string | null,
+  persona?: string | null,
+  projectId?: string | null,
+  targetAudience?: string | null
+) {
+  if (!message || !message.trim()) throw new Error('message_required')
+  let ctx: RetrievalContext
+  try {
+    ctx = await retrieveContext(concept, userId || null, { maxResults: 12, includeCore: true, includeLive: true, projectId: projectId || null })
+  } catch {
+    ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
+  }
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error('no-openai')
+  const model = process.env.MODEL_NAME || 'gpt-4o-mini'
+  const contextStr = formatContextForPrompt(ctx)
+  const { getPrompt, renderTemplate } = await import('./promptStore.js')
+  const prompt = renderTemplate(
+    await getPrompt('refine_debrief'),
+    {
+      persona,
+      personaOrGeneral: persona || 'General',
+      targetAudience,
+      concept,
+      brief: current?.brief || '',
+      summary: current?.summary || '',
+      keyPoints: Array.isArray(current?.keyPoints) ? current!.keyPoints!.join(' | ') : '',
+      didYouKnow: Array.isArray(current?.didYouKnow) ? current!.didYouKnow!.join(' | ') : '',
+      message,
+      context: contextStr,
+    }
+  )
+  const { DebriefSchema } = await import('./schemas.js')
+  const parsed = await callJSON(
+    [ { role: 'system', content: 'Return only JSON matching the requested schema.' }, { role: 'user', content: prompt } ],
+    DebriefSchema,
+    { model, maxTokens: 420, temperature: 0.5, allowExtract: true, retries: 1 }
+  )
+  return { ...parsed, sources: ctx.sources, _debug: { model, prompt } }
+}
+
 // Opportunities: ranked with impact
 export async function generateOpportunities(concept: string, userId?: string | null, persona?: string | null, projectId?: string | null, targetAudience?: string | null) {
   try {

@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements, generateConceptProposal, generateScoresAI } from '../services/ai.js'
+import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements, generateConceptProposal, generateScoresAI, refineDebrief } from '../services/ai.js'
 import { retrieveContext, formatContextForPrompt } from '../services/retrieval.js'
 import { getPrompt as getTpl, renderTemplate } from '../services/promptStore.js'
 import { generateEmbedding } from '../services/embeddings.js'
@@ -142,6 +142,19 @@ router.post('/rewrite-narrative', async (req, res) => {
   } catch (e: any) {
     console.error('[AI] rewrite-narrative failed:', e)
     res.json({ text: narrative })
+  }
+})
+
+// Refine the existing debrief with a user instruction
+router.post('/refine-debrief', async (req, res) => {
+  const { concept, currentDebrief, message, persona, projectId, targetAudience } = req.body || {}
+  if (!concept || !message) return res.status(400).json({ error: 'concept and message required' })
+  try {
+    const userId = (req as any).user?.sub || null
+    const data = await refineDebrief(concept, currentDebrief || null, message, userId, persona || null, projectId || null, targetAudience || null)
+    res.json(data)
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || 'failed' })
   }
 })
 
