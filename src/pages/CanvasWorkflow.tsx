@@ -1497,10 +1497,30 @@ export default function CanvasWorkflow() {
                           type="checkbox"
                           className="mt-0.5"
                           checked={checked}
-                          onChange={(ev) => {
+                          onChange={async (ev) => {
                             const set = new Set(selectedEnhancements)
                             if (ev.target.checked) set.add(idx); else set.delete(idx)
                             setSelectedEnhancements(set)
+
+                            // Apply score deltas immediately
+                            if (e.deltas && scores) {
+                              const delta = ev.target.checked ? 1 : -1
+                              setScores(prev => prev ? {
+                                narrative: (prev.narrative || 0) + (e.deltas.narrative || 0) * delta,
+                                ttpWeeks: (prev.ttpWeeks || 0) + (e.deltas.ttp || 0) * delta,
+                                cross: (prev.cross || 0) + (e.deltas.cross || 0) * delta,
+                                commercial: (prev.commercial || 0) + (e.deltas.commercial || 0) * delta,
+                                overall: prev.overall
+                              } : prev)
+                            }
+
+                            // Auto-refresh concept overview if it exists
+                            const hasOverview = nodes.some(n => n.id === 'concept-overview')
+                            if (hasOverview) {
+                              try {
+                                await refreshConceptOverview(Array.from(set).map(i => enhancements[i]?.text).filter(Boolean))
+                              } catch {}
+                            }
                           }}
                         />
                         <div>
@@ -1515,114 +1535,6 @@ export default function CanvasWorkflow() {
                 </div>
                 <button
                   className="mt-3 w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium"
-                  onClick={async (e) => {
-                    e.stopPropagation()
-                    if (!narrative) return
-                    const applied = enhancements.filter((_, i) => selectedEnhancements.has(i)).map(a => a.text)
-                    if (applied.length === 0) return
-                    setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'processing' as NodeData['status'] } : n))
-                    try {
-                      const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
-                      const rewritten = await api.applyEnhancements(concept, narrative.text, applied, { persona, region, projectId: pid })
-                      if (rewritten && rewritten.text) setNarrative({ text: rewritten.text })
-                    } catch {
-                      const extra = '\n\n---\n\nApplied Enhancements:\n' + applied.map(a => '- ' + a).join('\n')
-                      setNarrative({ text: (narrative?.text || '') + extra })
-                    }
-                    try {
-                      const graph: any = { concept, persona, region, debrief: debrief?.brief }
-                      const sc = await api.score(concept, graph, { persona, region })
-                      setRawScore(sc)
-                      try { if (debugScore) console.log('[Canvas Score] payload (after apply):', sc) } catch {}
-                      setScores(compactScore(sc))
-                    } catch {}
-                    setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'active' as NodeData['status'] } : n))
-
-                    // Add Concept Overview and Creative Partner nodes
-                    setNodes(prev => {
-                      const next: NodeData[] = [...prev]
-                      // Calculate viewport-aware positions to ensure nodes are visible
-                      const viewportWidth = window.innerWidth
-                      const viewportHeight = window.innerHeight
-                      const nodeWidth = 450
-                      // Position nodes in the right portion of viewport with padding
-                      const baseX = Math.max(100, Math.min(viewportWidth - nodeWidth - 100, viewportWidth * 0.55))
-
-                      if (!prev.find(n => n.id === 'concept-overview')) {
-                        next.push({
-                          id: 'concept-overview',
-                          type: 'ai-content',
-                          title: 'Concept Overview',
-                          x: baseX,
-                          y: 100,
-                          width: nodeWidth,
-                          height: 260,
-                          minimized: false,
-                          zIndex: 6,
-                          status: 'processing' as NodeData['status'],
-                          connectedTo: ['scoring']
-                        })
-                      }
-                      if (!prev.find(n => n.id === 'creative-partner')) {
-                        next.push({
-                          id: 'creative-partner',
-                          type: 'ai-content',
-                          title: 'Need a Creative Partner?',
-                          x: baseX,
-                          y: 380,
-                          width: nodeWidth,
-                          height: 340,
-                          minimized: true,
-                          zIndex: 6,
-                          status: 'processing' as NodeData['status'],
-                          connectedTo: ['scoring']
-                        })
-                      }
-                      return next
-                    })
-
-                    // Generate concept overview
-                    try {
-                      setOverviewLoading(true)
-                      const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
-                      const appliedEnhancements = Array.from(selectedEnhancements).map(idx => enhancements[idx]?.text).filter(Boolean)
-                      const result = await api.conceptOverview(concept, {
-                        persona,
-                        region,
-                        debrief: debrief?.brief,
-                        opportunities: opps?.opportunities,
-                        narrative: narrative?.text,
-                        enhancements: appliedEnhancements,
-                        projectId: pid,
-                        targetAudience
-                      })
-                      setConceptOverview(result?.overview || null)
-                      addActivity('Concept Overview created', 'ai')
-                      console.log('[ConceptOverview] Generated:', result?.overview)
-                    } catch (err) {
-                      console.error('[ConceptOverview] Failed:', err)
-                      setConceptOverview(null)
-                    } finally {
-                      setOverviewLoading(false)
-                    }
-
-                    // Fetch creators (non-blocking for overview)
-                    try {
-                      const rec = await api.recommendations(concept, { nodes: [], links: [] }, { persona, region, targetAudience })
-                      const creators = Array.isArray((rec as any)?.creators) ? (rec as any).creators : []
-                      setConceptCreators(creators)
-                    } catch (err) {
-                      console.error('[Creators] API failed:', err)
-                      setConceptCreators([])
-                    }
-
-                    setNodes(prev => prev.map(n => (n.id === 'concept-overview' || n.id === 'creative-partner') ? { ...n, status: 'active' as NodeData['status'] } : n))
-                  }}
-                >
-                  Apply Enhancements
-                </button>
-                <button
-                  className="mt-2 w-full px-3 py-2 rounded border border-ralph-cyan/40 bg-ralph-cyan/10 hover:bg-ralph-cyan/20 text-xs font-medium"
                   onClick={async (e) => {
                     e.stopPropagation()
                     await ensureConceptOverviewNode()
@@ -1796,7 +1708,7 @@ export default function CanvasWorkflow() {
             </>
           ) : (
             <div className="text-white/50 text-[11px]">
-              Click "Apply Enhancements" to generate the final concept overview.
+              Select enhancements to see real-time score updates. Click "Create Overview" when ready.
             </div>
           )}
         </div>
