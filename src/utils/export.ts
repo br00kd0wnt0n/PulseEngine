@@ -265,32 +265,39 @@ export function exportOverviewPdf(concept: string, overviewMarkdown: string, opt
   const scores = safeJSON(`score:${projectId}`) || {}
   const opps = safeJSON(`opps:${projectId}`)
 
-  // Minimal Markdown -> HTML conversion for the overview block
+  // Enhanced Markdown -> HTML conversion for the overview block
   const mdToHtml = (md: string): string => {
     let t = (md || '')
+    // Escape HTML first
     t = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    t = t.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>')
+    // Handle headings (### -> h3, ## -> h2)
+    t = t.replace(/^###\s+(.*)$/gm, '<h3 class="section-heading">$1</h3>')
+    t = t.replace(/^##\s+(.*)$/gm, '<h2 class="major-heading">$1</h2>')
+    // Bold text
+    t = t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    // Bullet lists
     t = t.replace(/^(?:- |\* )(.*)$/gm, '<li>$1</li>')
-    t = t.replace(/(?:(<li>[^<]*<\/li>)\n?)+/g, (m) => `<ul>${m}\n</ul>`) 
-    t = t.replace(/\n\n+/g, '</p><p>')
-    return `<p>${t}</p>`
+    t = t.replace(/(<li>.*?<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
+    // Paragraphs
+    t = t.replace(/\n\n+/g, '</p><p class="para">')
+    return `<p class="para">${t}</p>`
   }
 
   const overviewHtml = mdToHtml(overviewMarkdown)
+
+  // Don't show opportunities in PDF - only show actual campaign scores
   const scoreHtml = (() => {
     const items: string[] = []
-    if (typeof scores?.narrative === 'number') items.push(`<li>Cultural Relevance: ${scores.narrative}/100</li>`)
-    if (typeof scores?.cross === 'number') items.push(`<li>Engagement Potential: ${scores.cross}/100</li>`)
-    if (typeof scores?.ttpWeeks === 'number') items.push(`<li>Platform Fit (TTP): ${scores.ttpWeeks} weeks</li>`)
-    if (typeof scores?.commercial === 'number') items.push(`<li>Commercial Viability: ${scores.commercial}/100</li>`)
+    if (typeof scores?.narrative === 'number') items.push(`<li><strong>Cultural Relevance:</strong> ${scores.narrative}/100</li>`)
+    if (typeof scores?.cross === 'number') items.push(`<li><strong>Engagement Potential:</strong> ${scores.cross}/100</li>`)
+    if (typeof scores?.ttpWeeks === 'number') items.push(`<li><strong>Time to Peak:</strong> ${scores.ttpWeeks} weeks</li>`)
+    if (typeof scores?.commercial === 'number') items.push(`<li><strong>Commercial Viability:</strong> ${scores.commercial}/100</li>`)
+    if (typeof scores?.overall === 'number') items.push(`<li><strong>Overall Score:</strong> ${scores.overall}/100</li>`)
     if (!items.length) return ''
-    return `<h3>Key Scores</h3><ul>${items.join('')}</ul>`
+    return `<div class="scores-section"><h2>Campaign Scores</h2><ul class="scores-list">${items.join('')}</ul></div>`
   })()
-  const oppHtml = (() => {
-    const list = Array.isArray(opps?.opportunities) ? opps.opportunities.slice(0,5) : []
-    if (!list.length) return ''
-    return `<h3>Top Opportunities</h3><ul>${list.map((o:any)=>`<li>${o.title || ''}${o.impact?` — Impact ${o.impact}/100`:''}</li>`).join('')}</ul>`
-  })()
+
+  const oppHtml = '' // Remove opportunities from PDF for cleaner output
 
   const html = `<!doctype html>
   <html>
@@ -298,16 +305,73 @@ export function exportOverviewPdf(concept: string, overviewMarkdown: string, opt
     <meta charset="utf-8" />
     <title>Concept Overview — ${escapeHtml(concept)}</title>
     <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #111; }
-      .container { max-width: 760px; margin: 0 auto; padding: 24px; }
-      h1 { font-size: 20px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .04em; }
-      h2 { font-size: 16px; margin: 18px 0 8px; text-transform: uppercase; letter-spacing: .04em; }
-      h3 { font-size: 13px; margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
-      p { line-height: 1.5; margin: 8px 0; }
-      ul { margin: 6px 0 10px 20px; }
-      .meta { font-size: 12px; color: #666; margin-bottom: 16px; }
-      .divider { border-top: 1px solid #eee; margin: 16px 0; }
-      @media print { .no-print { display: none } }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        color: #111;
+        line-height: 1.6;
+      }
+      .container { max-width: 800px; margin: 0 auto; padding: 32px; }
+      h1 {
+        font-size: 24px;
+        margin: 0 0 12px;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        font-weight: 700;
+      }
+      h2, .major-heading {
+        font-size: 18px;
+        margin: 24px 0 12px;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        font-weight: 600;
+        color: #333;
+      }
+      h3, .section-heading {
+        font-size: 14px;
+        margin: 20px 0 8px;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        font-weight: 600;
+        color: #555;
+      }
+      p.para {
+        line-height: 1.7;
+        margin: 12px 0;
+        font-size: 14px;
+      }
+      ul {
+        margin: 10px 0 16px 24px;
+        line-height: 1.8;
+        font-size: 14px;
+      }
+      ul li { margin-bottom: 6px; }
+      .meta {
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 20px;
+        line-height: 1.6;
+      }
+      .meta div { margin: 4px 0; }
+      .divider { border-top: 2px solid #ddd; margin: 24px 0; }
+      .scores-section {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin: 24px 0;
+      }
+      .scores-list {
+        list-style: none;
+        margin: 12px 0 0 0;
+        padding: 0;
+      }
+      .scores-list li {
+        margin: 10px 0;
+        font-size: 15px;
+      }
+      @media print {
+        .no-print { display: none; }
+        body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      }
     </style>
   </head>
   <body>
