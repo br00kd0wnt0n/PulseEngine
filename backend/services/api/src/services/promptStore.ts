@@ -328,6 +328,11 @@ export function renderTemplate(tpl: string, vars: Record<string, any>): string {
     .replace(/\{\{ttpScore\}\}/g, String(vars.ttpScore ?? ''))
     .replace(/\{\{crossScore\}\}/g, String(vars.crossScore ?? ''))
     .replace(/\{\{commercialScore\}\}/g, String(vars.commercialScore ?? ''))
+    .replace(/\{\{brief\}\}/g, String(vars.brief || ''))
+    .replace(/\{\{summary\}\}/g, String(vars.summary || ''))
+    .replace(/\{\{keyPoints\}\}/g, String(vars.keyPoints || ''))
+    .replace(/\{\{didYouKnow\}\}/g, String(vars.didYouKnow || ''))
+    .replace(/\{\{message\}\}/g, String(vars.message || ''))
     // remove simple {{#if var}}...{{/if}} blocks when var is falsy
     .replace(/\{\{#if ([^}]+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (_m, v, inner) => vars[v.trim()] ? inner : '')
 }
