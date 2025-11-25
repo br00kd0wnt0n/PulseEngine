@@ -867,6 +867,32 @@ export default function CanvasWorkflow() {
     }
   }
 
+  // Global triggers from other modules (e.g., Scoring & Enhancements panel)
+  useEffect(() => {
+    function onCreateOverview() {
+      ;(async () => {
+        try {
+          await ensureConceptOverviewNode()
+          await refreshConceptOverview([])
+        } catch {}
+      })()
+    }
+    function onRefreshOverview() {
+      ;(async () => { try { await refreshConceptOverview([]) } catch {} })()
+    }
+    function onRefreshScoring() {
+      setNodes(prev => prev.map(n => n.id === 'scoring' ? { ...n, status: 'processing' as NodeData['status'] } : n))
+    }
+    window.addEventListener('create-overview', onCreateOverview)
+    window.addEventListener('refresh-overview', onRefreshOverview)
+    window.addEventListener('refresh-scoring', onRefreshScoring)
+    return () => {
+      window.removeEventListener('create-overview', onCreateOverview)
+      window.removeEventListener('refresh-overview', onRefreshOverview)
+      window.removeEventListener('refresh-scoring', onRefreshScoring)
+    }
+  }, [])
+
   // File upload helper
   const handleFileUpload = async (files: FileList | File[]) => {
     try {
@@ -1096,7 +1122,7 @@ export default function CanvasWorkflow() {
       const trendsCount = (stats?.trends ?? (trendNodes || []).filter((n: any) => n.kind === 'trend').length)
       const creatorsCount = (stats?.creators ?? (trendNodes || []).filter((n: any) => n.kind === 'creator').length)
       const projectCount = processed.length
-      const isProcessing = !!nodes.find(n => (n.id === 'debrief-opportunities' || n.id === 'narrative') && n.status === 'processing')
+      const isProcessing = !!nodes.find(n => (n.id === 'debrief-opportunities' || n.id === 'narrative' || n.id === 'scoring' || n.id === 'concept-overview') && n.status === 'processing')
       return (
         <div className="space-y-2 text-xs">
           <div className="text-white/70 leading-relaxed text-[11px]">Ralph Knowledge Base connected</div>
@@ -1104,7 +1130,7 @@ export default function CanvasWorkflow() {
             Project context: {projectCount} item{projectCount === 1 ? '' : 's'} • Live Trends: {trendsCount} trends • {creatorsCount} creators
           </div>
           {isProcessing && (
-            <div className="text-white/60 text-[10px] animate-pulse">Evaluating context and composing insights…</div>
+            <div className=""><BrandSpinner text="Evaluating context and composing insights…" /></div>
           )}
           <div className="panel p-2 bg-white/5 border border-white/10 max-h-28 overflow-auto space-y-1">
             {rkbActivity.length === 0 ? (
@@ -1166,11 +1192,9 @@ export default function CanvasWorkflow() {
 
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
-          {loading || !debrief ? (
-            <div className="text-white/80 leading-relaxed">
-              AI is analyzing your campaign with RKB semantic search and trends data...
-            </div>
-          ) : (!debrief.brief && (!Array.isArray(debrief.keyPoints) || debrief.keyPoints.length === 0)) ? (
+          {loading ? (
+            <BrandSpinner text="Analyzing concept and context… generating debrief and ranked opportunities." />
+          ) : (!debrief?.brief && (!Array.isArray(debrief?.keyPoints) || debrief.keyPoints.length === 0)) ? (
             <>
               <div className="panel p-3 bg-white/5 border border-white/10">
                 <div className="text-white/80 text-[11px] leading-relaxed">
@@ -1701,6 +1725,16 @@ export default function CanvasWorkflow() {
                   }}
                 >
                   Apply Enhancements
+                </button>
+                <button
+                  className="mt-2 w-full px-3 py-2 rounded border border-white/10 bg-white/10 hover:bg-white/20 text-xs"
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    await ensureConceptOverviewNode()
+                    await refreshConceptOverview([])
+                  }}
+                >
+                  CREATE OVERVIEW
                 </button>
                 <button
                   className="mt-2 w-full px-3 py-2 rounded border border-yellow-400/40 bg-yellow-400/10 hover:bg-yellow-400/20 text-xs font-medium"

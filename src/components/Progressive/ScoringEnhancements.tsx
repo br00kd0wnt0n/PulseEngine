@@ -91,6 +91,9 @@ export default function ScoringEnhancements() {
           setScore(s)
           try { if (debugScore) console.log('[Score] payload (after apply):', s) } catch {}
           logActivity('Scores recalculated after enhancement')
+          // Ask Canvas (if open) to refresh scoring and overview nodes
+          try { window.dispatchEvent(new CustomEvent('refresh-scoring')) } catch {}
+          try { window.dispatchEvent(new CustomEvent('refresh-overview')) } catch {}
           try {
             const pid = localStorage.getItem('activeProjectId') || 'local'
             const ext = s?.extended || {}
@@ -153,6 +156,20 @@ export default function ScoringEnhancements() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Create Overview */}
+      <div className="mt-3">
+        <button
+          className="w-full text-left panel p-2 hover:bg-white/10"
+          onClick={() => {
+            logActivity('Create Overview triggered from Scoring & Enhancements')
+            try { window.dispatchEvent(new CustomEvent('create-overview')) } catch {}
+          }}
+        >
+          <div className="text-sm text-white/90">CREATE OVERVIEW</div>
+          <div className="text-[11px] text-white/50">Open Concept Overview and generate the latest summary</div>
+        </button>
       </div>
 
       {/* Rationale tooltips reduce clutter; shown inline per metric */}
