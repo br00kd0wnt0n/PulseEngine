@@ -887,7 +887,7 @@ export async function generateModelRollout(
   const parsed = await callJSON(
     [ { role: 'system', content: sys }, { role: 'user', content: user } ],
     ModelRolloutSchema,
-    { model, maxTokens: 600, temperature: 0.4, allowExtract: true, retries: 1 }
+    { model, maxTokens: 1200, temperature: 0.4, allowExtract: true, retries: 1 }
   )
   return { ...parsed, _debug: { model } }
 }

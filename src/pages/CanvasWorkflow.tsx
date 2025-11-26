@@ -710,9 +710,11 @@ export default function CanvasWorkflow() {
       const margin = 40
       const scoringWidth = 450
       const scoringX = Math.max(700, Math.min(1200, vw - scoringWidth - margin))
+      const narrativeX = Math.max(400, scoringX - 500)
       const updated = prev.map(n => {
-        if (n.id === 'debrief-opportunities') return { ...n, minimized: true }
-        if (n.id === 'narrative') return { ...n, minimized: true, x: Math.max(400, scoringX - 500), y: 100 }
+        // Stack debrief and narrative vertically when minimized to avoid overlap
+        if (n.id === 'debrief-opportunities') return { ...n, minimized: true, x: narrativeX, y: 40 }
+        if (n.id === 'narrative') return { ...n, minimized: true, x: narrativeX, y: 100 }
         return n
       })
       return [
@@ -832,8 +834,17 @@ export default function CanvasWorkflow() {
       const overviewX = Math.max(margin, Math.min(vw - nodeWidth - margin, vw * 0.45))
       const overviewY = Math.max(margin, Math.min(vh - nodeHeight - margin, 100))
 
+      // Move scoring node left to make space for concept overview
+      const updated = prev.map(n => {
+        if (n.id === 'scoring') {
+          const newX = Math.max(margin, Math.min(overviewX - 500, vw * 0.25))
+          return { ...n, x: newX }
+        }
+        return n
+      })
+
       return [
-        ...prev,
+        ...updated,
         {
           id: 'concept-overview',
           type: 'ai-content',
@@ -842,7 +853,7 @@ export default function CanvasWorkflow() {
           y: overviewY,
           width: nodeWidth,
           height: nodeHeight,
-          minimized: false,
+          minimized: true,
           zIndex: 6,
           status: 'processing' as NodeData['status'],
           connectedTo: ['scoring']
@@ -868,7 +879,8 @@ export default function CanvasWorkflow() {
       })
       setConceptOverview(result?.overview || null)
       try { if (pid) localStorage.setItem(`overview:${pid}`, JSON.stringify(result)) } catch {}
-      setNodes(prev => prev.map(n => n.id === 'concept-overview' ? { ...n, status: 'active' as NodeData['status'] } : n))
+      // Open the node when generation completes
+      setNodes(prev => prev.map(n => n.id === 'concept-overview' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n))
     } catch (err) {
       console.error('[ConceptOverview] Failed:', err)
     } finally {
@@ -1560,30 +1572,31 @@ export default function CanvasWorkflow() {
                   className="mt-2 w-full px-3 py-2 rounded border border-yellow-400/40 bg-yellow-400/10 hover:bg-yellow-400/20 text-xs font-medium"
                   onClick={async (e) => {
                     e.stopPropagation()
-                    // spawn wildcard node minimized
+                    // spawn wildcard node to the right of scoring, open by default
                     setNodes(prev => {
-                      if (prev.find(n => n.id === 'wildcard')) return prev.map(n => n.id === 'wildcard' ? { ...n, minimized: true, status: 'processing' as NodeData['status'] } : n)
+                      if (prev.find(n => n.id === 'wildcard')) return prev.map(n => n.id === 'wildcard' ? { ...n, minimized: false, status: 'processing' as NodeData['status'] } : n)
 
-                      // Calculate viewport-aware position - position in clear space to right
+                      // Position to the right of scoring node
                       const vw = typeof window !== 'undefined' ? window.innerWidth : 1800
-                      const vh = typeof window !== 'undefined' ? window.innerHeight : 1000
                       const nodeWidth = 450
                       const nodeHeight = 360
                       const margin = 80
-                      const wildcardX = Math.max(margin, Math.min(vw - nodeWidth - margin, vw * 0.50))
-                      const wildcardY = Math.max(margin, Math.min(vh - nodeHeight - margin, vh * 0.50))
+                      const scoringNode = prev.find(n => n.id === 'scoring')
+                      const scoringRight = scoringNode ? (scoringNode.x + (scoringNode.width || 450)) : vw * 0.40
+                      const wildcardX = Math.max(margin, Math.min(vw - nodeWidth - margin, scoringRight + 40))
+                      const wildcardY = 100
 
                       return [
                         ...prev,
                         {
                           id: 'wildcard',
-                          type: 'wildcard',
+                          type: 'ai-content',
                           title: 'Wildcard Insight',
                           x: wildcardX,
                           y: wildcardY,
                           width: nodeWidth,
                           height: nodeHeight,
-                          minimized: true,
+                          minimized: false,
                           zIndex: 6,
                           status: 'processing' as NodeData['status'],
                           connectedTo: ['scoring', 'rkb']
