@@ -79,7 +79,21 @@ export type ConceptProposalResult = z.infer<typeof ConceptProposalSchema>
 
 export const ModelRolloutSchema = z.object({
   months: z.array(z.object({ m: z.number().min(0).max(11), followers: z.number().min(0) })).length(12),
-  moments: z.array(z.object({ m: z.number().min(0).max(11), label: z.string(), kind: z.string().optional(), color: z.string().optional() })).optional().default([]),
+  moments: z.array(z.object({
+    m: z.number().min(0).max(11),
+    label: z.string(),
+    desc: z.string().optional().default(''),
+    kind: z.string().optional(),
+    color: z.string().optional(),
+  })).optional().default([]),
+  phases: z.array(z.object({
+    startM: z.number().min(0).max(11),
+    endM: z.number().min(0).max(11),
+    label: z.string(),
+    summary: z.string().optional().default(''),
+    kind: z.string().optional(),
+    color: z.string().optional(),
+  })).optional().default([]),
   notes: z.array(z.string()).optional().default([]),
 })
 export type ModelRolloutResult = z.infer<typeof ModelRolloutSchema>

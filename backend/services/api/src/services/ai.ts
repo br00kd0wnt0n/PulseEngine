@@ -873,10 +873,15 @@ export async function generateModelRollout(
   const user = [
     `You are a growth strategist for ${persona || 'General'}${region?` in ${region}`:''}.`,
     targetAudience ? `Target audience: ${targetAudience}.` : '',
-    `\nCreate a 12‑month follower projection and rollout plan. Concept Overview below:`,
+    `\nTask: Create a 12‑month follower projection and rollout plan from the Concept Overview. Use no more than 5–7 key moments (not every month). Each moment must include a short "desc" explaining what is active (e.g., tease, collab, live push). Also group months into phases with background bands (e.g., Tease → Launch → Sustain → Amplify → Wrap).`,
+    `\nConcept Overview:`,
     overview,
-    context ? `\nContext:\n${context}` : '',
-    `\nReturn JSON with months (m:0..11, followers), moments (m,label,kind), notes (bullets).`
+    context ? `\nContext (scores/opportunities):\n${context}` : '',
+    `\nOutput JSON with:`,
+    `- months: 12 items { m:0..11, followers:number }`,
+    `- moments: 5–7 items { m, label, desc, kind? (launch|strategy|risk|pivot|push), color? }`,
+    `- phases: 3–5 items { startM, endM, label, summary?, kind?, color? }`,
+    `- notes: 2–4 bullets with watchouts (over‑saturation, fan‑fatigue) and measurement pivots.`,
   ].filter(Boolean).join('\n')
 
   const parsed = await callJSON(

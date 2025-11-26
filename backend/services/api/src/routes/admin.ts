@@ -184,6 +184,20 @@ router.delete('/assets/:id', async (req, res) => {
   }
 })
 
+// Delete assets by exact name (optionally RKB only)
+router.post('/assets/delete-by-name', async (req, res) => {
+  try {
+    const { name, rkbOnly, confirm } = req.body || {}
+    if (!name || typeof name !== 'string') return res.status(400).json({ ok: false, error: 'name required' })
+    if (confirm !== 'DELETE') return res.status(400).json({ ok: false, error: 'confirm=DELETE required' })
+    const where = rkbOnly ? `name = $1 AND "projectId" IS NULL` : `name = $1`
+    const result = await AppDataSource.query(`DELETE FROM content_assets WHERE ${where} RETURNING id, name`, [name])
+    res.json({ ok: true, deleted: result.length })
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e?.message || 'failed' })
+  }
+})
+
 router.delete('/projects/clear-all', async (req, res) => {
   try {
     const result = await AppDataSource.query('DELETE FROM projects')
@@ -366,4 +380,3 @@ router.post('/clear-rkb-no-embeddings', async (req, res) => {
 })
 
 export default router
-

@@ -1709,7 +1709,7 @@ export default function CanvasWorkflow() {
                               const snapScores = (()=>{ try { return JSON.parse(localStorage.getItem(`score:${pid}`) || '{}') } catch { return {} } })()
                               const snapOpps = opps?.opportunities?.slice(0,6).map((o:any)=>({ title: o.title, impact: o.impact })) || []
                               const resp = await api.modelRollout(concept, conceptOverview || '', { scores: snapScores, opportunities: snapOpps }, { persona, region, targetAudience, projectId: pid })
-                              setRollout({ months: resp.months || [], moments: resp.moments || [], notes: resp.notes || [] })
+                              setRollout({ months: resp.months || [], moments: resp.moments || [], phases: resp.phases || [], notes: resp.notes || [] })
                               setNodes(prev => {
                                 const exists = prev.find(n => n.id === 'model-rollout')
                                 if (exists) return prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n)
@@ -2085,6 +2085,19 @@ export default function CanvasWorkflow() {
 
           {/* SVG Chart */}
           <svg width={chartWidth} height={chartHeight} className="bg-white/5 rounded">
+            {/* Phase bands (AI‑driven) */}
+            {Array.isArray(rollout?.phases) && rollout!.phases!.length > 0 && rollout!.phases!.map((ph, idx) => {
+              const x1 = xScale(ph.startM + 1)
+              const x2 = xScale(ph.endM + 1)
+              const wBand = Math.max(0, x2 - x1)
+              const color = ph.color || (ph.label.toLowerCase().includes('tease') ? '#3be8ff' : ph.label.toLowerCase().includes('launch') ? '#EB008B' : ph.label.toLowerCase().includes('sustain') ? '#8a63ff' : ph.label.toLowerCase().includes('amplify') ? '#22C55E' : '#f59e0b')
+              return (
+                <g key={`ph-${idx}`}>
+                  <rect x={x1} y={padding.top} width={wBand} height={plotHeight} fill={color} opacity={0.07} />
+                  <text x={x1 + wBand/2} y={padding.top + 12} fill={color} fontSize="9" textAnchor="middle">{ph.label}</text>
+                </g>
+              )
+            })}
             {/* Grid lines */}
             {[0, 0.25, 0.5, 0.75, 1].map((pct, i) => (
               <line
