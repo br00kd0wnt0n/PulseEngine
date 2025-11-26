@@ -1716,6 +1716,13 @@ export default function CanvasWorkflow() {
                           disabled={rolloutLoading}
                           onClick={async (e) => {
                             e.stopPropagation()
+                            // Spawn node minimized immediately
+                            setNodes(prev => {
+                              const exists = prev.find(n => n.id === 'model-rollout')
+                              if (exists) return prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: true, status: 'processing' as NodeData['status'] } : n)
+                              const baseX = Math.max(100, Math.min(window.innerWidth - 520 - 100, window.innerWidth * 0.60))
+                              return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Model Rollout', x: baseX, y: 480, width: 520, height: 360, minimized: true, zIndex: 6, status: 'processing' as NodeData['status'], connectedTo: ['concept-overview'] } ]
+                            })
                             try {
                               setRolloutLoading(true)
                               const pid = localStorage.getItem('activeProjectId') || 'local'
@@ -1723,12 +1730,8 @@ export default function CanvasWorkflow() {
                               const snapOpps = opps?.opportunities?.slice(0,6).map((o:any)=>({ title: o.title, impact: o.impact })) || []
                               const resp = await api.modelRollout(concept, conceptOverview || '', { scores: snapScores, opportunities: snapOpps }, { persona, region, targetAudience, projectId: pid })
                               setRollout({ months: resp.months || [], moments: resp.moments || [], phases: resp.phases || [], notes: resp.notes || [] })
-                              setNodes(prev => {
-                                const exists = prev.find(n => n.id === 'model-rollout')
-                                if (exists) return prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n)
-                                const baseX = Math.max(100, Math.min(window.innerWidth - 520 - 100, window.innerWidth * 0.60))
-                                return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Model Rollout', x: baseX, y: 480, width: 520, height: 360, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: ['concept-overview'] } ]
-                              })
+                              // Open the node when generation completes
+                              setNodes(prev => prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n))
                             } catch (err) { console.error('[ModelRollout] Failed:', err) }
                             finally { setRolloutLoading(false) }
                           }}
