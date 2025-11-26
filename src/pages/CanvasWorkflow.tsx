@@ -157,9 +157,10 @@ export default function CanvasWorkflow() {
   const [wildLoading, setWildLoading] = useState<boolean>(false)
 
   const [conceptOverview, setConceptOverview] = useState<string | null>(null)
-  const [rollout, setRollout] = useState<{ months: { m:number; followers:number }[]; moments: { m:number; label:string; kind?:string; color?:string }[]; phases?: { startM:number; endM:number; label:string; summary?:string; kind?:string; color?:string }[]; notes?: string[] } | null>(null)
+  const [rollout, setRollout] = useState<{ months: { m:number; followers:number }[]; moments: { m:number; label:string; desc?:string; kind?:string; color?:string }[]; phases?: { startM:number; endM:number; label:string; summary?:string; kind?:string; color?:string }[]; notes?: string[] } | null>(null)
   const [rolloutLoading, setRolloutLoading] = useState<boolean>(false)
   const [rolloutEditMode, setRolloutEditMode] = useState<boolean>(false)
+  const [hoveredMoment, setHoveredMoment] = useState<number | null>(null)
   const [overviewLoading, setOverviewLoading] = useState<boolean>(false)
   const [showUnderHood, setShowUnderHood] = useState<boolean>(false)
 
@@ -1721,7 +1722,7 @@ export default function CanvasWorkflow() {
                               const exists = prev.find(n => n.id === 'model-rollout')
                               if (exists) return prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: true, status: 'processing' as NodeData['status'] } : n)
                               const baseX = Math.max(100, Math.min(window.innerWidth - 520 - 100, window.innerWidth * 0.60))
-                              return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Model Rollout', x: baseX, y: 480, width: 520, height: 360, minimized: true, zIndex: 6, status: 'processing' as NodeData['status'], connectedTo: ['concept-overview'] } ]
+                              return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Rollout Model (Under Construction)', x: baseX, y: 480, width: 520, height: 360, minimized: true, zIndex: 6, status: 'processing' as NodeData['status'], connectedTo: ['concept-overview'] } ]
                             })
                             try {
                               setRolloutLoading(true)
@@ -1807,7 +1808,7 @@ export default function CanvasWorkflow() {
                               const exists = prev.find(n => n.id === 'model-rollout')
                               if (exists) return prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n)
                               const baseX = Math.max(100, Math.min(window.innerWidth - 520 - 100, window.innerWidth * 0.60))
-                              return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Model Rollout', x: baseX, y: 480, width: 520, height: 360, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: ['concept-overview'] } ]
+                              return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Rollout Model (Under Construction)', x: baseX, y: 480, width: 520, height: 360, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: ['concept-overview'] } ]
                             })
                           } catch (err) { console.error('[ModelRollout] Failed:', err) }
                           finally { setRolloutLoading(false) }
@@ -2164,7 +2165,7 @@ export default function CanvasWorkflow() {
             <path d={monthlyData.slice(2).map((f,i)=>`${i===0?'M':'L'} ${xScale(i+3)} ${yScale(f)}`).join(' ')} stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeDasharray="4 3" fill="none" />
 
             {/* Strategic moment markers (AI-driven if present) */}
-            {(rollout?.moments && rollout.moments.length>0 ? rollout.moments.map(mo => ({ month: mo.m+1, label: mo.label, color: mo.color || (mo.kind==='risk'?'#FB923C': mo.kind==='pivot'?'#22C55E': mo.kind==='push'?'#EF4444': mo.kind==='strategy'?'#00D9FF':'#FF1B6D'), y: monthlyData[mo.m] || 0 })) : moments).map((m, i) => (
+            {(rollout?.moments && rollout.moments.length>0 ? rollout.moments.map(mo => ({ month: mo.m+1, label: mo.label, desc: mo.desc, color: mo.color || (mo.kind==='risk'?'#FB923C': mo.kind==='pivot'?'#22C55E': mo.kind==='push'?'#EF4444': mo.kind==='strategy'?'#00D9FF':'#FF1B6D'), y: monthlyData[mo.m] || 0 })) : moments.map(m => ({ ...m, desc: undefined as string | undefined }))).map((m, i) => (
               <g key={`moment-${i}`}>
                 <circle
                   cx={xScale(m.month)}
@@ -2173,6 +2174,9 @@ export default function CanvasWorkflow() {
                   fill={m.color}
                   stroke="white"
                   strokeWidth="1.5"
+                  style={{ cursor: 'pointer' }}
+                  onMouseEnter={() => setHoveredMoment(i)}
+                  onMouseLeave={() => setHoveredMoment(null)}
                 />
                 <text
                   x={xScale(m.month)}
@@ -2181,9 +2185,24 @@ export default function CanvasWorkflow() {
                   fontSize="8"
                   fontWeight="600"
                   textAnchor="middle"
+                  style={{ pointerEvents: 'none' }}
                 >
                   {m.label.split(' ')[0]}
                 </text>
+                {/* Tooltip */}
+                {hoveredMoment === i && m.desc && (
+                  <foreignObject
+                    x={xScale(m.month) - 80}
+                    y={yScale(m.y) - 70}
+                    width="160"
+                    height="60"
+                  >
+                    <div className="bg-charcoal-900 border border-white/20 rounded p-2 shadow-lg text-xs text-white/90">
+                      <div className="font-semibold mb-1" style={{ color: m.color }}>{m.label}</div>
+                      <div className="text-[10px] text-white/70">{m.desc}</div>
+                    </div>
+                  </foreignObject>
+                )}
               </g>
             ))}
 

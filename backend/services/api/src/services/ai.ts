@@ -869,25 +869,46 @@ export async function generateModelRollout(
   if (!apiKey) throw new Error('no-openai')
   const model = process.env.MODEL_NAME || 'gpt-4o-mini'
 
-  const sys = 'Return only valid JSON matching the requested schema. Be precise and realistic.'
+  const sys = 'You are a strategic growth planner. Return only valid JSON matching the requested schema. Be specific, strategic, and KPI-driven.'
   const user = [
-    `You are a growth strategist for ${persona || 'General'}${region?` in ${region}`:''}.`,
+    `You are planning a 12-month rollout strategy for ${persona || 'a creator'}${region?` in ${region}`:''}.`,
     targetAudience ? `Target audience: ${targetAudience}.` : '',
-    `\nTask: Create a 12‑month follower projection and rollout plan from the Concept Overview. Use no more than 5–7 key moments (not every month). Each moment must include a short "desc" explaining what is active (e.g., tease, collab, live push). Also group months into phases with background bands (e.g., Tease → Launch → Sustain → Amplify → Wrap).`,
-    `\nConcept Overview:`,
+    `\n📊 KEY PERFORMANCE INDICATORS (Reference these throughout):`,
+    context ? context : 'No KPI data available.',
+    `\n🎯 STRATEGIC TASK:`,
+    `Create a 12-month growth model that MAXIMIZES the KPIs above through strategic campaign timing.`,
+    `\n📋 CONCEPT OVERVIEW:`,
     overview,
-    context ? `\nContext (scores/opportunities):\n${context}` : '',
-    `\nOutput JSON with:`,
-    `- months: 12 items { m:0..11, followers:number }`,
-    `- moments: 5–7 items { m, label, desc, kind? (launch|strategy|risk|pivot|push), color? }`,
-    `- phases: 3–5 items { startM, endM, label, summary?, kind?, color? }`,
-    `- notes: 2–4 bullets with watchouts (over‑saturation, fan‑fatigue) and measurement pivots.`,
+    `\n🎨 REQUIREMENTS:`,
+    `1. PHASES (3-5 custom phases):`,
+    `   - Create phases that FIT THIS SPECIFIC CONCEPT (not generic Tease/Launch/Sustain)`,
+    `   - Each phase label should reflect the actual campaign strategy (e.g., "Community Building", "Viral Push", "Cross-Platform Expansion")`,
+    `   - Phase timing should maximize impact on the identified KPIs`,
+    `   - Each phase needs a brief "summary" explaining the strategic focus`,
+    ``,
+    `2. MOMENTS (5-7 strategic campaign milestones):`,
+    `   - Place moments at times that will BOOST the specific KPIs (narrative, commercial, cross-platform, etc.)`,
+    `   - Each "label" is the milestone name (e.g., "Album Drop", "Collab Announce", "TikTok Challenge")`,
+    `   - Each "desc" MUST explain WHAT happens and HOW it impacts KPIs (e.g., "Launch viral TikTok challenge to boost cross-platform engagement by 40%")`,
+    `   - Use "kind" to categorize: launch, strategy, collab, viral, risk, pivot, milestone`,
+    `   - Strategic spacing: early wins (M1-3), mid-campaign amplification (M4-8), late momentum (M9-12)`,
+    ``,
+    `3. FOLLOWER PROJECTION (12 months):`,
+    `   - Growth curve should reflect when key moments hit`,
+    `   - Account for compounding effects of successful moments`,
+    `   - Be realistic: plateaus after big pushes, gradual ramps during building phases`,
+    ``,
+    `4. NOTES (2-4 strategic considerations):`,
+    `   - Risks specific to THIS concept (not generic fan-fatigue)`,
+    `   - KPI measurement checkpoints (when to pivot if X metric isn't hitting target)`,
+    `   - Contingency strategies if early moments underperform`,
+    `\n🎯 REMEMBER: Every decision should tie back to maximizing the KPIs provided above.`,
   ].filter(Boolean).join('\n')
 
   const parsed = await callJSON(
     [ { role: 'system', content: sys }, { role: 'user', content: user } ],
     ModelRolloutSchema,
-    { model, maxTokens: 1200, temperature: 0.4, allowExtract: true, retries: 1 }
+    { model, maxTokens: 1800, temperature: 0.4, allowExtract: true, retries: 1 }
   )
   return { ...parsed, _debug: { model } }
 }
