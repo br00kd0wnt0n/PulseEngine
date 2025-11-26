@@ -74,7 +74,12 @@ async function main() {
     try {
       const ownerId = (req.body?.ownerId as string) || ''
       const projectId = (req.body?.projectId as string) || null
+      const rkb = req.body?.rkb === '1' || req.body?.rkb === true
       if (!ownerId) return res.status(400).json({ error: 'ownerId required' })
+      // Enforce: user uploads must be associated to a project; only admin RKB uploads may omit projectId
+      if (!projectId && !rkb) {
+        return res.status(400).json({ error: 'projectId required for uploads; set rkb=1 only for admin-managed RKB content' })
+      }
       // Set current user for RLS (optional, ignore if function doesn't exist)
       try { await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId]) } catch {}
       const files = (req.files as Express.Multer.File[]) || []
@@ -105,18 +110,20 @@ async function main() {
           },
           createdAt: new Date().toISOString(),
         }
-        // 4) Encrypt and store to object storage (optional; do not fail ingestion if misconfigured)
-        try {
-          const keyId = process.env.DATA_KEY_ID || 'v1'
-          const enc = encryptPayload(payload, keyId)
-          const store = await getObjectStore()
-          const objectKey = `kb/${ownerId}/${Date.now()}_${safeName(f.originalname)}.json`
-          await store.putObject(objectKey, enc.buffer, {
-            contentType: 'application/octet-stream',
-            metadata: { keyId, alg: 'AES-256-GCM', schema: 'kb.v1' },
-          })
-        } catch (e) {
-          req.log?.error({ err: e }, 'object-store-failure-or-encryption-missing')
+        // 4) Encrypt and store to object storage ONLY for RKB/admin uploads
+        if (rkb && process.env.ALLOW_OBJECT_STORE_RKB === '1') {
+          try {
+            const keyId = process.env.DATA_KEY_ID || 'v1'
+            const enc = encryptPayload(payload, keyId)
+            const store = await getObjectStore()
+            const objectKey = `rkb/${Date.now()}_${safeName(f.originalname)}.json`
+            await store.putObject(objectKey, enc.buffer, {
+              contentType: 'application/octet-stream',
+              metadata: { keyId, alg: 'AES-256-GCM', schema: 'kb.v1' },
+            })
+          } catch (e) {
+            req.log?.error({ err: e }, 'object-store-rkb-failed')
+          }
         }
         // 5) Persist reference row with embedding
         const a = repo.create({
@@ -149,7 +156,9 @@ async function main() {
     try {
       const ownerId = (req.body?.ownerId as string) || ''
       const projectId = (req.body?.projectId as string) || null
+      const rkb = req.body?.rkb === '1' || req.body?.rkb === true
       if (!ownerId || !req.file) return res.status(400).json({ error: 'ownerId and file required' })
+      if (!projectId && !rkb) return res.status(400).json({ error: 'projectId required for uploads; set rkb=1 only for admin-managed RKB content' })
       // Set current user for RLS (optional, ignore if function doesn't exist)
       try { await ds.query('SELECT app.set_current_user($1::uuid)', [ownerId]) } catch {}
       const meta = await analyzeFile(req.file)
