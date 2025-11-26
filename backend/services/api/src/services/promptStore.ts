@@ -13,6 +13,7 @@ export type PromptKey =
   | 'rewrite_narrative'
   | 'wildcard'
   | 'ralph_lens'
+  | 'clarifying_questions'
   | 'model_rollout'
 
 export const promptMeta: Record<PromptKey, { label: string; trigger: string }> = {
@@ -23,6 +24,7 @@ export const promptMeta: Record<PromptKey, { label: string; trigger: string }> =
   enhancements: { label: 'Enhancements (Targeted)', trigger: '/ai/enhancements' },
   recommendations: { label: 'Recommendations (Framework)', trigger: '/ai/recommendations' },
   concept_overview: { label: 'Concept Overview', trigger: '/ai/concept-overview' },
+  clarifying_questions: { label: 'Clarifying Questions', trigger: '/ai/clarifying-questions' },
   concept_proposal: { label: 'Concept Proposal', trigger: '/ai/concept-proposal' },
   rewrite_narrative: { label: 'Rewrite Narrative (Apply Enhancements)', trigger: '/ai/rewrite-narrative' },
   wildcard: { label: 'Wildcard Insight', trigger: '/ai/wildcard' },
@@ -146,6 +148,7 @@ personaNotes: 2 bullets of guidance specific to {{personaRole}}.`,
 {{opportunitiesList}}
 {{/if}}{{#if enhancementsList}}Enhancements (applied/considered):
 {{enhancementsList}}
+{{/if}}{{#if scoresSummary}}Scoring (snapshot): {{scoresSummary}}
 {{/if}}
 
 # Ralph Philosophy & Lens (weigh ideas against this):
@@ -159,18 +162,34 @@ personaNotes: 2 bullets of guidance specific to {{personaRole}}.`,
 - 3–5 bullets. Each bullet = a pillar with a short descriptor and an example beat. Tie at least two bullets to items from Opportunities/Enhancements.
 
 ### Platform & Format Plan
-- 3–5 bullets, each names a platform + primary format + timing (e.g., TikTok — 30–45s hook + stitch, weekly mini-arcs).
+- 3–5 bullets, each names a platform + primary format + timing (e.g., TikTok — 30–45s hook + stitch, weekly mini-arcs). Where relevant, ground at least one bullet in a selected Opportunity/Enhancement.
 
 ### Creator/Partner Angle
-- 2–4 bullets on collaboration types and selection criteria (not specific names), grounded in the concept’s culture.
+- 2–4 bullets on collaboration types and selection criteria (not specific names), grounded in the concept’s culture and referencing the criteria implied by the selected Opportunities/Enhancements.
 
 ### Next Steps to Finalize Concept (not production)
-- 5–7 checklist items (start each with "- [ ] ") focused on concept development: sharpen logline, define POV + tone, lock 3 pillars + sample segments, draft 1-page treatment, align brand fit & guardrails, define success criteria & learning loop, identify proof-of-concept pilot.
+- 5–7 checklist items (start each with "- [ ] ") focused on concept development: sharpen logline, define POV + tone, lock 3 pillars + sample segments, draft 1-page treatment, align brand fit & guardrails, define success criteria & learning loop, identify proof-of-concept pilot. Include one item to validate or pressure-test the top 1–2 selected Opportunities/Enhancements.
 
 ### Risks & Mitigations
-- 3 bullets: one creative risk, one audience/fit risk, one operational risk — each with a mitigation.
+- 3 bullets: one creative risk, one audience/fit risk, one operational risk — each with a mitigation. If applicable, note a risk tied to a selected Opportunity/Enhancement and how to mitigate it.
 
 Keep it specific, non-generic, and avoid repeating the inputs. Use compact, scannable bullets.`,
+
+  clarifying_questions:
+    `You are a {{personaRole}}. Read the concept brief and the generated debrief below, then ask up to 3 clarifying questions that would materially improve the campaign strategy.
+
+CONCEPT: "{{concept}}"
+BRIEF (user): {{brief}}
+DEBRIEF (current): {{debrief}}
+{{#if opportunitiesList}}OPPORTUNITIES (top):
+{{opportunitiesList}}
+{{/if}}
+
+Rules:
+- Questions must be concrete and answerable in 1–2 sentences by the user.
+- Only ask if the answer would change strategy, phasing, platform choices, or partner criteria.
+- Avoid generic “tell me more” or restating the brief.
+- Return ONLY JSON: { "questions": string[] } (max 3).`,
 
   concept_proposal:
     `You are a {{personaRole}} crafting a shareable campaign proposal.

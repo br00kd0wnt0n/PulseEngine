@@ -284,6 +284,10 @@ export default function CanvasWorkflow() {
   // Backend data state
   const [debrief, setDebrief] = useState<{ brief: string; summary: string; keyPoints: string[]; didYouKnow: string[]; sources?: any } | null>(null)
   const [opps, setOpps] = useState<{ opportunities: { title: string; why: string; impact: number }[]; rationale?: string; sources?: any } | null>(null)
+  // Clarifying Questions
+  const [clarifyingQs, setClarifyingQs] = useState<string[] | null>(null)
+  const [clarifyingAns, setClarifyingAns] = useState<string[]>([])
+  const [clarifyingLoading, setClarifyingLoading] = useState<boolean>(false)
   const [loading, setLoading] = useState(false)
   const [debriefAccepted, setDebriefAccepted] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -543,6 +547,7 @@ export default function CanvasWorkflow() {
               opportunities: o?.opportunities,
               narrative: narrative?.text,
               enhancements: [],
+              scores,
               projectId: pid,
               targetAudience
             })
@@ -638,6 +643,54 @@ export default function CanvasWorkflow() {
       }
     ])
   }, [debriefAccepted, nodes])
+
+  // Spawn Clarifying Questions after Debrief loads the first time
+  useEffect(() => {
+    if (!activated || !concept || !debrief || !opps) return
+    // Only create once
+    const hasCQ = nodes.some(n => n.id === 'clarifying-questions')
+    if (hasCQ || clarifyingQs) return
+    ;(async () => {
+      try {
+        setClarifyingLoading(true)
+        // Place node on left, below RKB stack
+        setNodes(prev => ([
+          ...prev,
+          {
+            id: 'clarifying-questions',
+            type: 'input',
+            title: 'Clarifying Questions',
+            x: 50,
+            y: 300,
+            width: 320,
+            height: 240,
+            minimized: false,
+            zIndex: 3,
+            status: 'active' as const,
+            connectedTo: ['debrief-opportunities']
+          }
+        ]))
+        const questions = await api.clarifyingQuestions(concept, {
+          brief: concept,
+          debrief: debrief?.brief || '',
+          opportunities: (opps?.opportunities || []).slice(0,6).map(o => ({ title: o.title, impact: o.impact })),
+          persona: persona || undefined,
+          targetAudience: targetAudience || undefined,
+          region: region || undefined,
+        })
+        const qs = Array.isArray(questions?.questions) ? questions.questions.slice(0,3) : []
+        setClarifyingQs(qs)
+        setClarifyingAns(new Array(qs.length).fill(''))
+        addActivity('AI suggested clarifying questions', 'ai')
+      } catch (e) {
+        console.warn('[ClarifyingQuestions] Failed to load:', e)
+        setClarifyingQs([])
+      } finally {
+        setClarifyingLoading(false)
+      }
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activated, concept, debrief, opps])
 
   const hasNarrativeNode = nodes.some(n => n.id === 'narrative')
 
@@ -924,6 +977,7 @@ export default function CanvasWorkflow() {
         opportunities: opps?.opportunities,
         narrative: narrative?.text,
         enhancements: appliedEnhancements,
+        scores,
         projectId: pid,
         targetAudience
       })
@@ -1514,6 +1568,73 @@ export default function CanvasWorkflow() {
       )
     }
 
+    if (node.id === 'clarifying-questions') {
+      return (
+        <div className="space-y-2 text-[11px]">
+          {clarifyingLoading ? (
+            <BrandSpinner text="Generating up to 3 clarifying questions…" />
+          ) : (
+            <>
+              {(!clarifyingQs || clarifyingQs.length === 0) ? (
+                <div className="text-white/60">No questions at this time. You can skip.</div>
+              ) : (
+                <div className="space-y-2">
+                  {clarifyingQs.map((q, i) => (
+                    <div key={i} className="p-2 rounded border border-white/10 bg-white/5">
+                      <div className="text-white/80 mb-1">{i+1}. {q}</div>
+                      <textarea
+                        value={clarifyingAns[i] || ''}
+                        onChange={(e)=>{
+                          const arr = [...clarifyingAns]; arr[i] = e.target.value; setClarifyingAns(arr)
+                        }}
+                        onMouseDown={(e)=>e.stopPropagation()}
+                        placeholder="Optional 1–2 sentence answer"
+                        className="w-full h-12 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-[11px] resize-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  className="flex-1 px-2 py-1 rounded bg-white/10 border border-white/15 hover:bg-white/20"
+                  onClick={(e)=>{ e.stopPropagation(); setNodes(prev=>prev.map(n=>n.id==='clarifying-questions'?{...n, minimized:true, status:'complete'}:n)) }}
+                >Skip</button>
+                <button
+                  className="flex-1 px-2 py-1 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan disabled:opacity-50"
+                  disabled={!clarifyingQs || clarifyingQs.length===0 || clarifyingAns.every(a => !a || !a.trim())}
+                  onClick={async (e)=>{
+                    e.stopPropagation()
+                    try {
+                      const pid = (()=>{ try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
+                      const message = (clarifyingQs||[]).map((q,i)=>`Q${i+1}: ${q}\nA${i+1}: ${(clarifyingAns[i]||'').trim()}`).filter(Boolean).join('\n\n')
+                      setNodes(prev=>prev.map(n=>n.id==='debrief-opportunities'?{...n, status:'processing' as const}:n))
+                      addActivity('Applying clarifications to debrief…', 'ai')
+                      const updated = await api.refineDebrief(concept, debrief, message, { persona, projectId: pid, targetAudience })
+                      setDebrief(updated)
+                      try { if (pid) localStorage.setItem(`debrief:${pid}`, JSON.stringify(updated)) } catch {}
+                      // Refresh opportunities using concept + appended clarifications to bias retrieval
+                      addActivity('Refreshing opportunities with clarifications…', 'ai')
+                      const conceptPlus = `${concept}\n\nClarifications Provided:\n${message}`
+                      const newOpps = await api.opportunities(conceptPlus, { persona, region, projectId: pid, targetAudience })
+                      setOpps(newOpps)
+                      try { if (pid) localStorage.setItem(`opps:${pid}`, JSON.stringify(newOpps)) } catch {}
+                      setNodes(prev=>prev.map(n=>n.id==='debrief-opportunities'?{...n, status:'complete' as const}:n))
+                      setNodes(prev=>prev.map(n=>n.id==='clarifying-questions'?{...n, status:'complete' as const, minimized:true}:n))
+                      addActivity('Debrief & Opportunities updated with clarifications', 'ai')
+                    } catch (err) {
+                      console.error('[ClarifyingQuestions] Submit failed:', err)
+                      addActivity('Clarification apply failed — check connection', 'ai')
+                    }
+                  }}
+                >Submit answers</button>
+              </div>
+            </>
+          )}
+        </div>
+      )
+    }
+
     if (node.id === 'scoring') {
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
@@ -1747,9 +1868,10 @@ export default function CanvasWorkflow() {
                           onClick={() => {
                             try {
                               const overview = conceptOverview || ''
-                              // Export a print‑ready PDF of the Concept Overview + extras
+                              const applied = Array.from(selectedEnhancements).map(i => enhancements[i]?.text).filter(Boolean) as string[]
+                              const topOpps = (opps?.opportunities || []).slice(0,6)
                               ;(window as any).scrollTo(0,0)
-                              exportOverviewPdf(concept || 'Untitled', overview, { persona, region })
+                              exportOverviewPdf(concept || 'Untitled', overview, { persona, region, opps: topOpps as any, enhancements: applied, scores })
                             } catch (e) {
                               // Fallback: export full markdown
                               const conceptName = (concept || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
@@ -1831,6 +1953,25 @@ export default function CanvasWorkflow() {
                       </div>
                     ))}
                     <div className="flex gap-2">
+                      <button
+                        className="flex-1 px-3 py-1.5 rounded border border-ralph-cyan/40 bg-ralph-cyan/10 hover:bg-ralph-cyan/20 text-[11px] font-medium"
+                        onClick={() => {
+                          try {
+                            const overview = conceptOverview || ''
+                            const applied = Array.from(selectedEnhancements).map(i => enhancements[i]?.text).filter(Boolean) as string[]
+                            const topOpps = (opps?.opportunities || []).slice(0,6)
+                            ;(window as any).scrollTo(0,0)
+                            exportOverviewPdf(concept || 'Untitled', overview, { persona, region, opps: topOpps as any, enhancements: applied, scores })
+                          } catch (e) {
+                            const conceptName = (concept || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+                            const md = exportProjectFull(concept || 'Untitled', persona || '', region || '')
+                            const ts = new Date().toISOString().replace(/[:.]/g, '-')
+                            downloadMarkdown(md, `${conceptName || 'project'}-${ts}.md`)
+                          }
+                        }}
+                      >
+                        Export PDF
+                      </button>
                       <button
                         className="flex-1 px-3 py-1.5 rounded border border-white/10 bg-white/10 hover:bg-white/20 text-[11px]"
                         onClick={() => {

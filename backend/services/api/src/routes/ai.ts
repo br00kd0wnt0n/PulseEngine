@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements, generateConceptProposal, generateScoresAI, refineDebrief, generateModelRollout } from '../services/ai.js'
+import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements, generateConceptProposal, generateScoresAI, refineDebrief, generateModelRollout, generateClarifyingQuestions } from '../services/ai.js'
 import { retrieveContext, formatContextForPrompt } from '../services/retrieval.js'
 import { getPrompt as getTpl, renderTemplate } from '../services/promptStore.js'
 import { generateEmbedding } from '../services/embeddings.js'
@@ -63,7 +63,7 @@ export default router
 
 // Generate an AI Concept Overview tailored to persona (author lens) and target audience
 router.post('/concept-overview', async (req, res) => {
-  const { concept, persona, region, debrief, opportunities, narrative, enhancements, targetAudience, projectId } = req.body || {}
+  const { concept, persona, region, debrief, opportunities, narrative, enhancements, targetAudience, projectId, scores } = req.body || {}
   if (!concept) return res.status(400).json({ error: 'concept required' })
   try {
     const apiKey = process.env.OPENAI_API_KEY
@@ -93,6 +93,7 @@ router.post('/concept-overview', async (req, res) => {
         narrative,
         opportunitiesList: oppText,
         enhancementsList: enhText,
+        scoresSummary: (() => { try { return scores ? JSON.stringify(scores) : '' } catch { return '' } })(),
         ralphLens,
         projectId,
       }
@@ -109,6 +110,18 @@ router.post('/concept-overview', async (req, res) => {
   } catch (e: any) {
     console.error('[AI] concept-overview failed:', e)
     res.json({ overview: concept })
+  }
+})
+
+// Clarifying Questions
+router.post('/clarifying-questions', async (req, res) => {
+  const { concept, brief, debrief, opportunities, persona, targetAudience, region } = req.body || {}
+  if (!concept || !debrief) return res.status(400).json({ error: 'concept and debrief required' })
+  try {
+    const data = await generateClarifyingQuestions(concept, brief || '', debrief || '', opportunities || [], persona || null, targetAudience || null, region || null)
+    res.json(data)
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || 'failed' })
   }
 })
 

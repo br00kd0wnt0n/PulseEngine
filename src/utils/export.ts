@@ -257,13 +257,19 @@ export function downloadMarkdown(content: string, filename: string) {
  * Export Concept Overview as a formatted PDF via print
  * Collects concept overview, key scores and top opportunities.
  */
-export function exportOverviewPdf(concept: string, overviewMarkdown: string, opts?: { persona?: string; region?: string }) {
+export function exportOverviewPdf(
+  concept: string,
+  overviewMarkdown: string,
+  opts?: { persona?: string; region?: string; opps?: { title: string; why?: string; impact?: number }[]; enhancements?: string[]; scores?: any }
+) {
   const projectId = localStorage.getItem('activeProjectId') || 'local'
   const persona = opts?.persona || (localStorage.getItem('persona') || '').replace(/\"/g,'')
   const region = opts?.region || (localStorage.getItem('region') || '').replace(/\"/g,'')
   const targetAudience = (localStorage.getItem('targetAudience') || '').replace(/\"/g,'')
-  const scores = safeJSON(`score:${projectId}`) || {}
-  const opps = safeJSON(`opps:${projectId}`)
+  const scores = opts?.scores || safeJSON(`score:${projectId}`) || {}
+  const oppsStore = safeJSON(`opps:${projectId}`)
+  const opps = Array.isArray(opts?.opps) ? opts!.opps! : (Array.isArray(oppsStore?.opportunities) ? oppsStore.opportunities : [])
+  const enhancements = Array.isArray(opts?.enhancements) ? opts!.enhancements! : []
 
   // Enhanced Markdown -> HTML conversion for the overview block
   const mdToHtml = (md: string): string => {
@@ -297,7 +303,17 @@ export function exportOverviewPdf(concept: string, overviewMarkdown: string, opt
     return `<div class="scores-section"><h2>Campaign Scores</h2><ul class="scores-list">${items.join('')}</ul></div>`
   })()
 
-  const oppHtml = '' // Remove opportunities from PDF for cleaner output
+  const oppHtml = (() => {
+    if (!opps || opps.length === 0) return ''
+    const items = opps.slice(0, 6).map((o: any, i: number) => `<li><strong>${i + 1}. ${escapeHtml(o.title)}</strong>${o.why ? ` — ${escapeHtml(o.why)}` : ''}${typeof o.impact === 'number' ? ` <em>(impact ${o.impact}/100)</em>` : ''}</li>`)
+    return `<div class="opps-section"><h2>Top Opportunities (specifics)</h2><ul>${items.join('')}</ul></div>`
+  })()
+
+  const enhHtml = (() => {
+    if (!enhancements || enhancements.length === 0) return ''
+    const items = enhancements.slice(0, 8).map((e: string) => `<li>${escapeHtml(e)}</li>`)
+    return `<div class="enh-section"><h2>Selected Enhancements</h2><ul>${items.join('')}</ul></div>`
+  })()
 
   const html = `<!doctype html>
   <html>
@@ -388,6 +404,7 @@ export function exportOverviewPdf(concept: string, overviewMarkdown: string, opt
       ${overviewHtml}
       ${scoreHtml}
       ${oppHtml}
+      ${enhHtml}
     </div>
     <script>
       window.onload = () => { setTimeout(()=>{ window.print() }, 300) }

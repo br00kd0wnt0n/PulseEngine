@@ -60,6 +60,10 @@ export const api = {
     '/ai/concept-proposal',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, narrativeBlocks, recommendedCreators, ...(opts||{}) }) }
   ),
+  clarifyingQuestions: (concept: string, payload: { brief: string; debrief: string; opportunities?: { title: string; impact?: number }[]; persona?: string; targetAudience?: string; region?: string }) => request<{ questions: string[] }>(
+    '/ai/clarifying-questions',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(payload||{}) }) }
+  ),
   applyEnhancements: (concept: string, narrative: string, enhancements: string[], opts?: { persona?: string; region?: string; projectId?: string }) => request<{ text: string }>(
     '/ai/rewrite-narrative',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, narrative, enhancements, ...(opts||{}) }) }
