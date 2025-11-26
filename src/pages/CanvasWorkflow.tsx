@@ -136,6 +136,50 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
   )
 }
 
+// Helper function to find clear vertical space in a column
+function findClearY(nodes: NodeData[], targetX: number, nodeWidth: number, nodeHeight: number, startY = 40, columnTolerance = 100): number {
+  // Find all nodes in this column (within columnTolerance of targetX)
+  const nodesInColumn = nodes.filter(n => Math.abs(n.x - targetX) < columnTolerance)
+
+  if (nodesInColumn.length === 0) return startY
+
+  // Sort by Y position
+  const sorted = nodesInColumn.sort((a, b) => a.y - b.y)
+
+  // Check if startY is clear
+  let candidateY = startY
+  let foundClear = false
+
+  while (!foundClear && candidateY < 2000) {
+    // Check if this Y position overlaps with any existing node
+    const overlaps = sorted.some(node => {
+      const nodeBottom = node.y + (node.height || 360)
+      const candidateBottom = candidateY + nodeHeight
+
+      // Check for vertical overlap
+      return !(candidateY >= nodeBottom + 20 || candidateBottom + 20 <= node.y)
+    })
+
+    if (!overlaps) {
+      foundClear = true
+    } else {
+      // Find the next node that blocks this position and position below it
+      const blockingNode = sorted.find(node => {
+        const nodeBottom = node.y + (node.height || 360)
+        return candidateY < nodeBottom + 20
+      })
+
+      if (blockingNode) {
+        candidateY = blockingNode.y + (blockingNode.height || 360) + 20
+      } else {
+        candidateY += 60
+      }
+    }
+  }
+
+  return candidateY
+}
+
 const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string | undefined) || ''
 const USER_ID = '087d78e9-4bbe-49f6-8981-1588ce4934a2'
 const ENABLE_REMOTE_SAVE = Boolean((import.meta as any).env?.VITE_ENABLE_REMOTE_SAVE)
@@ -712,10 +756,15 @@ export default function CanvasWorkflow() {
       const scoringWidth = 450
       const scoringX = Math.max(700, Math.min(1200, vw - scoringWidth - margin))
       const narrativeX = Math.max(400, scoringX - 500)
+
+      // Find clear Y positions for debrief and narrative using helper
+      const debriefY = findClearY(prev, narrativeX, 450, 60, 40)
+      const narrativeY = findClearY(prev, narrativeX, 450, 60, debriefY + 80)
+
       const updated = prev.map(n => {
         // Stack debrief and narrative vertically when minimized to avoid overlap
-        if (n.id === 'debrief-opportunities') return { ...n, minimized: true, x: narrativeX, y: 40 }
-        if (n.id === 'narrative') return { ...n, minimized: true, x: narrativeX, y: 100 }
+        if (n.id === 'debrief-opportunities') return { ...n, minimized: true, x: narrativeX, y: debriefY }
+        if (n.id === 'narrative') return { ...n, minimized: true, x: narrativeX, y: narrativeY }
         return n
       })
       return [
@@ -1585,7 +1634,7 @@ export default function CanvasWorkflow() {
                       const scoringNode = prev.find(n => n.id === 'scoring')
                       const scoringRight = scoringNode ? (scoringNode.x + (scoringNode.width || 450)) : vw * 0.40
                       const wildcardX = Math.max(margin, Math.min(vw - nodeWidth - margin, scoringRight + 40))
-                      const wildcardY = 100
+                      const wildcardY = findClearY(prev, wildcardX, nodeWidth, nodeHeight, 40)
 
                       return [
                         ...prev,
@@ -1722,7 +1771,8 @@ export default function CanvasWorkflow() {
                               const exists = prev.find(n => n.id === 'model-rollout')
                               if (exists) return prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: true, status: 'processing' as NodeData['status'] } : n)
                               const baseX = Math.max(100, Math.min(window.innerWidth - 520 - 100, window.innerWidth * 0.60))
-                              return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Rollout Model (Under Construction)', x: baseX, y: 480, width: 520, height: 360, minimized: true, zIndex: 6, status: 'processing' as NodeData['status'], connectedTo: ['concept-overview'] } ]
+                              const baseY = findClearY(prev, baseX, 520, 60, 40)
+                              return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Rollout Model (Under Construction)', x: baseX, y: baseY, width: 520, height: 360, minimized: true, zIndex: 6, status: 'processing' as NodeData['status'], connectedTo: ['concept-overview'] } ]
                             })
                             try {
                               setRolloutLoading(true)
