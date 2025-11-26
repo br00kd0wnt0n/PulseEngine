@@ -42,7 +42,10 @@ export default function KnowledgeBaseBuilder() {
   // Load existing items from database
   async function loadAssets() {
     try {
-      const response = await fetch(`${API_BASE}/admin/assets?limit=1000&rkbOnly=true`)
+      const headers: Record<string,string> = {}
+      const adminToken = ((import.meta as any).env?.VITE_ADMIN_TOKEN as string | undefined)
+      if (adminToken) headers['X-Admin-Token'] = adminToken
+      const response = await fetch(`${API_BASE}/admin/assets?limit=1000&rkbOnly=true`, { headers })
       if (!response.ok) return
 
       const data = await response.json()
@@ -96,6 +99,7 @@ export default function KnowledgeBaseBuilder() {
       const formData = new FormData()
       files.forEach(file => formData.append('files', file))
       formData.append('ownerId', USER_ID)
+      formData.append('rkb', '1') // explicitly mark as RKB upload (admin)
 
       const response = await fetch(`${INGESTION_URL}/ingest/upload`, {
         method: 'POST',
@@ -126,6 +130,22 @@ export default function KnowledgeBaseBuilder() {
       alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setUploading(false)
+    }
+  }
+
+  async function deleteItem(id: string, name: string) {
+    const confirm = window.confirm(`Delete from RKB:\n${name}?`)
+    if (!confirm) return
+    try {
+      const headers: Record<string,string> = { 'Content-Type': 'application/json' }
+      // If an admin token is provided via env, include it
+      const adminToken = ((import.meta as any).env?.VITE_ADMIN_TOKEN as string | undefined)
+      if (adminToken) headers['X-Admin-Token'] = adminToken
+      const resp = await fetch(`${API_BASE}/admin/assets/${encodeURIComponent(id)}`, { method: 'DELETE', headers })
+      if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`)
+      await loadAssets()
+    } catch (e: any) {
+      alert(`Delete failed: ${e?.message || e}`)
     }
   }
 
@@ -278,6 +298,12 @@ function PieChart({ stats }: { stats: Record<string, number> }) {
               <div className="text-xs text-white/60 mt-0.5">{it.type} • {it.conf} • {new Date(it.createdAt).toLocaleDateString()}</div>
               <div className="mt-2 flex flex-wrap gap-1">
                 {(it.tags||[]).map((t: string, i: number) => <span key={i} className="px-1.5 py-0.5 rounded text-[10px] border border-white/10 bg-white/5">{t}</span>)}
+              </div>
+              <div className="mt-2 flex items-center justify-end">
+                <button
+                  className="text-[10px] px-2 py-0.5 rounded border border-red-400/40 bg-red-400/10 hover:bg-red-400/20 text-red-200"
+                  onClick={() => deleteItem(it.id, it.title)}
+                >Delete</button>
               </div>
             </div>
           ))}
