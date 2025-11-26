@@ -822,16 +822,26 @@ export default function CanvasWorkflow() {
     setNodes(prev => {
       const exists = prev.find(n => n.id === 'concept-overview')
       if (exists) return prev.map(n => n.id === 'concept-overview' ? { ...n, minimized: false, status: 'processing' as NodeData['status'] } : n)
+
+      // Calculate viewport-aware position
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1800
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 1000
+      const nodeWidth = 450
+      const nodeHeight = 260
+      const margin = 80
+      const overviewX = Math.max(margin, Math.min(vw - nodeWidth - margin, vw * 0.45))
+      const overviewY = Math.max(margin, Math.min(vh - nodeHeight - margin, 100))
+
       return [
         ...prev,
         {
           id: 'concept-overview',
           type: 'ai-content',
           title: 'Concept Overview',
-          x: 1650,
-          y: 100,
-          width: 450,
-          height: 260,
+          x: overviewX,
+          y: overviewY,
+          width: nodeWidth,
+          height: nodeHeight,
           minimized: false,
           zIndex: 6,
           status: 'processing' as NodeData['status'],
@@ -1554,14 +1564,14 @@ export default function CanvasWorkflow() {
                     setNodes(prev => {
                       if (prev.find(n => n.id === 'wildcard')) return prev.map(n => n.id === 'wildcard' ? { ...n, minimized: true, status: 'processing' as NodeData['status'] } : n)
 
-                      // Calculate viewport-aware position
+                      // Calculate viewport-aware position - position in clear space to right
                       const vw = typeof window !== 'undefined' ? window.innerWidth : 1800
                       const vh = typeof window !== 'undefined' ? window.innerHeight : 1000
                       const nodeWidth = 450
                       const nodeHeight = 360
-                      const margin = 60
-                      const wildcardX = Math.max(margin, Math.min(vw - nodeWidth - margin, vw * 0.58))
-                      const wildcardY = Math.max(margin, Math.min(vh - nodeHeight - margin, 400))
+                      const margin = 80
+                      const wildcardX = Math.max(margin, Math.min(vw - nodeWidth - margin, vw * 0.50))
+                      const wildcardY = Math.max(margin, Math.min(vh - nodeHeight - margin, vh * 0.50))
 
                       return [
                         ...prev,
@@ -1659,30 +1669,6 @@ export default function CanvasWorkflow() {
                   }}
                 >Refresh</button>
               </div>
-              <div className="mb-2">
-                <button
-                  className="text-[10px] px-2 py-0.5 rounded border border-ralph-pink/40 bg-ralph-pink/10 hover:bg-ralph-pink/20 mr-2"
-                  onClick={async (e) => {
-                    e.stopPropagation()
-                    try {
-                      setRolloutLoading(true)
-                      const pid = localStorage.getItem('activeProjectId') || 'local'
-                      const snapScores = (()=>{ try { return JSON.parse(localStorage.getItem(`score:${pid}`) || '{}') } catch { return {} } })()
-                      const snapOpps = opps?.opportunities?.slice(0,6).map((o:any)=>({ title: o.title, impact: o.impact })) || []
-                      const resp = await api.modelRollout(concept, conceptOverview || '', { scores: snapScores, opportunities: snapOpps }, { persona, region, targetAudience, projectId: pid })
-                      setRollout({ months: resp.months || [], moments: resp.moments || [], notes: resp.notes || [] })
-                      setNodes(prev => {
-                        const exists = prev.find(n => n.id === 'model-rollout')
-                        if (exists) return prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n)
-                        const baseX = Math.max(100, Math.min(window.innerWidth - 520 - 100, window.innerWidth * 0.60))
-                        return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Model Rollout', x: baseX, y: 480, width: 520, height: 360, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: ['concept-overview'] } ]
-                      })
-                    } catch (err) { console.error('[ModelRollout] Failed:', err) }
-                    finally { setRolloutLoading(false) }
-                  }}
-                >Model Rollout</button>
-                {rolloutLoading && <span className="text-[10px] text-white/60">Generating…</span>}
-              </div>
               {/* Parse and display sections like narrative node */}
               {(() => {
                 const parsed = extractNarrativeSections(conceptOverview || '')
@@ -1692,9 +1678,9 @@ export default function CanvasWorkflow() {
                       <div className="panel p-3 bg-white/5">
                         <div className="prose prose-invert max-w-none text-[11px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(conceptOverview) }} />
                       </div>
-                      <div>
+                      <div className="flex gap-2">
                         <button
-                          className="w-full px-3 py-1.5 rounded border border-ralph-cyan/40 bg-ralph-cyan/10 hover:bg-ralph-cyan/20 text-[11px] font-medium"
+                          className="flex-1 px-3 py-1.5 rounded border border-ralph-cyan/40 bg-ralph-cyan/10 hover:bg-ralph-cyan/20 text-[11px] font-medium"
                           onClick={() => {
                             try {
                               const overview = conceptOverview || ''
@@ -1711,6 +1697,54 @@ export default function CanvasWorkflow() {
                           }}
                         >
                           Export PDF
+                        </button>
+                        <button
+                          className="flex-1 px-3 py-1.5 rounded border border-ralph-pink/40 bg-ralph-pink/10 hover:bg-ralph-pink/20 text-[11px] font-medium"
+                          disabled={rolloutLoading}
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            try {
+                              setRolloutLoading(true)
+                              const pid = localStorage.getItem('activeProjectId') || 'local'
+                              const snapScores = (()=>{ try { return JSON.parse(localStorage.getItem(`score:${pid}`) || '{}') } catch { return {} } })()
+                              const snapOpps = opps?.opportunities?.slice(0,6).map((o:any)=>({ title: o.title, impact: o.impact })) || []
+                              const resp = await api.modelRollout(concept, conceptOverview || '', { scores: snapScores, opportunities: snapOpps }, { persona, region, targetAudience, projectId: pid })
+                              setRollout({ months: resp.months || [], moments: resp.moments || [], notes: resp.notes || [] })
+                              setNodes(prev => {
+                                const exists = prev.find(n => n.id === 'model-rollout')
+                                if (exists) return prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n)
+                                const baseX = Math.max(100, Math.min(window.innerWidth - 520 - 100, window.innerWidth * 0.60))
+                                return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Model Rollout', x: baseX, y: 480, width: 520, height: 360, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: ['concept-overview'] } ]
+                              })
+                            } catch (err) { console.error('[ModelRollout] Failed:', err) }
+                            finally { setRolloutLoading(false) }
+                          }}
+                        >
+                          {rolloutLoading ? 'Generating…' : 'Model Rollout'}
+                        </button>
+                      </div>
+                      <div className="mt-2">
+                        <button
+                          className="w-full px-3 py-1.5 rounded border border-purple-400/40 bg-purple-400/10 hover:bg-purple-400/20 text-[11px]"
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            try {
+                              const creators = await api.creators()
+                              setConceptCreators(creators.slice(0, 8))
+                              setNodes(prev => {
+                                const exists = prev.find(n => n.id === 'creative-partner')
+                                if (exists) return prev.map(n => n.id === 'creative-partner' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n)
+                                const vw = typeof window !== 'undefined' ? window.innerWidth : 1800
+                                const vh = typeof window !== 'undefined' ? window.innerHeight : 1000
+                                const margin = 80
+                                const partnerX = Math.max(margin, Math.min(vw - 420 - margin, vw * 0.55))
+                                const partnerY = Math.max(margin, Math.min(vh - 380 - margin, vh * 0.40))
+                                return [ ...prev, { id: 'creative-partner', type: 'ai-content', title: 'Creative Partners', x: partnerX, y: partnerY, width: 420, height: 380, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: ['concept-overview'] } ]
+                              })
+                            } catch (err) { console.error('[CreativePartner] Failed:', err) }
+                          }}
+                        >
+                          Need a creative partner?
                         </button>
                       </div>
                     </div>
@@ -1729,9 +1763,9 @@ export default function CanvasWorkflow() {
                         <div className="prose prose-invert max-w-none text-[11px] leading-relaxed" dangerouslySetInnerHTML={{ __html: renderMarkdown(cleanSectionBody(sec.body, sec.title)) }} />
                       </div>
                     ))}
-                    <div>
+                    <div className="flex gap-2">
                       <button
-                        className="w-full px-3 py-1.5 rounded border border-white/10 bg-white/10 hover:bg-white/20 text-[11px]"
+                        className="flex-1 px-3 py-1.5 rounded border border-white/10 bg-white/10 hover:bg-white/20 text-[11px]"
                         onClick={() => {
                           const conceptName = (concept || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
                           const md = exportProjectFull(concept || 'Untitled', persona || '', region || '')
@@ -1740,6 +1774,54 @@ export default function CanvasWorkflow() {
                         }}
                       >
                         Export Project
+                      </button>
+                      <button
+                        className="flex-1 px-3 py-1.5 rounded border border-ralph-pink/40 bg-ralph-pink/10 hover:bg-ralph-pink/20 text-[11px] font-medium"
+                        disabled={rolloutLoading}
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          try {
+                            setRolloutLoading(true)
+                            const pid = localStorage.getItem('activeProjectId') || 'local'
+                            const snapScores = (()=>{ try { return JSON.parse(localStorage.getItem(`score:${pid}`) || '{}') } catch { return {} } })()
+                            const snapOpps = opps?.opportunities?.slice(0,6).map((o:any)=>({ title: o.title, impact: o.impact })) || []
+                            const resp = await api.modelRollout(concept, conceptOverview || '', { scores: snapScores, opportunities: snapOpps }, { persona, region, targetAudience, projectId: pid })
+                            setRollout({ months: resp.months || [], moments: resp.moments || [], notes: resp.notes || [] })
+                            setNodes(prev => {
+                              const exists = prev.find(n => n.id === 'model-rollout')
+                              if (exists) return prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n)
+                              const baseX = Math.max(100, Math.min(window.innerWidth - 520 - 100, window.innerWidth * 0.60))
+                              return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Model Rollout', x: baseX, y: 480, width: 520, height: 360, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: ['concept-overview'] } ]
+                            })
+                          } catch (err) { console.error('[ModelRollout] Failed:', err) }
+                          finally { setRolloutLoading(false) }
+                        }}
+                      >
+                        {rolloutLoading ? 'Generating…' : 'Model Rollout'}
+                      </button>
+                    </div>
+                    <div className="mt-2">
+                      <button
+                        className="w-full px-3 py-1.5 rounded border border-purple-400/40 bg-purple-400/10 hover:bg-purple-400/20 text-[11px]"
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          try {
+                            const creators = await api.creators()
+                            setConceptCreators(creators.slice(0, 8))
+                            setNodes(prev => {
+                              const exists = prev.find(n => n.id === 'creative-partner')
+                              if (exists) return prev.map(n => n.id === 'creative-partner' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n)
+                              const vw = typeof window !== 'undefined' ? window.innerWidth : 1800
+                              const vh = typeof window !== 'undefined' ? window.innerHeight : 1000
+                              const margin = 80
+                              const partnerX = Math.max(margin, Math.min(vw - 420 - margin, vw * 0.55))
+                              const partnerY = Math.max(margin, Math.min(vh - 380 - margin, vh * 0.40))
+                              return [ ...prev, { id: 'creative-partner', type: 'ai-content', title: 'Creative Partners', x: partnerX, y: partnerY, width: 420, height: 380, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: ['concept-overview'] } ]
+                            })
+                          } catch (err) { console.error('[CreativePartner] Failed:', err) }
+                        }}
+                      >
+                        Need a creative partner?
                       </button>
                     </div>
                   </div>
