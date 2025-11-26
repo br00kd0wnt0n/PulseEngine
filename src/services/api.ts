@@ -48,7 +48,7 @@ export const api = {
     '/ai/wildcard',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(opts||{}) }) }
   ),
-  conceptOverview: (concept: string, opts?: { persona?: string; region?: string; debrief?: string; opportunities?: any[]; narrative?: string; enhancements?: string[]; projectId?: string; targetAudience?: string }) => request<{ overview: string }>(
+  conceptOverview: (concept: string, opts?: { persona?: string; region?: string; debrief?: string; opportunities?: any[]; narrative?: string; enhancements?: string[]; scores?: any; projectId?: string; targetAudience?: string }) => request<{ overview: string }>(
     '/ai/concept-overview',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(opts||{}) }) }
   ),
