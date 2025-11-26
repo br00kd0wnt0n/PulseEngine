@@ -265,6 +265,26 @@ Recommendation Weighting:
   * Generate genuine happiness
   * Challenge conventional thinking
   * Celebrate creativity and diversity`,
+
+  model_rollout:
+    `You are a growth strategist for {{personaRole}}{{#if targetAudience}} targeting {{targetAudience}}{{/if}}.
+
+Create a 12-month follower projection and strategic rollout plan for this concept:
+
+{{overview}}
+
+{{#if context}}Context (scores & opportunities):
+{{context}}
+{{/if}}
+
+Output ONLY valid JSON with this schema:
+{
+  "months": [{ "m": 0-11, "followers": number }], // 12 entries
+  "moments": [{ "m": 0-11, "label": string, "kind": "launch|strategy|collab|risk|pivot|push", "color": string }],
+  "notes": [string] // 3-5 bullet insights
+}
+
+Be realistic with growth projections. Strategic moments should align with the concept's timeline and opportunities.`,
 }
 
 export async function getPrompt(key: PromptKey): Promise<string> {
