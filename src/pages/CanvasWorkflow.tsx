@@ -157,7 +157,7 @@ export default function CanvasWorkflow() {
   const [wildLoading, setWildLoading] = useState<boolean>(false)
 
   const [conceptOverview, setConceptOverview] = useState<string | null>(null)
-  const [rollout, setRollout] = useState<{ months: { m:number; followers:number }[]; moments: { m:number; label:string; kind?:string; color?:string }[]; notes?: string[] } | null>(null)
+  const [rollout, setRollout] = useState<{ months: { m:number; followers:number }[]; moments: { m:number; label:string; kind?:string; color?:string }[]; phases?: { startM:number; endM:number; label:string; summary?:string; kind?:string; color?:string }[]; notes?: string[] } | null>(null)
   const [rolloutLoading, setRolloutLoading] = useState<boolean>(false)
   const [rolloutEditMode, setRolloutEditMode] = useState<boolean>(false)
   const [overviewLoading, setOverviewLoading] = useState<boolean>(false)
@@ -2102,7 +2102,7 @@ export default function CanvasWorkflow() {
           {/* SVG Chart */}
           <svg width={chartWidth} height={chartHeight} className="bg-white/5 rounded">
             {/* Phase bands (AI‑driven) */}
-            {Array.isArray(rollout?.phases) && rollout!.phases!.length > 0 && rollout!.phases!.map((ph, idx) => {
+            {Array.isArray(rollout?.phases) && rollout!.phases!.length > 0 && rollout!.phases!.map((ph: { startM:number; endM:number; label:string; summary?:string; kind?:string; color?:string }, idx: number) => {
               const x1 = xScale(ph.startM + 1)
               const x2 = xScale(ph.endM + 1)
               const wBand = Math.max(0, x2 - x1)
