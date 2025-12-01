@@ -39,7 +39,16 @@ export const DebriefSchema = z.object({
   summary: z.string().optional().default(''),
   keyPoints: z.array(z.string()).optional().default([]),
   didYouKnow: z.array(z.string()).optional().default([]),
-  personaNotes: z.array(z.string()).optional().default([]),
+  personaNotes: z.preprocess(
+    (val) => {
+      // Handle AI returning object instead of array
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        return Object.values(val).filter(v => typeof v === 'string')
+      }
+      return val
+    },
+    z.array(z.string()).optional().default([])
+  ),
 })
 export type DebriefResult = z.infer<typeof DebriefSchema>
 
