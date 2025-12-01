@@ -348,7 +348,7 @@ export async function generateDebrief(concept: string, userId?: string | null, p
 // Refine Debrief with a user instruction
 export async function refineDebrief(
   concept: string,
-  current: { brief?: string; summary?: string; keyPoints?: string[]; didYouKnow?: string[] } | null,
+  current: { brief?: string; summary?: string; keyPoints?: string[]; didYouKnow?: string[]; personaNotes?: string[] } | null,
   message: string,
   userId?: string | null,
   persona?: string | null,
@@ -356,20 +356,24 @@ export async function refineDebrief(
   targetAudience?: string | null
 ) {
   if (!message || !message.trim()) throw new Error('message_required')
+  if (!concept || !concept.trim()) throw new Error('concept_required')
+
   let ctx: RetrievalContext
   try {
     ctx = await retrieveContext(concept, userId || null, { maxResults: 12, includeCore: true, includeLive: true, projectId: projectId || null })
-  } catch {
+  } catch (err) {
+    console.error('[refineDebrief] retrieveContext failed:', err)
     ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
   }
+
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new Error('no-openai')
   const model = process.env.MODEL_NAME || 'gpt-4o-mini'
   const contextStr = formatContextForPrompt(ctx)
-  const { getPrompt, renderTemplate } = await import('./promptStore.js')
-  const prompt = renderTemplate(
-    await getPrompt('refine_debrief'),
-    {
+
+  try {
+    const { getPrompt, renderTemplate } = await import('./promptStore.js')
+    const templateVars = {
       persona,
       personaOrGeneral: persona || 'General',
       targetAudience,
@@ -381,14 +385,19 @@ export async function refineDebrief(
       message,
       context: contextStr,
     }
-  )
-  const { DebriefSchema } = await import('./schemas.js')
-  const parsed = await callJSON(
-    [ { role: 'system', content: 'Return only JSON matching the requested schema.' }, { role: 'user', content: prompt } ],
-    DebriefSchema,
-    { model, maxTokens: 1000, temperature: 0.5, allowExtract: true, retries: 1 }
-  )
-  return { ...parsed, sources: ctx.sources, _debug: { model, prompt } }
+    const prompt = renderTemplate(await getPrompt('refine_debrief'), templateVars)
+
+    const { DebriefSchema } = await import('./schemas.js')
+    const parsed = await callJSON(
+      [ { role: 'system', content: 'Return only JSON matching the requested schema.' }, { role: 'user', content: prompt } ],
+      DebriefSchema,
+      { model, maxTokens: 1200, temperature: 0.5, allowExtract: true, retries: 2 }
+    )
+    return { ...parsed, sources: ctx.sources, _debug: { model, prompt: prompt.slice(0, 500) } }
+  } catch (err: any) {
+    console.error('[refineDebrief] Error:', err?.message, err?.stack?.slice(0, 300))
+    throw new Error(`refine_debrief_failed: ${err?.message || 'unknown'}`)
+  }
 }
 
 // Opportunities: ranked with impact
