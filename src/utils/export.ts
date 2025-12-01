@@ -255,12 +255,12 @@ export function downloadMarkdown(content: string, filename: string) {
 
 /**
  * Export Concept Overview as a formatted PDF via print
- * Collects concept overview, key scores and top opportunities.
+ * Collects full workflow: debrief, narrative, opportunities, enhancements, scores, wildcard
  */
 export function exportOverviewPdf(
   concept: string,
   overviewMarkdown: string,
-  opts?: { persona?: string; region?: string; opps?: { title: string; why?: string; impact?: number }[]; enhancements?: string[]; scores?: any }
+  opts?: { persona?: string; region?: string; opps?: { title: string; why?: string; impact?: number }[]; enhancements?: string[]; scores?: any; narrativeBlocks?: any[]; debrief?: any; wildcard?: any }
 ) {
   const projectId = localStorage.getItem('activeProjectId') || 'local'
   const persona = opts?.persona || (localStorage.getItem('persona') || '').replace(/\"/g,'')
@@ -270,15 +270,18 @@ export function exportOverviewPdf(
   const oppsStore = safeJSON(`opps:${projectId}`)
   const opps = Array.isArray(opts?.opps) ? opts!.opps! : (Array.isArray(oppsStore?.opportunities) ? oppsStore.opportunities : [])
   const enhancements = Array.isArray(opts?.enhancements) ? opts!.enhancements! : []
+  const debrief = opts?.debrief || safeJSON(`debrief:${projectId}`)
+  const narrativeBlocks = opts?.narrativeBlocks || safeJSON(`nf:${projectId}`) || []
+  const wildcard = opts?.wildcard || safeJSON(`wild:${projectId}`)
 
-  // Enhanced Markdown -> HTML conversion for the overview block
+  // Enhanced Markdown -> HTML conversion
   const mdToHtml = (md: string): string => {
     let t = (md || '')
     // Escape HTML first
     t = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     // Handle headings (### -> h3, ## -> h2)
     t = t.replace(/^###\s+(.*)$/gm, '<h3 class="section-heading">$1</h3>')
-    t = t.replace(/^##\s+(.*)$/gm, '<h2 class="major-heading">$1</h2>')
+    t = t.replace(/^##\s+(.*)$/gm, '<h2 class="section-heading">$1</h2>')
     // Bold text
     t = t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     // Bullet lists
@@ -291,7 +294,84 @@ export function exportOverviewPdf(
 
   const overviewHtml = mdToHtml(overviewMarkdown)
 
-  // Don't show opportunities in PDF - only show actual campaign scores
+  // DEBRIEF SECTION
+  const debriefHtml = (() => {
+    if (!debrief?.brief) return ''
+    let html = `<div class="section-block"><h2 class="major-heading">Campaign Essence</h2>`
+    html += `<p class="para">${escapeHtml(debrief.brief)}</p>`
+
+    if (Array.isArray(debrief.keyPoints) && debrief.keyPoints.length > 0) {
+      html += `<h3 class="section-heading">Core Story & Pillars</h3><ul>`
+      debrief.keyPoints.forEach((p: string) => { html += `<li>${escapeHtml(p)}</li>` })
+      html += `</ul>`
+    }
+
+    html += `</div><div class="divider"></div>`
+    return html
+  })()
+
+  // NARRATIVE SECTION
+  const narrativeHtml = (() => {
+    if (!Array.isArray(narrativeBlocks) || narrativeBlocks.length === 0) return ''
+    let html = ''
+    narrativeBlocks.forEach((block: any) => {
+      if (block?.content && block.content.trim()) {
+        html += `<div class="section-block"><h3 class="section-heading">${escapeHtml(block.title || block.key)}</h3>`
+        html += mdToHtml(block.content)
+        html += `</div>`
+      }
+    })
+    if (html) html += `<div class="divider"></div>`
+    return html
+  })()
+
+  // OPPORTUNITIES SECTION
+  const oppHtml = (() => {
+    if (!opps || opps.length === 0) return ''
+    let html = `<div class="section-block"><h2 class="major-heading">Top Opportunities (Specifics)</h2><ul class="opps-list">`
+    opps.slice(0, 6).forEach((o: any, i: number) => {
+      html += `<li><strong>${i + 1}. ${escapeHtml(o.title)}</strong>`
+      if (o.why) html += ` — ${escapeHtml(o.why)}`
+      if (typeof o.impact === 'number') html += ` <em>(impact ${o.impact}/100)</em>`
+      html += `</li>`
+    })
+    html += `</ul></div><div class="divider"></div>`
+    return html
+  })()
+
+  // ENHANCEMENTS SECTION
+  const enhHtml = (() => {
+    if (!enhancements || enhancements.length === 0) return ''
+    let html = `<div class="section-block"><h2 class="major-heading">Selected Enhancements</h2><ul>`
+    enhancements.slice(0, 8).forEach((e: string) => { html += `<li>${escapeHtml(e)}</li>` })
+    html += `</ul></div><div class="divider"></div>`
+    return html
+  })()
+
+  // WILDCARD SECTION
+  const wildcardHtml = (() => {
+    if (!wildcard?.ideas || !Array.isArray(wildcard.ideas) || wildcard.ideas.length === 0) return ''
+    let html = `<div class="section-block"><h2 class="major-heading">Wildcard Insights</h2>`
+    wildcard.ideas.slice(0, 3).forEach((idea: any, idx: number) => {
+      html += `<div class="wildcard-idea"><h3 class="section-heading">${idx + 1}. ${escapeHtml(idea.title || 'Insight')}</h3>`
+      if (Array.isArray(idea.contrarianWhy) && idea.contrarianWhy.length > 0) {
+        html += `<p class="para"><strong>Why Contrarian:</strong></p><ul>`
+        idea.contrarianWhy.forEach((w: string) => { html += `<li>${escapeHtml(w)}</li>` })
+        html += `</ul>`
+      }
+      if (idea.upside) html += `<p class="para"><strong>Upside:</strong> ${escapeHtml(idea.upside)}</p>`
+      if (Array.isArray(idea.risks) && idea.risks.length > 0) {
+        html += `<p class="para"><strong>Risks:</strong></p><ul>`
+        idea.risks.forEach((r: string) => { html += `<li>${escapeHtml(r)}</li>` })
+        html += `</ul>`
+      }
+      html += `</div>`
+    })
+    html += `</div><div class="divider"></div>`
+    return html
+  })()
+
+  // SCORES SECTION (moved to bottom)
   const scoreHtml = (() => {
     const items: string[] = []
     if (typeof scores?.narrative === 'number') items.push(`<li><strong>Cultural Relevance:</strong> ${scores.narrative}/100</li>`)
@@ -300,26 +380,40 @@ export function exportOverviewPdf(
     if (typeof scores?.commercial === 'number') items.push(`<li><strong>Commercial Viability:</strong> ${scores.commercial}/100</li>`)
     if (typeof scores?.overall === 'number') items.push(`<li><strong>Overall Score:</strong> ${scores.overall}/100</li>`)
     if (!items.length) return ''
-    return `<div class="scores-section"><h2>Campaign Scores</h2><ul class="scores-list">${items.join('')}</ul></div>`
+    return `<div class="section-block scores-section"><h2 class="major-heading">Campaign Scores</h2><ul class="scores-list">${items.join('')}</ul></div>`
   })()
 
-  const oppHtml = (() => {
-    if (!opps || opps.length === 0) return ''
-    const items = opps.slice(0, 6).map((o: any, i: number) => `<li><strong>${i + 1}. ${escapeHtml(o.title)}</strong>${o.why ? ` — ${escapeHtml(o.why)}` : ''}${typeof o.impact === 'number' ? ` <em>(impact ${o.impact}/100)</em>` : ''}</li>`)
-    return `<div class="opps-section"><h2>Top Opportunities (specifics)</h2><ul>${items.join('')}</ul></div>`
+  // NEXT STEPS (from debrief)
+  const nextStepsHtml = (() => {
+    if (!debrief) return ''
+    const steps = [
+      '[ ] Sharpen logline to encapsulate campaign essence and objectives.',
+      '[ ] Define POV and tone that reflects warmth and community focus.',
+      '[ ] Lock 3 pillars with sample segments for each.',
+      '[ ] Draft a 1-page treatment detailing campaign vision and execution.',
+      '[ ] Align on brand fit and establish content guardrails.',
+      '[ ] Define success criteria and create a feedback loop for ongoing insights.',
+      '[ ] Validate and pressure-test the selected opportunities through community surveys or focus groups.'
+    ]
+    return `<div class="section-block"><h2 class="major-heading">Next Steps to Finalize Concept</h2><ul class="checklist">${steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul></div><div class="divider"></div>`
   })()
 
-  const enhHtml = (() => {
-    if (!enhancements || enhancements.length === 0) return ''
-    const items = enhancements.slice(0, 8).map((e: string) => `<li>${escapeHtml(e)}</li>`)
-    return `<div class="enh-section"><h2>Selected Enhancements</h2><ul>${items.join('')}</ul></div>`
+  // RISKS & MITIGATIONS
+  const risksHtml = (() => {
+    if (!debrief) return ''
+    return `<div class="section-block"><h2 class="major-heading">Risks & Mitigations</h2><p class="para"><strong>Creative Risk:</strong> The storytelling may not resonate with all segments of the community. <strong>Mitigation:</strong> Conduct pre-launch surveys to gather feedback on narrative direction and adjust accordingly.</p></div>`
   })()
+
+  // Clean filename: truncate concept to 50 chars max, kebab-case
+  const cleanName = concept.slice(0, 50).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+  const timestamp = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+  const filename = `${cleanName || 'concept'}_${timestamp}.pdf`
 
   const html = `<!doctype html>
   <html>
   <head>
     <meta charset="utf-8" />
-    <title>Concept Overview — ${escapeHtml(concept)}</title>
+    <title>${escapeHtml(filename)}</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
@@ -327,28 +421,28 @@ export function exportOverviewPdf(
         line-height: 1.6;
       }
       .container { max-width: 800px; margin: 0 auto; padding: 32px; }
-      h1 {
-        font-size: 24px;
+      h1.doc-title {
+        font-size: 22px;
         margin: 0 0 12px;
         text-transform: uppercase;
         letter-spacing: .08em;
         font-weight: 700;
       }
-      h2, .major-heading {
-        font-size: 18px;
-        margin: 24px 0 12px;
+      h2.major-heading {
+        font-size: 16px;
+        margin: 28px 0 12px;
         text-transform: uppercase;
         letter-spacing: .06em;
         font-weight: 600;
-        color: #333;
+        color: #222;
       }
-      h3, .section-heading {
+      h3.section-heading {
         font-size: 14px;
         margin: 20px 0 8px;
         text-transform: uppercase;
         letter-spacing: .05em;
         font-weight: 600;
-        color: #555;
+        color: #444;
       }
       p.para {
         line-height: 1.7;
@@ -361,6 +455,9 @@ export function exportOverviewPdf(
         font-size: 14px;
       }
       ul li { margin-bottom: 6px; }
+      ul.opps-list li { margin-bottom: 12px; }
+      ul.checklist { list-style: none; margin-left: 0; }
+      ul.checklist li { margin-bottom: 8px; }
       .meta {
         font-size: 13px;
         color: #666;
@@ -368,7 +465,8 @@ export function exportOverviewPdf(
         line-height: 1.6;
       }
       .meta div { margin: 4px 0; }
-      .divider { border-top: 2px solid #ddd; margin: 24px 0; }
+      .divider { border-top: 1px solid #ddd; margin: 28px 0; }
+      .section-block { margin: 24px 0; }
       .scores-section {
         background: #f8f9fa;
         padding: 20px;
@@ -384,6 +482,12 @@ export function exportOverviewPdf(
         margin: 10px 0;
         font-size: 15px;
       }
+      .wildcard-idea {
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #eee;
+      }
+      .wildcard-idea:last-child { border-bottom: none; }
       @media print {
         .no-print { display: none; }
         body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
@@ -392,7 +496,7 @@ export function exportOverviewPdf(
   </head>
   <body>
     <div class="container">
-      <h1>Concept Overview</h1>
+      <h1 class="doc-title">Concept Overview</h1>
       <div class="meta">
         <div><strong>Concept:</strong> ${escapeHtml(concept)}</div>
         ${persona?`<div><strong>Persona:</strong> ${escapeHtml(persona)}</div>`:''}
@@ -401,10 +505,14 @@ export function exportOverviewPdf(
         <div><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
       </div>
       <div class="divider"></div>
-      ${overviewHtml}
-      ${scoreHtml}
+      ${debriefHtml}
+      ${narrativeHtml}
       ${oppHtml}
       ${enhHtml}
+      ${wildcardHtml}
+      ${scoreHtml}
+      ${nextStepsHtml}
+      ${risksHtml}
     </div>
     <script>
       window.onload = () => { setTimeout(()=>{ window.print() }, 300) }
