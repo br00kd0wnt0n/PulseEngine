@@ -316,6 +316,14 @@ export default function CanvasWorkflow() {
   const [scoringError, setScoringError] = useState<string | null>(null)
   const [conceptCreators, setConceptCreators] = useState<any[]>([])
 
+  // Persist a compact snapshot of scores for exports and model rollout
+  useEffect(() => {
+    try {
+      const pid = localStorage.getItem('activeProjectId') || 'local'
+      if (scores) localStorage.setItem(`score:${pid}`, JSON.stringify(scores))
+    } catch {}
+  }, [scores])
+
   // Track if nodes have been stacked to avoid infinite loops
   const [nodesStacked, setNodesStacked] = useState(false)
   // Narrative refresh + in-flight tracking
@@ -1678,7 +1686,15 @@ export default function CanvasWorkflow() {
                 )}
                 <ScoreBar label="Cultural Relevance" value={scores?.narrative ?? 0} />
                 <ScoreBar label="Engagement Potential" value={scores?.cross ?? 0} />
-                <ScoreBar label="Platform Fit" value={scores?.ttpWeeks ? Math.max(0, 100 - (scores.ttpWeeks-1)*12) : 0} />
+                <ScoreBar
+                  label="Platform Fit"
+                  value={(() => {
+                    const direct = Number((rawScore as any)?.extended?.timeToPeakScore)
+                    if (Number.isFinite(direct)) return direct
+                    if (scores?.ttpWeeks) return Math.max(0, 100 - (scores.ttpWeeks - 1) * 12)
+                    return 0
+                  })()}
+                />
                 <ScoreBar label="Commercial Viability" value={scores?.commercial ?? 0} />
               </div>
 
@@ -1698,16 +1714,23 @@ export default function CanvasWorkflow() {
                             if (ev.target.checked) set.add(idx); else set.delete(idx)
                             setSelectedEnhancements(set)
 
-                            // Apply score deltas immediately
+                            // Apply score deltas immediately (gentle scaling + clamping)
                             if (e.deltas && scores) {
-                              const delta = ev.target.checked ? 1 : -1
-                              setScores(prev => prev ? {
-                                narrative: (prev.narrative || 0) + ((e.deltas?.narrative || 0) * delta),
-                                ttpWeeks: (prev.ttpWeeks || 0) + ((e.deltas?.ttp || 0) * delta),
-                                cross: (prev.cross || 0) + ((e.deltas?.cross || 0) * delta),
-                                commercial: (prev.commercial || 0) + ((e.deltas?.commercial || 0) * delta),
-                                overall: prev.overall
-                              } : prev)
+                              const sign = ev.target.checked ? 1 : -1
+                              const scale = 0.5 // reduce jumpiness; apply half-strength deltas
+                              setScores(prev => {
+                                if (!prev) return prev
+                                const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
+                                const nextNarr = clamp((prev.narrative || 0) + (Number(e.deltas?.narrative || 0) * scale * sign))
+                                const nextCross = clamp((prev.cross || 0) + (Number(e.deltas?.cross || 0) * scale * sign))
+                                const nextComm  = clamp((prev.commercial || 0) + (Number(e.deltas?.commercial || 0) * scale * sign))
+                                // For time‑to‑peak, deltas indicate improved speed; approximate by reducing weeks slightly
+                                const weekShift = Math.sign(sign) * Math.ceil((Number(e.deltas?.ttp || 0) * scale) / 5)
+                                const nextWeeks = Math.max(1, Math.min(12, Math.round((prev.ttpWeeks || 8) - weekShift)))
+                                const fit = Math.max(0, 100 - (nextWeeks - 1) * 12)
+                                const nextOverall = Math.round((nextNarr + nextCross + nextComm + fit) / 4)
+                                return { ...prev, narrative: nextNarr, cross: nextCross, commercial: nextComm, ttpWeeks: nextWeeks, overall: nextOverall }
+                              })
                             }
 
                             // Auto-refresh concept overview if it exists

@@ -146,7 +146,8 @@ export async function generateScoresAI(
 
   const ttpWeeksRaw = pick(parsed.scores.timeToPeakWeeks as unknown as number, baseline?.scores.timeToPeakWeeks)
   const ttpWeeks = Math.max(1, Math.min(12, Number(ttpWeeksRaw ?? 8)))
-  const timeToPeakScore = Math.max(0, Math.min(100, 100 - (ttpWeeks - 1) * 12))
+  // Avoid flat zeroes; set a small floor to keep scale meaningful
+  const timeToPeakScore = Math.max(10, Math.min(100, 100 - (ttpWeeks - 1) * 12))
   const collab = pick(parsed.scores.collaborationOpportunity, baseline?.scores.collaborationOpportunity)
   const narr = pick(parsed.scores.narrativeStrength, baseline?.scores.narrativeStrength)
   const cross = pick(parsed.ralph.crossPlatformPotential, baseline?.ralph.crossPlatformPotential)
@@ -385,7 +386,7 @@ export async function refineDebrief(
   const parsed = await callJSON(
     [ { role: 'system', content: 'Return only JSON matching the requested schema.' }, { role: 'user', content: prompt } ],
     DebriefSchema,
-    { model, maxTokens: 600, temperature: 0.5, allowExtract: true, retries: 1 }
+    { model, maxTokens: 1000, temperature: 0.5, allowExtract: true, retries: 1 }
   )
   return { ...parsed, sources: ctx.sources, _debug: { model, prompt } }
 }

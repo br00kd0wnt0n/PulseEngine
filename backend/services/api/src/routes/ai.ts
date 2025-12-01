@@ -78,6 +78,28 @@ router.post('/concept-overview', async (req, res) => {
     const enhText = Array.isArray(enhancements) && enhancements.length
       ? enhancements.slice(0, 6).map((t: string) => `- ${t}`).join('\n')
       : ''
+    const scoresText = (() => {
+      try {
+        if (!scores) return ''
+        const s = typeof scores === 'string' ? JSON.parse(scores) : scores
+        const narr = Number(s?.narrative ?? s?.narrativeStrength)
+        const cross = Number(s?.cross ?? s?.crossPlatformPotential)
+        const comm = Number(s?.commercial ?? s?.commercialPotential)
+        const overall = Number(s?.overall ?? s?.extended?.overall)
+        const ttpWeeks = Number(s?.ttpWeeks ?? s?.timeToPeakWeeks)
+        const platformFit = Number.isFinite(ttpWeeks)
+          ? Math.max(0, Math.min(100, 100 - (Math.max(1, Math.min(12, ttpWeeks)) - 1) * 12))
+          : (Number(s?.ttpScore) || null)
+        const fmt10 = (x: any) => `${(Math.max(0, Math.min(100, Number(x) || 0)) / 10).toFixed(1)}/10`
+        const parts: string[] = []
+        if (Number.isFinite(narr)) parts.push(`Narrative ${fmt10(narr)}`)
+        if (Number.isFinite(cross)) parts.push(`Cross-platform ${fmt10(cross)}`)
+        if (platformFit !== null) parts.push(`Platform fit ${fmt10(platformFit as number)}`)
+        if (Number.isFinite(comm)) parts.push(`Commercial ${fmt10(comm)}`)
+        if (Number.isFinite(overall)) parts.push(`Overall ${fmt10(overall)}`)
+        return parts.join('; ')
+      } catch { return '' }
+    })()
     // Use centralized prompt template for richer, integrated overviews
     const { getPrompt, renderTemplate } = await import('../services/promptStore.js')
     const ralphLens = await getPrompt('ralph_lens')
@@ -93,7 +115,7 @@ router.post('/concept-overview', async (req, res) => {
         narrative,
         opportunitiesList: oppText,
         enhancementsList: enhText,
-        scoresSummary: (() => { try { return scores ? JSON.stringify(scores) : '' } catch { return '' } })(),
+        scoresSummary: scoresText,
         ralphLens,
         projectId,
       }
