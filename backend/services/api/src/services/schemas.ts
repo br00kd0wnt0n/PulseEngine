@@ -41,11 +41,19 @@ export const DebriefSchema = z.object({
   didYouKnow: z.array(z.string()).optional().default([]),
   personaNotes: z.preprocess(
     (val) => {
-      // Handle AI returning object instead of array
-      if (val && typeof val === 'object' && !Array.isArray(val)) {
+      // Handle AI returning different types instead of array
+      if (!val) return []
+      if (Array.isArray(val)) return val
+      if (typeof val === 'string') {
+        // If it's a string, try to split by newlines or return as single item
+        const lines = val.split('\n').map(s => s.trim()).filter(Boolean)
+        return lines.length > 0 ? lines : [val]
+      }
+      if (typeof val === 'object') {
+        // If it's an object, extract string values
         return Object.values(val).filter(v => typeof v === 'string')
       }
-      return val
+      return []
     },
     z.array(z.string()).optional().default([])
   ),
