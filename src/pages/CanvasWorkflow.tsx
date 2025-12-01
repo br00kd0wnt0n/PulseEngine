@@ -1816,7 +1816,7 @@ export default function CanvasWorkflow() {
                       console.error('[Wildcard] Error:', err)
                       setWildIdeas([])
                       setNodes(prev => prev.map(n => n.id === 'wildcard' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n))
-                      addActivity('Wildcard generation failed', 'error')
+                      addActivity('Wildcard generation failed')
                     } finally {
                       setWildLoading(false)
                     }
