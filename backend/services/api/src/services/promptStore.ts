@@ -176,25 +176,31 @@ personaNotes: 2 bullets of guidance specific to {{personaRole}}.`,
 Keep it specific, non-generic, and avoid repeating the inputs. Use compact, scannable bullets.`,
 
   clarifying_questions:
-    `You are a {{personaRole}}. Read the concept brief, debrief, and uploaded materials below, then ask up to 3 clarifying questions that would materially improve the campaign strategy.
+    `You are a {{personaRole}}. Read the concept brief and debrief below, then ask up to 3 clarifying questions that would materially improve the campaign strategy.
 
 CONCEPT: "{{concept}}"
-BRIEF (user): {{brief}}
-DEBRIEF (current): {{debrief}}
+BRIEF (user's submission): {{brief}}
+DEBRIEF (AI-generated analysis): {{debrief}}
 {{#if opportunitiesList}}OPPORTUNITIES (top):
 {{opportunitiesList}}
 {{/if}}
 
-{{#if context}}# UPLOADED MATERIALS & KNOWLEDGE BASE:
+{{#if context}}# AVAILABLE CONTEXT:
 {{context}}
 
-Use the uploaded materials to ask specific, informed questions about gaps, contradictions, or opportunities you see between the brief and the available context.
+IMPORTANT INSTRUCTIONS FOR CONTEXT USAGE:
+- The "Project Contextual Files" section contains the user's actual uploaded brief/documents
+- The "Ralph Knowledge Base (RKB)" section contains industry examples for your reference ONLY
+- ONLY ask questions about what you see in the user's uploaded brief and the debrief
+- DO NOT cite or reference RKB documents as if the user uploaded them
+- DO NOT ask about documents from the RKB (they are background context only)
+- Focus your questions on clarifying the user's specific project goals, constraints, and requirements
 {{/if}}
 
 Rules:
 - Questions must be concrete and answerable in 1–2 sentences by the user.
 - Only ask if the answer would change strategy, phasing, platform choices, or partner criteria.
-- Reference specific details from the uploaded materials when relevant.
+- Ask about gaps, ambiguities, or assumptions in the user's brief and the generated debrief.
 - Avoid generic "tell me more" or restating the brief.
 - Return ONLY JSON: { "questions": string[] } (max 3).`,
 
