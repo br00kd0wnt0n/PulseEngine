@@ -1801,17 +1801,22 @@ export default function CanvasWorkflow() {
                       setWildLoading(true)
                       const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
                       const baseline = [debrief?.brief || '', narrative?.text || ''].filter(Boolean).join('\n\n')
+                      console.log('[Wildcard] Calling API with concept:', concept)
                       const resp = await api.wildcard(concept, { persona, region, projectId: pid, baseline })
+                      console.log('[Wildcard] Response:', resp)
                       const ideas = Array.isArray(resp?.ideas) ? resp.ideas : []
                       const sources = Array.isArray((resp as any)?.sourcesUsed) ? (resp as any).sourcesUsed : []
+                      console.log('[Wildcard] Ideas count:', ideas.length)
                       setWildIdeas(ideas)
                       setWildSources(sources)
                       try { if (pid) localStorage.setItem(`wild:${pid}`, JSON.stringify({ ts: Date.now(), ...resp })) } catch {}
                       setNodes(prev => prev.map(n => n.id === 'wildcard' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n))
-                      addActivity('Rolled Wildcard insight', 'ai')
+                      addActivity(ideas.length > 0 ? 'Rolled Wildcard insight' : 'Wildcard generated no ideas', 'ai')
                     } catch (err) {
+                      console.error('[Wildcard] Error:', err)
                       setWildIdeas([])
                       setNodes(prev => prev.map(n => n.id === 'wildcard' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n))
+                      addActivity('Wildcard generation failed', 'error')
                     } finally {
                       setWildLoading(false)
                     }
