@@ -137,12 +137,14 @@ router.post('/concept-overview', async (req, res) => {
 
 // Clarifying Questions
 router.post('/clarifying-questions', async (req, res) => {
-  const { concept, brief, debrief, opportunities, persona, targetAudience, region } = req.body || {}
+  const { concept, brief, debrief, opportunities, persona, targetAudience, region, projectId } = req.body || {}
   if (!concept || !debrief) return res.status(400).json({ error: 'concept and debrief required' })
   try {
-    const data = await generateClarifyingQuestions(concept, brief || '', debrief || '', opportunities || [], persona || null, targetAudience || null, region || null)
+    const userId = (req as any).user?.sub || null
+    const data = await generateClarifyingQuestions(concept, brief || '', debrief || '', opportunities || [], persona || null, targetAudience || null, region || null, userId, projectId || null)
     res.json(data)
   } catch (e: any) {
+    console.error('[clarifying-questions] Error:', e?.message)
     res.status(500).json({ error: e?.message || 'failed' })
   }
 })

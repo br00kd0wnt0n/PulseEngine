@@ -176,7 +176,7 @@ personaNotes: 2 bullets of guidance specific to {{personaRole}}.`,
 Keep it specific, non-generic, and avoid repeating the inputs. Use compact, scannable bullets.`,
 
   clarifying_questions:
-    `You are a {{personaRole}}. Read the concept brief and the generated debrief below, then ask up to 3 clarifying questions that would materially improve the campaign strategy.
+    `You are a {{personaRole}}. Read the concept brief, debrief, and uploaded materials below, then ask up to 3 clarifying questions that would materially improve the campaign strategy.
 
 CONCEPT: "{{concept}}"
 BRIEF (user): {{brief}}
@@ -185,10 +185,17 @@ DEBRIEF (current): {{debrief}}
 {{opportunitiesList}}
 {{/if}}
 
+{{#if context}}# UPLOADED MATERIALS & KNOWLEDGE BASE:
+{{context}}
+
+Use the uploaded materials to ask specific, informed questions about gaps, contradictions, or opportunities you see between the brief and the available context.
+{{/if}}
+
 Rules:
 - Questions must be concrete and answerable in 1–2 sentences by the user.
 - Only ask if the answer would change strategy, phasing, platform choices, or partner criteria.
-- Avoid generic “tell me more” or restating the brief.
+- Reference specific details from the uploaded materials when relevant.
+- Avoid generic "tell me more" or restating the brief.
 - Return ONLY JSON: { "questions": string[] } (max 3).`,
 
   concept_proposal:

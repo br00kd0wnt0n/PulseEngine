@@ -857,20 +857,32 @@ export async function generateClarifyingQuestions(
   opportunities?: { title: string; impact?: number }[],
   persona?: string | null,
   targetAudience?: string | null,
-  region?: string | null
+  region?: string | null,
+  userId?: string | null,
+  projectId?: string | null
 ) {
+  // Retrieve context from uploaded materials and knowledge base
+  let ctx: RetrievalContext
+  try {
+    ctx = await retrieveContext(concept, userId || null, { maxResults: 10, includeCore: true, includeLive: false, projectId: projectId || null })
+  } catch (err) {
+    console.error('[generateClarifyingQuestions] retrieveContext failed:', err)
+    ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
+  }
+  const contextStr = formatContextForPrompt(ctx)
+
   const { getPrompt, renderTemplate } = await import('./promptStore.js')
   const tpl = await getPrompt('clarifying_questions')
   const opportunitiesList = Array.isArray(opportunities) && opportunities.length
     ? opportunities.slice(0, 6).map((o: any, i: number) => `${i+1}. ${o.title}${o.impact?` — ${o.impact}`:''}`).join('\n')
     : ''
-  const prompt = renderTemplate(tpl, { concept, brief, debrief: debriefText, opportunitiesList, persona, personaOrGeneral: persona || 'General', targetAudience, region })
+  const prompt = renderTemplate(tpl, { concept, brief, debrief: debriefText, opportunitiesList, persona, personaOrGeneral: persona || 'General', targetAudience, region, context: contextStr })
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return { questions: [] }
   const { OpenAI } = await import('openai')
   const client = new OpenAI({ apiKey })
   const model = process.env.MODEL_NAME || 'gpt-4o-mini'
-  const resp = await client.chat.completions.create({ model, temperature: 0.4, max_tokens: 250, messages: [ { role:'system', content:'Return only JSON with key "questions" (max 3).' }, { role:'user', content: prompt } ] })
+  const resp = await client.chat.completions.create({ model, temperature: 0.4, max_tokens: 300, messages: [ { role:'system', content:'Return only JSON with key "questions" (max 3).' }, { role:'user', content: prompt } ] })
   const raw = resp.choices?.[0]?.message?.content || '{}'
   try { const parsed = JSON.parse(raw); return parsed } catch { const m = raw.match(/\{[\s\S]*\}/); if (m) { try { return JSON.parse(m[0]) } catch{} } }
   return { questions: [] }
