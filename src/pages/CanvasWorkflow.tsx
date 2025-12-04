@@ -342,6 +342,80 @@ export default function CanvasWorkflow() {
   const [nodesStacked, setNodesStacked] = useState(false)
   // Narrative refresh + in-flight tracking
   const [narrativeRefreshRequested, setNarrativeRefreshRequested] = useState(false)
+
+  // Find clear space for a new node (avoids overlap with existing nodes)
+  const findClearSpace = (sourceNode: NodeData | undefined, newWidth: number, newHeight: number): { x: number; y: number } => {
+    // Default position if no source node
+    let targetX = 50
+    let targetY = 360
+
+    if (sourceNode) {
+      // Try to position to the right of the source node
+      targetX = sourceNode.x + sourceNode.width + 30
+      targetY = sourceNode.y
+    }
+
+    // Check for overlaps and adjust
+    const checkOverlap = (x: number, y: number, w: number, h: number): boolean => {
+      return nodes.some(n => {
+        const nw = n.minimized ? 240 : n.width
+        const nh = n.minimized ? 48 : n.height
+        return !(x + w < n.x || x > n.x + nw || y + h < n.y || y > n.y + nh)
+      })
+    }
+
+    // Try positions: right of source, below source, then find any clear spot
+    const positions = [
+      { x: targetX, y: targetY }, // Right of source
+      { x: sourceNode?.x || 50, y: (sourceNode?.y || 0) + (sourceNode?.height || 0) + 30 }, // Below source
+      { x: targetX, y: targetY + 200 }, // Further below right
+      { x: 50, y: Math.max(...nodes.map(n => n.y + (n.minimized ? 48 : n.height)), 100) + 30 }, // Bottom of canvas
+    ]
+
+    for (const pos of positions) {
+      if (!checkOverlap(pos.x, pos.y, newWidth, newHeight)) {
+        return pos
+      }
+    }
+
+    // If all positions overlap, stack below the lowest node
+    const lowestY = Math.max(...nodes.map(n => n.y + (n.minimized ? 48 : n.height)), 100)
+    return { x: targetX, y: lowestY + 30 }
+  }
+
+  // Launch Course Correct for a specific node
+  const launchCourseCorrect = (sourceNodeId: string, sourceNodeTitle: string) => {
+    const sourceNode = nodes.find(n => n.id === sourceNodeId)
+    const existingCC = nodes.filter(n => n.id.startsWith('course-correct'))
+    const nextNum = existingCC.length + 1
+    const maxZ = Math.max(...nodes.map(n => n.zIndex), 0)
+
+    const ccWidth = 320
+    const ccHeight = 180
+    const { x, y } = findClearSpace(sourceNode, ccWidth, ccHeight)
+
+    const newCCId = `course-correct-${nextNum}`
+
+    setNodes(prev => ([
+      ...prev,
+      {
+        id: newCCId,
+        type: 'course-correct',
+        title: `Course Correct: ${sourceNodeTitle}`,
+        x,
+        y,
+        width: ccWidth,
+        height: ccHeight,
+        minimized: false,
+        zIndex: maxZ + 1,
+        status: 'active' as const,
+        connectedTo: [sourceNodeId] // Connect to the source node
+      }
+    ]))
+
+    // Pre-fill with context about which node we're correcting
+    setCcInputs(prev => ({ ...prev, [newCCId]: '' }))
+  }
   const debriefRefreshInFlight = useRef(false)
   const narrativeInFlight = useRef(false)
 
@@ -621,25 +695,8 @@ export default function CanvasWorkflow() {
         }
       ]))
     }
-    // Ensure Course Correct node exists early - floating, no connections
-    if (!nodes.find(n => n.id.startsWith('course-correct'))) {
-      setNodes(prev => ([
-        ...prev,
-        {
-          id: 'course-correct-1',
-          type: 'course-correct',
-          title: 'Course Correct',
-          x: 50,
-          y: 360,
-          width: 300,
-          height: 160,
-          minimized: false,
-          zIndex: 3,
-          status: 'active' as const
-          // No connectedTo - this is a floating node
-        }
-      ]))
-    }
+    // Course Correct nodes are now launched from the Course Correct button on each node
+    // No automatic creation needed
   }, [activated, nodes, processed])
 
   // Stack and minimize left nodes when debrief opens
@@ -1311,43 +1368,25 @@ export default function CanvasWorkflow() {
       const isLoading = ccLoading === nodeId
       const disabled = isLoading || !concept
 
-      // Add node callback for the '+' button
-      const addCourseCorrectNode = () => {
-        const existingCC = nodes.filter(n => n.id.startsWith('course-correct'))
-        const nextNum = existingCC.length + 1
-        const maxZ = Math.max(...nodes.map(n => n.zIndex), 0)
-        // Position below existing ones
-        const lastCC = existingCC[existingCC.length - 1]
-        const newY = lastCC ? lastCC.y + (lastCC.minimized ? 60 : lastCC.height) + 20 : 360
-        setNodes(prev => ([
-          ...prev,
-          {
-            id: `course-correct-${nextNum}`,
-            type: 'course-correct',
-            title: 'Course Correct',
-            x: 50,
-            y: newY,
-            width: 300,
-            height: 160,
-            minimized: false,
-            zIndex: maxZ + 1,
-            status: 'active' as const
-          }
-        ]))
-      }
-
-      // Attach onAddNode to the node data for the Node component to use
-      if (!node.onAddNode) {
-        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, onAddNode: addCourseCorrectNode } : n))
-      }
+      // Get the connected node info for context
+      const connectedNodeId = node.connectedTo?.[0]
+      const connectedNode = connectedNodeId ? nodes.find(n => n.id === connectedNodeId) : null
 
       return (
         <div className="space-y-2 text-[11px]">
+          {connectedNode && (
+            <div className="text-purple-300/70 text-[10px] mb-1">
+              Adjusting: <span className="text-purple-200">{connectedNode.title}</span>
+            </div>
+          )}
           <textarea
             value={ccInput}
             onChange={(e)=>setCcInputs(prev => ({ ...prev, [nodeId]: e.target.value }))}
             onMouseDown={(e)=>e.stopPropagation()}
-            placeholder="e.g., Show more aggressive enhancements; add an opportunity about X; tighten platform fit."
+            placeholder={connectedNode
+              ? `Describe changes for ${connectedNode.title}...`
+              : "e.g., Show more aggressive enhancements; add an opportunity about X; tighten platform fit."
+            }
             className="w-full h-16 bg-charcoal-800/70 border border-purple-400/30 rounded px-2 py-1 text-[11px] resize-none focus:border-purple-400/60 focus:outline-none"
           />
           <div className="flex items-center gap-2">
@@ -2685,8 +2724,12 @@ export default function CanvasWorkflow() {
 
   return (
     <div className="relative w-full h-screen">
-      {/* Canvas with Nodes */}
-      <Canvas nodes={nodes} onNodesChange={setNodes} renderNodeContent={renderNodeContent} />
+      {/* Canvas with Nodes - attach onCourseCorrect callback to each node */}
+      <Canvas
+        nodes={nodes.map(n => ({ ...n, onCourseCorrect: launchCourseCorrect }))}
+        onNodesChange={setNodes}
+        renderNodeContent={renderNodeContent}
+      />
 
       {/* Activity Toasts (top-right of canvas, stacked) */}
       <div className="pointer-events-none absolute top-4 right-4 z-[300] flex flex-col-reverse gap-2 w-72">

@@ -12,7 +12,7 @@ export type NodeData = {
   zIndex: number
   status?: 'idle' | 'active' | 'complete' | 'processing'
   connectedTo?: string[]
-  onAddNode?: () => void // Callback for adding duplicate nodes (e.g., Course Correct)
+  onCourseCorrect?: (nodeId: string, nodeTitle: string) => void // Launch Course Correct for this node
 }
 
 type NodeProps = {
@@ -114,9 +114,9 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, scale = 1, 
 
   // Type-based colors (brand-consistent accents)
   const getNodeColor = () => {
-    // Wildcard: standout yellow accent
+    // Wildcard: yellow to match Roll Wildcard button
     if (data.type === 'wildcard') {
-      return 'border-yellow-400/60 bg-yellow-400/20'
+      return 'border-yellow-400/40 bg-yellow-400/10'
     }
     // Integrations (inactive): subtle greyed
     if (data.type === 'integration') {
@@ -168,6 +168,11 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, scale = 1, 
   const nodeColor = getNodeColor()
   const hoverGlow = getHoverGlow()
 
+  // Show Course Correct button on content nodes (not on utility/input nodes or course-correct itself)
+  const showCourseCorrectButton = !['course-correct', 'integration', 'rkb', 'input', 'user-input', 'upload', 'brief-input', 'context-upload'].includes(data.type)
+    && !data.id.startsWith('course-correct')
+    && !['brief-input', 'context-upload', 'rkb'].includes(data.id)
+
   return (
     <div
       ref={nodeRef}
@@ -196,16 +201,6 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, scale = 1, 
           <div className="text-sm font-medium">{data.title}</div>
         </div>
         <div className="flex items-center gap-1">
-          {/* Add button for course-correct type nodes */}
-          {data.type === 'course-correct' && data.onAddNode && (
-            <button
-              onClick={(e) => { e.stopPropagation(); data.onAddNode?.() }}
-              className="px-2 py-0.5 text-xs hover:bg-white/10 rounded transition-colors text-purple-300"
-              title="Add another Course Correct"
-            >
-              +
-            </button>
-          )}
           <button
             onClick={toggleMinimize}
             className="px-2 py-0.5 text-xs hover:bg-white/10 rounded transition-colors"
@@ -218,9 +213,20 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, scale = 1, 
       {/* Content */}
       {!data.minimized && (
         <>
-          <div className="node-content p-3 overflow-auto" style={{ height: data.height - 48 }}>
+          <div className="node-content p-3 overflow-auto" style={{ height: data.height - 48 - (showCourseCorrectButton ? 36 : 0) }}>
             {children}
           </div>
+          {/* Course Correct button - shown on content nodes */}
+          {showCourseCorrectButton && data.onCourseCorrect && (
+            <div className="absolute bottom-5 left-3 right-3">
+              <button
+                onClick={(e) => { e.stopPropagation(); data.onCourseCorrect?.(data.id, data.title) }}
+                className="w-full px-2 py-1.5 rounded border border-purple-400/40 bg-purple-500/20 hover:bg-purple-500/40 text-[10px] text-purple-200 font-medium transition-colors"
+              >
+                Course Correct
+              </button>
+            </div>
+          )}
           {/* Resize handle */}
           <div
             className="resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize opacity-50 hover:opacity-100 transition-opacity"
