@@ -193,7 +193,18 @@ export default function CanvasWorkflow() {
   const hasPlaceholders = (items: any[]) => items.some(it => typeof it?.id === 'string' && (it.id.startsWith('placeholder-') || it.id.startsWith('url-placeholder-')))
 
   const addActivity = (text: string, kind?: 'rkb'|'project'|'trends'|'ai') => {
-    setRkbActivity(prev => [{ id: Date.now(), text, kind }, ...prev].slice(0, 20))
+    const id = Date.now() + Math.floor(Math.random()*1000)
+    setRkbActivity(prev => [{ id, text, kind }, ...prev].slice(0, 10))
+    // auto-fade then remove
+    setTimeout(() => {
+      const el = document.getElementById('toast-'+id)
+      if (el) {
+        el.classList.add('opacity-0')
+        setTimeout(() => setRkbActivity(prev => prev.filter(a => a.id !== id)), 600)
+      } else {
+        setRkbActivity(prev => prev.filter(a => a.id !== id))
+      }
+    }, 3500)
   }
 
   const [wildIdeas, setWildIdeas] = useState<any[] | null>(null)
@@ -288,6 +299,9 @@ export default function CanvasWorkflow() {
   const [clarifyingQs, setClarifyingQs] = useState<string[] | null>(null)
   const [clarifyingAns, setClarifyingAns] = useState<string[]>([])
   const [clarifyingLoading, setClarifyingLoading] = useState<boolean>(false)
+  // Course Correct
+  const [ccInput, setCcInput] = useState<string>('')
+  const [ccLoading, setCcLoading] = useState<boolean>(false)
   const [loading, setLoading] = useState(false)
   const [debriefAccepted, setDebriefAccepted] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -607,6 +621,25 @@ export default function CanvasWorkflow() {
         }
       ]))
     }
+    // Ensure Course Correct node exists early
+    if (!nodes.find(n => n.id === 'course-correct')) {
+      setNodes(prev => ([
+        ...prev,
+        {
+          id: 'course-correct',
+          type: 'input',
+          title: 'Course Correct',
+          x: 50,
+          y: 360,
+          width: 320,
+          height: 180,
+          minimized: false,
+          zIndex: 3,
+          status: 'active' as const,
+          connectedTo: ['debrief-opportunities', 'narrative', 'scoring', 'concept-overview']
+        }
+      ]))
+    }
   }, [activated, nodes, processed])
 
   // Stack and minimize left nodes when debrief opens
@@ -685,6 +718,7 @@ export default function CanvasWorkflow() {
           persona: persona || undefined,
           targetAudience: targetAudience || undefined,
           region: region || undefined,
+          projectId: (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })(),
         })
         const qs = Array.isArray(questions?.questions) ? questions.questions.slice(0,3) : []
         setClarifyingQs(qs)
@@ -1265,17 +1299,121 @@ export default function CanvasWorkflow() {
           {isProcessing && (
             <div className=""><BrandSpinner text="Evaluating context and composing insights…" /></div>
           )}
-          <div className="panel p-2 bg-white/5 border border-white/10 max-h-28 overflow-auto space-y-1">
-            {rkbActivity.length === 0 ? (
-              <div className="text-white/40 text-[10px]">No recent activity</div>
-            ) : (
-              rkbActivity.slice(0, 8).map((a) => (
-                <div key={a.id} className="flex items-center gap-2 text-[10px]">
-                  <span className={`w-1.5 h-1.5 rounded-full ${a.kind === 'ai' ? 'bg-ralph-cyan' : a.kind === 'project' ? 'bg-ralph-pink' : 'bg-white/40'}`} />
-                  <span className="text-white/70">{a.text}</span>
-                </div>
-              ))
-            )}
+          {/* Activity feed moved to toast overlay */}
+        </div>
+      )
+    }
+
+    if (node.id === 'course-correct') {
+      const disabled = ccLoading || !concept
+      return (
+        <div className="space-y-2 text-[11px]">
+          <textarea
+            value={ccInput}
+            onChange={(e)=>setCcInput(e.target.value)}
+            onMouseDown={(e)=>e.stopPropagation()}
+            placeholder="e.g., Show more aggressive enhancements; add an opportunity about X; tighten platform fit."
+            className="w-full h-20 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-[11px] resize-none"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              className="flex-1 px-2 py-1 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan disabled:opacity-50"
+              disabled={disabled || !ccInput.trim()}
+              onClick={async (e)=>{
+                e.stopPropagation()
+                if (!ccInput.trim()) return
+                try {
+                  setCcLoading(true)
+                  addActivity('Applying course correction…', 'ai')
+                  const pid = (()=>{ try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
+                  const scoresText = (()=>{ try { return JSON.stringify(scores || {}) } catch { return '' } })()
+                  const resp = await api.courseCorrect(concept, {
+                    message: ccInput.trim(),
+                    persona: persona || undefined,
+                    targetAudience: targetAudience || undefined,
+                    region: region || undefined,
+                    debrief: debrief?.brief || '',
+                    opportunities: (opps?.opportunities || []).slice(0,6).map(o=>({ title: o.title, impact: o.impact })),
+                    narrative: narrative?.text || '',
+                    enhancements: enhancements.map(e=>e.text),
+                    scoresText
+                  })
+                  const actions = (resp && resp.actions) || {}
+                  // 1) Refine Debrief
+                  if (actions.refineDebrief && concept) {
+                    setNodes(prev=>prev.map(n=>n.id==='debrief-opportunities'?{...n, status:'processing' as const}:n))
+                    const updated = await api.refineDebrief(concept, debrief, actions.refineDebrief, { persona, projectId: pid, targetAudience })
+                    setDebrief(updated)
+                    try { if (pid) localStorage.setItem(`debrief:${pid}`, JSON.stringify(updated)) } catch {}
+                    setNodes(prev=>prev.map(n=>n.id==='debrief-opportunities'?{...n, status:'complete' as const}:n))
+                    addActivity('Debrief updated via Course Correct', 'ai')
+                  }
+                  // 2) Opportunities refresh with hint
+                  if (actions.opportunitiesHint) {
+                    const conceptPlus = `${concept}\n\nCourse Correct:\n${actions.opportunitiesHint}`
+                    const newOpps = await api.opportunities(conceptPlus, { persona, region, projectId: pid, targetAudience })
+                    setOpps(newOpps)
+                    try { if (pid) localStorage.setItem(`opps:${pid}`, JSON.stringify(newOpps)) } catch {}
+                    addActivity('Opportunities refreshed via Course Correct', 'ai')
+                  }
+                  // 3) Enhancements refresh
+                  if (actions.refreshEnhancements) {
+                    try {
+                      const graph: any = { concept, persona, region, debrief: (debrief?.brief || '') }
+                      const eh = await api.enhancements(concept, graph, { persona, region })
+                      setEnhancements(Array.isArray(eh?.suggestions) ? eh.suggestions : [])
+                      addActivity('Enhancements refreshed', 'ai')
+                    } catch {}
+                  }
+                  // 4) Scoring refresh
+                  if (actions.refreshScoring) {
+                    try {
+                      setNodes(prev=>prev.map(n=>n.id==='scoring'?{...n, status:'processing' as const}:n))
+                      const graph: any = { concept, persona, region, debrief: debrief?.brief }
+                      const sc = await api.score(concept, graph, { persona, region })
+                      setRawScore(sc)
+                      setScores(compactScore(sc))
+                      setNodes(prev=>prev.map(n=>n.id==='scoring'?{...n, status:'active' as const}:n))
+                      addActivity('Scores refreshed', 'ai')
+                    } catch {}
+                  }
+                  // 5) Overview refresh
+                  if (actions.refreshOverview) {
+                    try {
+                      const applied = Array.from(selectedEnhancements).map(i => enhancements[i]?.text).filter(Boolean) as string[]
+                      await refreshConceptOverview(applied)
+                      addActivity('Concept Overview refreshed', 'ai')
+                      // Auto-refresh rollout if present
+                      const hasRollout = nodes.some(n => n.id === 'model-rollout')
+                      if (hasRollout) {
+                        try {
+                          setRolloutLoading(true)
+                          const pid2 = localStorage.getItem('activeProjectId') || 'local'
+                          const snapScores = (()=>{ try { return JSON.parse(localStorage.getItem(`score:${pid2}`) || '{}') } catch { return {} } })()
+                          const snapOpps = opps?.opportunities?.slice(0,6).map((o:any)=>({ title: o.title, impact: o.impact })) || []
+                          const overObj = (()=>{ try { return JSON.parse(localStorage.getItem(`overview:${pid2}`) || '{}') } catch { return {} } })()
+                          const ov = (overObj && overObj.overview) || (conceptOverview || '')
+                          const resp = await api.modelRollout(concept, ov, { scores: snapScores, opportunities: snapOpps }, { persona, region, targetAudience, projectId: pid2 })
+                          setRollout({ months: resp.months || [], moments: resp.moments || [], phases: resp.phases || [], notes: resp.notes || [] })
+                          setNodes(prev => prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n))
+                          addActivity('Model Rollout refreshed', 'ai')
+                        } catch (e) { console.error('[ModelRollout] Auto-refresh failed:', e) }
+                        finally { setRolloutLoading(false) }
+                      }
+                    } catch {}
+                  }
+                } catch (err) {
+                  console.error('[CourseCorrect] Failed:', err)
+                  addActivity('Course Correct failed — check connection', 'ai')
+                } finally {
+                  setCcLoading(false)
+                }
+              }}
+            >Submit</button>
+            <button
+              className="px-2 py-1 rounded border border-white/10 bg-white/10 hover:bg-white/20"
+              onClick={(e)=>{ e.stopPropagation(); setCcInput('') }}
+            >Clear</button>
           </div>
         </div>
       )
@@ -1627,6 +1765,15 @@ export default function CanvasWorkflow() {
                       const newOpps = await api.opportunities(conceptPlus, { persona, region, projectId: pid, targetAudience })
                       setOpps(newOpps)
                       try { if (pid) localStorage.setItem(`opps:${pid}`, JSON.stringify(newOpps)) } catch {}
+                      // Auto-refresh Concept Overview if it already exists
+                      try {
+                        const hasOverview = nodes.some(n => n.id === 'concept-overview')
+                        if (hasOverview) {
+                          const applied = Array.from(selectedEnhancements).map(i => enhancements[i]?.text).filter(Boolean) as string[]
+                          await refreshConceptOverview(applied)
+                          addActivity('Concept Overview refreshed with clarifications', 'ai')
+                        }
+                      } catch {}
                       setNodes(prev=>prev.map(n=>n.id==='debrief-opportunities'?{...n, status:'complete' as const}:n))
                       setNodes(prev=>prev.map(n=>n.id==='clarifying-questions'?{...n, status:'complete' as const, minimized:true}:n))
                       addActivity('Debrief & Opportunities updated with clarifications', 'ai')
@@ -2217,6 +2364,13 @@ export default function CanvasWorkflow() {
     }
 
     if (node.id === 'model-rollout') {
+      if (rolloutLoading || !rollout || !Array.isArray(rollout.months) || rollout.months.length === 0) {
+        return (
+          <div className="flex items-center justify-center h-full">
+            <BrandSpinner text="Generating rollout model…" />
+          </div>
+        )
+      }
       // Get score snapshot from localStorage
       const pid = (() => { try { return localStorage.getItem('activeProjectId') || '' } catch { return '' } })()
       const scSnap = (() => { try { return JSON.parse(localStorage.getItem(`score:${pid}`) || '{}') } catch { return {} } })()
@@ -2229,12 +2383,14 @@ export default function CanvasWorkflow() {
       // Simple noise function for variance
       const noise = (m: number) => 1 + (Math.sin(m * 2.3) * 0.08) + (Math.cos(m * 1.7) * 0.05)
 
-      // Calculate 12-month follower projection
-      const monthlyData = Array.from({ length: 12 }, (_, i) => {
-        const month = i + 1
-        const base = baseFollowers * Math.pow(1 + growthRate, month)
-        return Math.round(base * noise(month))
-      })
+      // Calculate 12-month follower projection — prefer AI output if available
+      const monthlyData = (rollout?.months && rollout.months.length > 0)
+        ? rollout.months.slice(0,12).map(m => Math.max(0, Number(m.followers) || 0))
+        : Array.from({ length: 12 }, (_, i) => {
+            const month = i + 1
+            const base = baseFollowers * Math.pow(1 + growthRate, month)
+            return Math.round(base * noise(month))
+          })
 
       // Strategic moments with color coding
       const moments = [
@@ -2493,6 +2649,26 @@ export default function CanvasWorkflow() {
     <div className="relative w-full h-screen">
       {/* Canvas with Nodes */}
       <Canvas nodes={nodes} onNodesChange={setNodes} renderNodeContent={renderNodeContent} />
+
+      {/* Activity Toasts (top-right) */}
+      <div className="pointer-events-none fixed top-3 right-3 z-[300] flex flex-col gap-2 w-80">
+        {rkbActivity.slice(0,5).map((a) => (
+          <div
+            key={a.id}
+            id={`toast-${a.id}`}
+            className={`transition-opacity duration-500 pointer-events-auto px-3 py-2 rounded border text-[11px] shadow-md backdrop-blur-sm ${
+              a.kind === 'ai' ? 'bg-ralph-cyan/15 border-ralph-cyan/30 text-white/90' :
+              a.kind === 'project' ? 'bg-ralph-pink/15 border-ralph-pink/30 text-white/90' :
+              'bg-white/10 border-white/20 text-white/80'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${a.kind === 'ai' ? 'bg-ralph-cyan' : a.kind === 'project' ? 'bg-ralph-pink' : 'bg-white/60'}`} />
+              <span className="truncate">{a.text}</span>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* Floating assistant removed per new UX */}
 

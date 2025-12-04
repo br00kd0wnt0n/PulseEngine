@@ -15,6 +15,7 @@ export type PromptKey =
   | 'ralph_lens'
   | 'clarifying_questions'
   | 'model_rollout'
+  | 'course_correct'
 
 export const promptMeta: Record<PromptKey, { label: string; trigger: string }> = {
   narrative_from_trends: { label: 'Narrative from Trends', trigger: '/ai/narrative (TrendGraph mode)' },
@@ -30,6 +31,7 @@ export const promptMeta: Record<PromptKey, { label: string; trigger: string }> =
   wildcard: { label: 'Wildcard Insight', trigger: '/ai/wildcard' },
   ralph_lens: { label: 'Ralph Philosophy & Lens', trigger: 'Injected into prompts' },
   model_rollout: { label: 'Model Rollout (12 months)', trigger: '/ai/model-rollout' },
+  course_correct: { label: 'Course Correct (Planner)', trigger: '/ai/course-correct' },
 }
 
 // Default templates with {{variables}}
@@ -117,6 +119,8 @@ Current campaign scores (0-100):
 
 # YOUR TASK:
 Propose 4 SPECIFIC, ACTIONABLE enhancements to strengthen this campaign. Each enhancement should target a narrative block (origin|hook|arc|pivots|evidence|resolution) and provide concrete execution.
+
+If Time to Peak or Cross-Platform Potential are below 50, include at least 2 suggestions focused on improving platform-native fit and momentum (e.g., tighter hook cadence, platform-specific edit patterns, stitching/duet mechanics, UGC prompts, posting tempo). Tie suggestions to the specific platform mechanics they improve.
 
 Return ONLY JSON: { "suggestions": [{ "text": string, "target": string, "deltas": { "narrative": number, "ttp": number, "cross": number, "commercial": number } }] }`,
 
@@ -317,6 +321,38 @@ Output ONLY valid JSON with this schema:
 }
 
 Be realistic with growth projections. Strategic moments should align with the concept's timeline and opportunities.`,
+
+  course_correct:
+    `You are a {{personaRole}} acting as a course corrector for the following project.
+
+CONCEPT: "{{concept}}"
+USER INSTRUCTION:
+"""
+{{message}}
+"""
+
+CURRENT SNAPSHOT:
+{{#if debrief}}- Debrief: {{debrief}}{{/if}}
+{{#if opportunitiesList}}- Opportunities (top):\n{{opportunitiesList}}{{/if}}
+{{#if narrative}}- Narrative (summary): {{narrative}}{{/if}}
+{{#if enhancementsList}}- Enhancements (selected/considered):\n{{enhancementsList}}{{/if}}
+{{#if scoresSummary}}- Scores: {{scoresSummary}}{{/if}}
+
+Return ONLY JSON with this schema:
+{
+  "actions": {
+    "refineDebrief": string | null,              // concise instruction to refine debrief or null
+    "opportunitiesHint": string | null,          // short hint to bias new opportunities or null
+    "refreshEnhancements": boolean,              // should regenerate enhancements
+    "refreshScoring": boolean,                   // should regenerate scores
+    "refreshOverview": boolean                   // should refresh concept overview
+  }
+}
+
+Rules:
+- If the instruction implies adding/changing an opportunity, set opportunitiesHint with a short phrase.
+- If the instruction implies tone/angle changes, put a concise refineDebrief.
+- Keep text minimal and specific; no prose outside JSON.`,
 }
 
 export async function getPrompt(key: PromptKey): Promise<string> {

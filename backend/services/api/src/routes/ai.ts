@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements, generateConceptProposal, generateScoresAI, refineDebrief, generateModelRollout, generateClarifyingQuestions } from '../services/ai.js'
+import { narrativeFromTrends, scoreConceptMvp, generateRecommendations, generateDebrief, generateOpportunities, generateEnhancements, generateConceptProposal, generateScoresAI, refineDebrief, generateModelRollout, generateClarifyingQuestions, generateCourseCorrect } from '../services/ai.js'
 import { retrieveContext, formatContextForPrompt } from '../services/retrieval.js'
 import { getPrompt as getTpl, renderTemplate } from '../services/promptStore.js'
 import { generateEmbedding } from '../services/embeddings.js'
@@ -179,6 +179,19 @@ router.post('/rewrite-narrative', async (req, res) => {
   } catch (e: any) {
     console.error('[AI] rewrite-narrative failed:', e)
     res.json({ text: narrative })
+  }
+})
+
+// Course Correct
+router.post('/course-correct', async (req, res) => {
+  const { concept, message, persona, targetAudience, region, debrief, opportunities, narrative, enhancements, scoresText } = req.body || {}
+  if (!concept || !message) return res.status(400).json({ error: 'concept and message required' })
+  try {
+    const data = await generateCourseCorrect(concept, message, { debrief, opportunities, narrative, enhancements, scoresText }, persona || null, targetAudience || null, region || null)
+    res.json(data)
+  } catch (e: any) {
+    console.error('[course-correct] Error:', e?.message)
+    res.status(500).json({ error: e?.message || 'failed' })
   }
 })
 

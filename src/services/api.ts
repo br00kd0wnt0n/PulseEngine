@@ -52,6 +52,10 @@ export const api = {
     '/ai/concept-overview',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(opts||{}) }) }
   ),
+  courseCorrect: (concept: string, payload: { message: string; persona?: string; targetAudience?: string; region?: string; debrief?: string; opportunities?: { title: string; impact?: number }[]; narrative?: string; enhancements?: string[]; scoresText?: string }) => request<any>(
+    '/ai/course-correct',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(payload||{}) }) }
+  ),
   modelRollout: (concept: string, overview: string, snapshot?: any, opts?: { persona?: string; region?: string; targetAudience?: string; projectId?: string }) => request<any>(
     '/ai/model-rollout',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, overview, snapshot, ...(opts||{}) }) }
@@ -60,7 +64,7 @@ export const api = {
     '/ai/concept-proposal',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, narrativeBlocks, recommendedCreators, ...(opts||{}) }) }
   ),
-  clarifyingQuestions: (concept: string, payload: { brief: string; debrief: string; opportunities?: { title: string; impact?: number }[]; persona?: string; targetAudience?: string; region?: string }) => request<{ questions: string[] }>(
+  clarifyingQuestions: (concept: string, payload: { brief: string; debrief: string; opportunities?: { title: string; impact?: number }[]; persona?: string; targetAudience?: string; region?: string; projectId?: string }) => request<{ questions: string[] }>(
     '/ai/clarifying-questions',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(payload||{}) }) }
   ),

@@ -888,6 +888,45 @@ export async function generateClarifyingQuestions(
   return { questions: [] }
 }
 
+// Course Correct: interpret user instruction and propose minimal set of updates
+export async function generateCourseCorrect(
+  concept: string,
+  message: string,
+  snapshot: { debrief?: string; opportunities?: { title: string; impact?: number }[]; narrative?: string; enhancements?: string[]; scoresText?: string } | null,
+  persona?: string | null,
+  targetAudience?: string | null,
+  region?: string | null,
+) {
+  const { getPrompt, renderTemplate } = await import('./promptStore.js')
+  const tpl = await getPrompt('course_correct')
+  const opportunitiesList = Array.isArray(snapshot?.opportunities) && snapshot!.opportunities!.length
+    ? snapshot!.opportunities!.slice(0, 6).map((o: any, i: number) => `${i+1}. ${o.title}${o.impact?` — ${o.impact}`:''}`).join('\n')
+    : ''
+  const enhancementsList = Array.isArray(snapshot?.enhancements) && snapshot!.enhancements!.length
+    ? snapshot!.enhancements!.slice(0, 8).map((t: string) => `- ${t}`).join('\n')
+    : ''
+  const prompt = renderTemplate(tpl, {
+    concept,
+    message,
+    debrief: snapshot?.debrief || '',
+    opportunitiesList,
+    narrative: snapshot?.narrative || '',
+    enhancementsList,
+    scoresSummary: snapshot?.scoresText || '',
+    persona,
+    personaOrGeneral: persona || 'General',
+    targetAudience,
+    region,
+  })
+  const { CourseCorrectSchema } = await import('./schemas.js')
+  const parsed = await callJSON(
+    [ { role: 'system', content: 'Return only valid JSON matching schema. No prose.' }, { role: 'user', content: prompt } ],
+    CourseCorrectSchema,
+    { model: process.env.MODEL_NAME || 'gpt-4o-mini', maxTokens: 400, temperature: 0.3, allowExtract: true, retries: 1 }
+  )
+  return parsed
+}
+
 // Model Rollout: 12‑month projection and key moments
 export async function generateModelRollout(
   concept: string,

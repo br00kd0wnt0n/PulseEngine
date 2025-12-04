@@ -114,3 +114,14 @@ export const ModelRolloutSchema = z.object({
   notes: z.array(z.string()).optional().default([]),
 })
 export type ModelRolloutResult = z.infer<typeof ModelRolloutSchema>
+
+export const CourseCorrectSchema = z.object({
+  actions: z.object({
+    refineDebrief: z.string().optional().nullable(),
+    opportunitiesHint: z.string().optional().nullable(),
+    refreshEnhancements: z.boolean().optional().default(false),
+    refreshScoring: z.boolean().optional().default(false),
+    refreshOverview: z.boolean().optional().default(false),
+  })
+})
+export type CourseCorrectResult = z.infer<typeof CourseCorrectSchema>
