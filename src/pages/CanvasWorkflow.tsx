@@ -195,7 +195,7 @@ export default function CanvasWorkflow() {
   const addActivity = (text: string, kind?: 'rkb'|'project'|'trends'|'ai') => {
     const id = Date.now() + Math.floor(Math.random()*1000)
     setRkbActivity(prev => [{ id, text, kind }, ...prev].slice(0, 10))
-    // auto-fade then remove
+    // auto-fade then remove after 4 seconds
     setTimeout(() => {
       const el = document.getElementById('toast-'+id)
       if (el) {
@@ -204,7 +204,7 @@ export default function CanvasWorkflow() {
       } else {
         setRkbActivity(prev => prev.filter(a => a.id !== id))
       }
-    }, 3500)
+    }, 4000)
   }
 
   const [wildIdeas, setWildIdeas] = useState<any[] | null>(null)
@@ -299,9 +299,9 @@ export default function CanvasWorkflow() {
   const [clarifyingQs, setClarifyingQs] = useState<string[] | null>(null)
   const [clarifyingAns, setClarifyingAns] = useState<string[]>([])
   const [clarifyingLoading, setClarifyingLoading] = useState<boolean>(false)
-  // Course Correct
-  const [ccInput, setCcInput] = useState<string>('')
-  const [ccLoading, setCcLoading] = useState<boolean>(false)
+  // Course Correct - per-node state for multiple instances
+  const [ccInputs, setCcInputs] = useState<Record<string, string>>({})
+  const [ccLoading, setCcLoading] = useState<string | null>(null) // node id that is loading
   const [loading, setLoading] = useState(false)
   const [debriefAccepted, setDebriefAccepted] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -621,22 +621,22 @@ export default function CanvasWorkflow() {
         }
       ]))
     }
-    // Ensure Course Correct node exists early
-    if (!nodes.find(n => n.id === 'course-correct')) {
+    // Ensure Course Correct node exists early - floating, no connections
+    if (!nodes.find(n => n.id.startsWith('course-correct'))) {
       setNodes(prev => ([
         ...prev,
         {
-          id: 'course-correct',
-          type: 'input',
+          id: 'course-correct-1',
+          type: 'course-correct',
           title: 'Course Correct',
           x: 50,
           y: 360,
-          width: 320,
-          height: 180,
+          width: 300,
+          height: 160,
           minimized: false,
           zIndex: 3,
-          status: 'active' as const,
-          connectedTo: ['debrief-opportunities', 'narrative', 'scoring', 'concept-overview']
+          status: 'active' as const
+          // No connectedTo - this is a floating node
         }
       ]))
     }
@@ -1304,26 +1304,61 @@ export default function CanvasWorkflow() {
       )
     }
 
-    if (node.id === 'course-correct') {
-      const disabled = ccLoading || !concept
+    // Course Correct nodes (can have multiple)
+    if (node.id.startsWith('course-correct')) {
+      const nodeId = node.id
+      const ccInput = ccInputs[nodeId] || ''
+      const isLoading = ccLoading === nodeId
+      const disabled = isLoading || !concept
+
+      // Add node callback for the '+' button
+      const addCourseCorrectNode = () => {
+        const existingCC = nodes.filter(n => n.id.startsWith('course-correct'))
+        const nextNum = existingCC.length + 1
+        const maxZ = Math.max(...nodes.map(n => n.zIndex), 0)
+        // Position below existing ones
+        const lastCC = existingCC[existingCC.length - 1]
+        const newY = lastCC ? lastCC.y + (lastCC.minimized ? 60 : lastCC.height) + 20 : 360
+        setNodes(prev => ([
+          ...prev,
+          {
+            id: `course-correct-${nextNum}`,
+            type: 'course-correct',
+            title: 'Course Correct',
+            x: 50,
+            y: newY,
+            width: 300,
+            height: 160,
+            minimized: false,
+            zIndex: maxZ + 1,
+            status: 'active' as const
+          }
+        ]))
+      }
+
+      // Attach onAddNode to the node data for the Node component to use
+      if (!node.onAddNode) {
+        setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, onAddNode: addCourseCorrectNode } : n))
+      }
+
       return (
         <div className="space-y-2 text-[11px]">
           <textarea
             value={ccInput}
-            onChange={(e)=>setCcInput(e.target.value)}
+            onChange={(e)=>setCcInputs(prev => ({ ...prev, [nodeId]: e.target.value }))}
             onMouseDown={(e)=>e.stopPropagation()}
             placeholder="e.g., Show more aggressive enhancements; add an opportunity about X; tighten platform fit."
-            className="w-full h-20 bg-charcoal-800/70 border border-white/10 rounded px-2 py-1 text-[11px] resize-none"
+            className="w-full h-16 bg-charcoal-800/70 border border-purple-400/30 rounded px-2 py-1 text-[11px] resize-none focus:border-purple-400/60 focus:outline-none"
           />
           <div className="flex items-center gap-2">
             <button
-              className="flex-1 px-2 py-1 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan disabled:opacity-50"
+              className="flex-1 px-2 py-1 rounded bg-purple-500/70 hover:bg-purple-500 disabled:opacity-50 text-white"
               disabled={disabled || !ccInput.trim()}
               onClick={async (e)=>{
                 e.stopPropagation()
                 if (!ccInput.trim()) return
                 try {
-                  setCcLoading(true)
+                  setCcLoading(nodeId)
                   addActivity('Applying course correction…', 'ai')
                   const pid = (()=>{ try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
                   const scoresText = (()=>{ try { return JSON.stringify(scores || {}) } catch { return '' } })()
@@ -1402,17 +1437,20 @@ export default function CanvasWorkflow() {
                       }
                     } catch {}
                   }
+                  // Clear input and minimize node after successful submission
+                  setCcInputs(prev => ({ ...prev, [nodeId]: '' }))
+                  setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, minimized: true } : n))
                 } catch (err) {
                   console.error('[CourseCorrect] Failed:', err)
                   addActivity('Course Correct failed — check connection', 'ai')
                 } finally {
-                  setCcLoading(false)
+                  setCcLoading(null)
                 }
               }}
-            >Submit</button>
+            >{isLoading ? 'Applying…' : 'Submit'}</button>
             <button
               className="px-2 py-1 rounded border border-white/10 bg-white/10 hover:bg-white/20"
-              onClick={(e)=>{ e.stopPropagation(); setCcInput('') }}
+              onClick={(e)=>{ e.stopPropagation(); setCcInputs(prev => ({ ...prev, [nodeId]: '' })) }}
             >Clear</button>
           </div>
         </div>
@@ -2650,20 +2688,20 @@ export default function CanvasWorkflow() {
       {/* Canvas with Nodes */}
       <Canvas nodes={nodes} onNodesChange={setNodes} renderNodeContent={renderNodeContent} />
 
-      {/* Activity Toasts (top-right) */}
-      <div className="pointer-events-none fixed top-3 right-3 z-[300] flex flex-col gap-2 w-80">
+      {/* Activity Toasts (top-right of canvas, stacked) */}
+      <div className="pointer-events-none absolute top-4 right-4 z-[300] flex flex-col-reverse gap-2 w-72">
         {rkbActivity.slice(0,5).map((a) => (
           <div
             key={a.id}
             id={`toast-${a.id}`}
-            className={`transition-opacity duration-500 pointer-events-auto px-3 py-2 rounded border text-[11px] shadow-md backdrop-blur-sm ${
-              a.kind === 'ai' ? 'bg-ralph-cyan/15 border-ralph-cyan/30 text-white/90' :
-              a.kind === 'project' ? 'bg-ralph-pink/15 border-ralph-pink/30 text-white/90' :
-              'bg-white/10 border-white/20 text-white/80'
+            className={`transition-opacity duration-500 pointer-events-auto px-3 py-2 rounded border text-[11px] shadow-lg backdrop-blur-md ${
+              a.kind === 'ai' ? 'bg-ralph-cyan/20 border-ralph-cyan/40 text-white/90' :
+              a.kind === 'project' ? 'bg-ralph-pink/20 border-ralph-pink/40 text-white/90' :
+              'bg-white/15 border-white/25 text-white/80'
             }`}
           >
             <div className="flex items-center gap-2">
-              <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${a.kind === 'ai' ? 'bg-ralph-cyan' : a.kind === 'project' ? 'bg-ralph-pink' : 'bg-white/60'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${a.kind === 'ai' ? 'bg-ralph-cyan' : a.kind === 'project' ? 'bg-ralph-pink' : 'bg-white/60'}`} />
               <span className="truncate">{a.text}</span>
             </div>
           </div>

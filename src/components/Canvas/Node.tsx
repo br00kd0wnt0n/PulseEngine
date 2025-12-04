@@ -12,6 +12,7 @@ export type NodeData = {
   zIndex: number
   status?: 'idle' | 'active' | 'complete' | 'processing'
   connectedTo?: string[]
+  onAddNode?: () => void // Callback for adding duplicate nodes (e.g., Course Correct)
 }
 
 type NodeProps = {
@@ -125,6 +126,10 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, scale = 1, 
     if (data.type === 'rkb') {
       return 'border-orange-400/40 bg-orange-400/10'
     }
+    // Course Correct - distinct floating style with gradient border effect
+    if (data.type === 'course-correct') {
+      return 'border-purple-400/50 bg-gradient-to-br from-purple-900/30 to-indigo-900/30'
+    }
     // AI-generated content - pink (debrief, opportunities, etc.)
     if (data.type === 'ai-content' || data.type === 'debrief') {
       return 'border-ralph-pink/40 bg-ralph-pink/10'
@@ -147,6 +152,9 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, scale = 1, 
     }
     if (data.type === 'rkb') {
       return 'hover:ring-2 hover:ring-orange-400/50 hover:shadow-xl hover:shadow-orange-400/40'
+    }
+    if (data.type === 'course-correct') {
+      return 'hover:ring-2 hover:ring-purple-400/50 hover:shadow-xl hover:shadow-purple-400/40'
     }
     if (data.type === 'ai-content' || data.type === 'debrief') {
       return 'hover:ring-2 hover:ring-ralph-pink/50 hover:shadow-xl hover:shadow-ralph-pink/40'
@@ -179,6 +187,7 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, scale = 1, 
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${
             (data.status === 'active' && data.type === 'wildcard') ? 'bg-yellow-400' :
+            (data.status === 'active' && data.type === 'course-correct') ? 'bg-purple-400' :
             data.status === 'active' ? 'bg-ralph-cyan' :
             data.status === 'complete' ? 'bg-ralph-pink' :
             data.status === 'processing' ? 'bg-ralph-pink animate-pulse' :
@@ -187,6 +196,16 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, scale = 1, 
           <div className="text-sm font-medium">{data.title}</div>
         </div>
         <div className="flex items-center gap-1">
+          {/* Add button for course-correct type nodes */}
+          {data.type === 'course-correct' && data.onAddNode && (
+            <button
+              onClick={(e) => { e.stopPropagation(); data.onAddNode?.() }}
+              className="px-2 py-0.5 text-xs hover:bg-white/10 rounded transition-colors text-purple-300"
+              title="Add another Course Correct"
+            >
+              +
+            </button>
+          )}
           <button
             onClick={toggleMinimize}
             className="px-2 py-0.5 text-xs hover:bg-white/10 rounded transition-colors"
