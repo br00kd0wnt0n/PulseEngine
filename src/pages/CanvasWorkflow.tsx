@@ -246,7 +246,7 @@ export default function CanvasWorkflow() {
     if (!concept) return
     let projectId: string | null = null
     try { projectId = localStorage.getItem('activeProjectId') } catch {}
-    setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'processing' as const } : n))
+    setNodes(prev => prev.map(n => n.id === 'debrief' ? { ...n, status: 'processing' as const } : n))
     addActivity('Manual re-evaluation started…', 'ai')
     try {
       const [d, o] = await Promise.all([
@@ -258,7 +258,7 @@ export default function CanvasWorkflow() {
       setOpps(o)
       try { if (projectId) localStorage.setItem(`debrief:${projectId}`, JSON.stringify(d)) } catch {}
       try { if (projectId) localStorage.setItem(`opps:${projectId}`, JSON.stringify(o)) } catch {}
-      setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'complete' as const } : n))
+      setNodes(prev => prev.map(n => n.id === 'debrief' ? { ...n, status: 'complete' as const } : n))
       addActivity('Debrief updated with project context', 'ai')
       if (debriefAccepted) {
         setNodes(prev => prev.map(n => n.id === 'narrative' ? { ...n, status: 'processing' as const } : n))
@@ -266,7 +266,7 @@ export default function CanvasWorkflow() {
       }
     } catch (e) {
       addActivity('Re-evaluation failed — check connection', 'ai')
-      setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'active' as const } : n))
+      setNodes(prev => prev.map(n => n.id === 'debrief' ? { ...n, status: 'active' as const } : n))
     }
   }
 
@@ -286,7 +286,7 @@ export default function CanvasWorkflow() {
           minimized: false,
           zIndex: 3,
           status: 'processing' as const,
-          connectedTo: ['debrief-opportunities']
+          connectedTo: ['debrief']
         }
       ]))
     }
@@ -308,14 +308,16 @@ export default function CanvasWorkflow() {
   const [paletteFor, setPaletteFor] = useState<string | null>(null)
   const [paletteAnchor, setPaletteAnchor] = useState<{ x: number; y: number } | null>(null)
 
-  // V3: Available node types for the palette
+  // V3: Available node types (split enforced)
   const availableNodeTypes = () => [
-    { key: 'debrief-opportunities', title: 'Debrief & Opportunities' },
+    { key: 'debrief', title: 'Debrief' },
+    { key: 'opportunities', title: 'Opportunities' },
     { key: 'narrative', title: 'Narrative Structure' },
-    { key: 'scoring', title: 'Scoring & Enhancements' },
+    { key: 'scoring', title: 'Scoring' },
+    { key: 'enhancements', title: 'Enhancements' },
     { key: 'concept-overview', title: 'Concept Overview' },
     { key: 'model-rollout', title: 'Model Rollout' },
-    { key: 'wildcard', title: 'Wildcard' },
+    { key: 'export-pdf', title: 'Export to PDF' },
   ]
 
   // V3: Add a node of specific type after source node
@@ -694,9 +696,9 @@ export default function CanvasWorkflow() {
           // Mark debrief node status depending on sufficiency
           const insufficient = !d || (!(d.brief && String(d.brief).trim().length >= 8) && !(Array.isArray(d.keyPoints) && d.keyPoints.length > 0))
           setNodes(prev => prev.map(n =>
-            n.id === 'debrief-opportunities' ? { ...n, status: (insufficient ? 'active' : 'complete') as NodeData['status'] } : n
+            n.id === 'debrief' ? { ...n, status: (insufficient ? 'active' : 'complete') as NodeData['status'] } : n
           ))
-          addActivity('Debrief & Opportunities ready', 'ai')
+          addActivity('Debrief ready', 'ai')
         }
       } catch (err) {
         console.error('Failed to load debrief/opportunities:', err)
@@ -716,7 +718,7 @@ export default function CanvasWorkflow() {
     prevPersonaRef.current = persona || ''
     ;(async () => {
       try {
-        setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'processing' as const } : n))
+        setNodes(prev => prev.map(n => n.id === 'debrief' ? { ...n, status: 'processing' as const } : n))
         const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
         const [d, o] = await Promise.all([
           api.debrief(concept, { persona, region, projectId: pid, targetAudience }),
@@ -725,7 +727,7 @@ export default function CanvasWorkflow() {
         setDebrief(d); setOpps(o)
         try { if (pid) localStorage.setItem(`debrief:${pid}`, JSON.stringify(d)) } catch {}
         try { if (pid) localStorage.setItem(`opps:${pid}`, JSON.stringify(o)) } catch {}
-        setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'complete' as const } : n))
+        setNodes(prev => prev.map(n => n.id === 'debrief' ? { ...n, status: 'complete' as const } : n))
         // Refresh Concept Overview if present
         if (nodes.find(n => n.id === 'concept-overview')) {
           setOverviewLoading(true)
@@ -760,7 +762,7 @@ export default function CanvasWorkflow() {
     const hasUploads = (processed?.length || 0) > 0
     const uploadsAssessed = !hasUploads || (hasUploads && !hasPlaceholders(processed))
     const hasRkb = !!nodes.find(n => n.id === 'rkb')
-    const hasDebrief = !!nodes.find(n => n.id === 'debrief-opportunities')
+    const hasDebrief = !!nodes.find(n => n.id === 'debrief')
 
     if (!hasRkb) {
       setNodes(prev => ([
@@ -775,9 +777,9 @@ export default function CanvasWorkflow() {
       setNodes(prev => ([
         ...prev,
         {
-          id: 'debrief-opportunities',
+          id: 'debrief',
           type: 'ai-content',
-          title: 'Debrief & Opportunities',
+          title: 'Debrief',
           x: 500,
           y: 100,
           width: 450,
@@ -795,7 +797,7 @@ export default function CanvasWorkflow() {
 
   // Stack and minimize left nodes when debrief opens
   useEffect(() => {
-    if (activated && !nodesStacked && nodes.find(n => n.id === 'debrief-opportunities')) {
+    if (activated && !nodesStacked && nodes.find(n => n.id === 'debrief')) {
       setNodesStacked(true)
       setNodes(prev => prev.map(node => {
         // Minimize and stack the three left nodes
@@ -817,7 +819,7 @@ export default function CanvasWorkflow() {
 
   // Spawn Clarifying Questions after Debrief loads the first time
   useEffect(() => {
-    if (!activated || !concept || !debrief || !opps) return
+    if (!activated || !concept || !debrief) return
     // Only create once
     const hasCQ = nodes.some(n => n.id === 'clarifying-questions')
     if (hasCQ || clarifyingQs) return
@@ -838,7 +840,7 @@ export default function CanvasWorkflow() {
             minimized: false,
             zIndex: 3,
             status: 'active' as const,
-            connectedTo: ['debrief-opportunities']
+            connectedTo: ['debrief']
           }
         ]))
         const questions = await api.clarifyingQuestions(concept, {
@@ -871,10 +873,8 @@ export default function CanvasWorkflow() {
     let cancel = false
 
     // Early return conditions with logging
-    if (!debriefAccepted) {
-      console.log('[Narrative] Waiting for debrief acceptance')
-      return
-    }
+    // No acceptance gate in v3; allow narrative once node exists and debrief present
+    if (!debrief) return
     if (!hasNarrativeNode) {
       console.log('[Narrative] Waiting for narrative node to be created')
       return
@@ -1419,7 +1419,7 @@ export default function CanvasWorkflow() {
       const trendsCount = (stats?.trends ?? (trendNodes || []).filter((n: any) => n.kind === 'trend').length)
       const creatorsCount = (stats?.creators ?? (trendNodes || []).filter((n: any) => n.kind === 'creator').length)
       const projectCount = processed.length
-      const isProcessing = !!nodes.find(n => (n.id === 'debrief-opportunities' || n.id === 'narrative' || n.id === 'scoring' || n.id === 'concept-overview') && n.status === 'processing')
+  const isProcessing = !!nodes.find(n => (n.id === 'debrief' || n.id === 'narrative' || n.id === 'scoring' || n.id === 'concept-overview') && n.status === 'processing')
       return (
         <div className="space-y-2 text-xs">
           <div className="text-white/70 leading-relaxed text-[11px]">Ralph Knowledge Base connected</div>
@@ -1911,7 +1911,7 @@ export default function CanvasWorkflow() {
                     try {
                       const pid = (()=>{ try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
                       const message = (clarifyingQs||[]).map((q,i)=>`Q${i+1}: ${q}\nA${i+1}: ${(clarifyingAns[i]||'').trim()}`).filter(Boolean).join('\n\n')
-                      setNodes(prev=>prev.map(n=>n.id==='debrief-opportunities'?{...n, status:'processing' as const}:n))
+                      setNodes(prev=>prev.map(n=>n.id==='debrief'?{...n, status:'processing' as const}:n))
                       addActivity('Applying clarifications to debrief…', 'ai')
                       const updated = await api.refineDebrief(concept, debrief, message, { persona, projectId: pid, targetAudience })
                       setDebrief(updated)
@@ -1931,7 +1931,7 @@ export default function CanvasWorkflow() {
                           addActivity('Concept Overview refreshed with clarifications', 'ai')
                         }
                       } catch {}
-                      setNodes(prev=>prev.map(n=>n.id==='debrief-opportunities'?{...n, status:'complete' as const}:n))
+                      setNodes(prev=>prev.map(n=>n.id==='debrief'?{...n, status:'complete' as const}:n))
                       setNodes(prev=>prev.map(n=>n.id==='clarifying-questions'?{...n, status:'complete' as const, minimized:true}:n))
                       addActivity('Debrief & Opportunities updated with clarifications', 'ai')
                     } catch (err) {
