@@ -5,7 +5,7 @@ type CanvasProps = {
   nodes: NodeData[]
   onNodesChange: (nodes: NodeData[]) => void
   renderNodeContent?: (node: NodeData) => React.ReactNode
-  onAddNode?: (sourceId: string) => void
+  onAddNode?: (sourceId: string, anchor?: { x: number; y: number }) => void
   onRemoveNode?: (id: string) => void
 }
 
@@ -86,11 +86,15 @@ export default function Canvas({ nodes, onNodesChange, renderNodeContent, onAddN
         const target = nodes.find(n => n.id === targetId)
         if (!target) return
 
-        // Calculate connection points (right of source to left of target)
-        const sourceX = node.x + (node.minimized ? 240 : node.width)
-        const sourceY = node.y + (node.minimized ? 24 : node.height / 2)
-        const targetX = target.x
-        const targetY = target.y + (target.minimized ? 24 : target.height / 2)
+        // Calculate connection points: emanate from '+' (right) and hit '-' (left)
+        const nodeW = node.minimized ? 240 : node.width
+        const nodeH = node.minimized ? 48 : node.height
+        const tgtW = target.minimized ? 240 : target.width
+        const tgtH = target.minimized ? 48 : target.height
+        const sourceX = node.x + nodeW // approx center of '+' button
+        const sourceY = node.y + (nodeH / 2)
+        const targetX = target.x // approx center line of '-' button
+        const targetY = target.y + (tgtH / 2)
 
         // Create curved path
         const midX = (sourceX + targetX) / 2
@@ -131,6 +135,7 @@ export default function Canvas({ nodes, onNodesChange, renderNodeContent, onAddN
     const v = clamp(parseFloat(next.toFixed(2)), 0.5, 2)
     setScale(v)
     try { localStorage.setItem('canvas:scale', String(v)) } catch {}
+    ;(window as any).__canvasScale = v
   }
 
   return (

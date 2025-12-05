@@ -306,6 +306,7 @@ export default function CanvasWorkflow() {
 
   // V3: Node palette state for add/remove controls
   const [paletteFor, setPaletteFor] = useState<string | null>(null)
+  const [paletteAnchor, setPaletteAnchor] = useState<{ x: number; y: number } | null>(null)
 
   // V3: Available node types for the palette
   const availableNodeTypes = () => [
@@ -810,28 +811,7 @@ export default function CanvasWorkflow() {
     }
   }, [activated, nodesStacked, nodes.length])
 
-  // Step 2: Add Narrative Structure ONLY after user accepts Debrief
-  useEffect(() => {
-    if (!debriefAccepted || nodes.find(n => n.id === 'narrative')) return
-
-    setNodes(prev => [
-      ...prev,
-      // Narrative Structure node
-      {
-        id: 'narrative',
-        type: 'ai-content',
-        title: 'Narrative Structure',
-        x: 1000,
-        y: 100,
-        width: 450,
-        height: 500,
-        minimized: false,
-        zIndex: 3,
-        status: 'processing',
-        connectedTo: ['debrief-opportunities']
-      }
-    ])
-  }, [debriefAccepted, nodes])
+  // Removed auto-advance to narrative; user chooses next node
 
   // Spawn Clarifying Questions after Debrief loads the first time
   useEffect(() => {
@@ -1787,30 +1767,7 @@ export default function CanvasWorkflow() {
                 </div>
               )}
 
-              {/* Manual Re-evaluate */}
-              <div className="panel p-2 bg-white/5 flex items-center justify-between">
-                <div className="text-white/60 text-[10px]">If you added new context, re-run analysis now.</div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); reEvaluateNow() }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[10px] border border-white/15"
-                >
-                  Re-evaluate now
-                </button>
-              </div>
-
-              {/* Accept Button (only in combined node) */}
-              {node.id === 'debrief-opportunities' && (<button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setDebriefAccepted(true)
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                disabled={debriefAccepted || node.status === 'processing' || ((processed?.length||0)>0 && hasPlaceholders(processed)) || !debrief || (!debrief.brief && (!Array.isArray(debrief.keyPoints) || debrief.keyPoints.length === 0))}
-                className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {debriefAccepted ? 'Accepted ✓' : 'Accept & Continue to Narrative'}
-              </button>)}
+              {/* Re-evaluate removed; flow is user-driven via Course Correct or manual node refresh */}
             </>
           )}
         </div>
@@ -2934,7 +2891,7 @@ export default function CanvasWorkflow() {
         nodes={nodes}
         onNodesChange={setNodes}
         renderNodeContent={renderNodeContent}
-        onAddNode={(id)=>setPaletteFor(id)}
+        onAddNode={(id, anchor)=>{ setPaletteFor(id); if (anchor) (setPaletteAnchor as any)?.(anchor) }}
         onRemoveNode={handleRemoveNode}
       />
 
@@ -2960,11 +2917,12 @@ export default function CanvasWorkflow() {
 
       {/* Node palette modal */}
       {paletteFor && (
-        <div className="fixed inset-0 z-[250] bg-black/50 flex items-center justify-center" onClick={()=>setPaletteFor(null)}>
-          <div className="w-[420px] max-h-[70vh] overflow-auto bg-charcoal-900 border border-white/10 rounded-lg p-3 text-xs text-white/80" onClick={(e)=>e.stopPropagation()}>
+        <div className="fixed inset-0 z-[250]" onClick={()=>{ setPaletteFor(null); (setPaletteAnchor as any)?.(null) }}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="absolute w-[320px] max-h-[60vh] overflow-auto bg-charcoal-900 border border-white/10 rounded-lg p-3 text-xs text-white/80 shadow-xl" style={{ left: ((paletteAnchor as any)?.x || 120) + 12, top: ((paletteAnchor as any)?.y || 120) - 20 }} onClick={(e)=>e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
               <div className="text-white/90 font-medium">Add next node</div>
-              <button className="px-2 py-0.5 rounded border border-white/10 bg-white/10 hover:bg-white/20" onClick={()=>setPaletteFor(null)}>Close</button>
+              <button className="px-2 py-0.5 rounded border border-white/10 bg-white/10 hover:bg-white/20" onClick={()=>{ setPaletteFor(null); (setPaletteAnchor as any)?.(null) }}>Close</button>
             </div>
             <div className="space-y-1">
               {availableNodeTypes().map(opt => (

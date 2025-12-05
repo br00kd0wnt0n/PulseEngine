@@ -20,7 +20,7 @@ type NodeProps = {
   onUpdate: (id: string, updates: Partial<NodeData>) => void
   onFocus: (id: string) => void
   onStartLink?: (id: string) => void
-  onAdd?: (id: string) => void
+  onAdd?: (id: string, anchor?: { x: number; y: number }) => void
   onRemove?: (id: string) => void
   scale?: number
   getCanvasBounds?: () => DOMRect | null
@@ -201,7 +201,16 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, onAdd, onRe
         <button
           title="Add next"
           className="absolute right-[-10px] top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/10 border border-white/20 text-white/70 text-xs hover:bg-white/20"
-          onMouseDown={(e)=>{ e.stopPropagation(); onAdd(data.id) }}
+          onMouseDown={(e)=>{ 
+            e.stopPropagation(); 
+            const rect = getCanvasBounds?.() || { left: 0, top: 0 } as any
+            const scale = (window as any).__canvasScale || 1
+            const nodeW = data.minimized ? 240 : data.width
+            const nodeH = data.minimized ? 48 : data.height
+            const ax = (rect.left || 0) + scale * (data.x + nodeW)
+            const ay = (rect.top || 0) + scale * (data.y + nodeH/2)
+            onAdd(data.id, { x: ax, y: ay })
+          }}
         >+</button>
       )}
       {/* Header */}
