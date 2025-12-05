@@ -8,6 +8,7 @@ import { api } from '../services/api'
 import { CitationToken } from '../components/shared/CitationOverlay'
 import BrandSpinner from '../components/shared/BrandSpinner'
 import { exportProjectFull, downloadMarkdown, exportOverviewPdf } from '../utils/export'
+import { filterAvailable } from '../nodes/registry'
 
 function compactScore(sc: any): { narrative?: number; ttpWeeks?: number; cross?: number; commercial?: number; overall?: number } | null {
   try {
@@ -302,6 +303,55 @@ export default function CanvasWorkflow() {
   // Course Correct - per-node state for multiple instances
   const [ccInputs, setCcInputs] = useState<Record<string, string>>({})
   const [ccLoading, setCcLoading] = useState<string | null>(null) // node id that is loading
+
+  // V3: Node palette state for add/remove controls
+  const [paletteFor, setPaletteFor] = useState<string | null>(null)
+
+  // V3: Available node types for the palette
+  const availableNodeTypes = () => [
+    { key: 'debrief-opportunities', title: 'Debrief & Opportunities' },
+    { key: 'narrative', title: 'Narrative Structure' },
+    { key: 'scoring', title: 'Scoring & Enhancements' },
+    { key: 'concept-overview', title: 'Concept Overview' },
+    { key: 'model-rollout', title: 'Model Rollout' },
+    { key: 'wildcard', title: 'Wildcard' },
+  ]
+
+  // V3: Add a node of specific type after source node
+  const addNodeOfType = (sourceId: string, nodeType: string, title: string) => {
+    const sourceNode = nodes.find(n => n.id === sourceId)
+    const maxZ = Math.max(...nodes.map(n => n.zIndex), 0)
+    const newWidth = 450
+    const newHeight = 400
+    const { x, y } = findClearSpace(sourceNode, newWidth, newHeight)
+    const newId = `${nodeType}-${Date.now()}`
+
+    setNodes(prev => ([
+      ...prev,
+      {
+        id: newId,
+        type: nodeType === 'wildcard' ? 'wildcard' : 'ai-content',
+        title,
+        x,
+        y,
+        width: newWidth,
+        height: newHeight,
+        minimized: false,
+        zIndex: maxZ + 1,
+        status: 'active' as const,
+        connectedTo: [sourceId]
+      }
+    ]))
+    setPaletteFor(null)
+  }
+
+  // V3: Remove a node
+  const handleRemoveNode = (id: string) => {
+    // Don't remove essential nodes
+    if (['brief-input', 'context-upload', 'rkb'].includes(id)) return
+    setNodes(prev => prev.filter(n => n.id !== id))
+  }
+
   const [loading, setLoading] = useState(false)
   const [debriefAccepted, setDebriefAccepted] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -458,6 +508,47 @@ export default function CanvasWorkflow() {
 
     setNodes(initialNodes)
   }, [])
+
+  // Generate opportunities when standalone node exists and data missing
+  useEffect(() => {
+    (async () => {
+      if (!concept) return
+      if (!nodes.some(n => n.id === 'opportunities')) return
+      if (opps && Array.isArray(opps.opportunities) && opps.opportunities.length) return
+      if (!debrief || !(debrief.brief || (debrief.keyPoints||[]).length)) return
+      try {
+        setNodes(prev => prev.map(n => n.id === 'opportunities' ? { ...n, status: 'processing' as const } : n))
+        const pid = (() => { try { return localStorage.getItem('activeProjectId') || undefined } catch { return undefined } })()
+        const o = await api.opportunities(concept, { persona, region, projectId: pid, targetAudience })
+        setOpps(o)
+        try { if (pid) localStorage.setItem(`opps:${pid}`, JSON.stringify(o)) } catch {}
+        setNodes(prev => prev.map(n => n.id === 'opportunities' ? { ...n, status: 'active' as const } : n))
+        addActivity('Opportunities generated', 'ai')
+      } catch (e) {
+        setNodes(prev => prev.map(n => n.id === 'opportunities' ? { ...n, status: 'active' as const } : n))
+      }
+    })()
+  }, [nodes.some(n=>n.id==='opportunities'), concept, persona, region, targetAudience, debrief])
+
+  // Generate enhancements when standalone node exists and suggestions missing
+  useEffect(() => {
+    (async () => {
+      if (!concept) return
+      if (!nodes.some(n => n.id === 'enhancements')) return
+      if (enhancements && enhancements.length) return
+      if (!debrief || !(debrief.brief || (debrief.keyPoints||[]).length)) return
+      try {
+        setNodes(prev => prev.map(n => n.id === 'enhancements' ? { ...n, status: 'processing' as const } : n))
+        const graph: any = { concept, persona, region, debrief: debrief?.brief }
+        const eh = await api.enhancements(concept, graph, { persona, region })
+        setEnhancements(Array.isArray(eh?.suggestions) ? eh.suggestions : [])
+        setNodes(prev => prev.map(n => n.id === 'enhancements' ? { ...n, status: 'active' as const } : n))
+        addActivity('Enhancements generated', 'ai')
+      } catch (e) {
+        setNodes(prev => prev.map(n => n.id === 'enhancements' ? { ...n, status: 'active' as const } : n))
+      }
+    })()
+  }, [nodes.some(n=>n.id==='enhancements'), concept, persona, region, debrief])
 
   // Ensure server project exists on mount (Canvas-first)
   useEffect(() => {
@@ -1720,6 +1811,98 @@ export default function CanvasWorkflow() {
               >
                 {debriefAccepted ? 'Accepted ✓' : 'Accept & Continue to Narrative'}
               </button>)}
+            </>
+          )}
+        </div>
+      )
+    }
+
+    if (node.id === 'opportunities') {
+      return (
+        <div className="space-y-3 text-xs max-h-full overflow-auto">
+          {!opps ? (
+            <BrandSpinner text="Finding high-impact opportunities…" />
+          ) : (
+            <>
+              <div className="panel p-3 bg-white/5">
+                <div className="text-white/70 font-medium mb-2 text-[11px]">OPPORTUNITIES</div>
+                <div className="space-y-2">
+                  {opps?.opportunities?.map((o, i) => {
+                    const isSelected = selectedOpportunities.has(o.title)
+                    return (
+                      <label key={i} className="flex items-start gap-2 p-2 bg-white/5 rounded border border-white/10 cursor-pointer hover:border-ralph-cyan/30 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            const next = new Set(selectedOpportunities)
+                            if (e.target.checked) next.add(o.title); else next.delete(o.title)
+                            setSelectedOpportunities(next)
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          className="mt-0.5 shrink-0"
+                        />
+                        <div className="flex-1">
+                          <div className="text-white/90 font-medium text-[10px] mb-1">{o.title}</div>
+                          <div className="text-white/70 text-[10px] leading-relaxed">{o.why}</div>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+                {opps?.rationale && (
+                  <div className="mt-2 text-[10px] text-white/50">{opps.rationale}</div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )
+    }
+
+    if (node.id === 'enhancements') {
+      return (
+        <div className="space-y-3 text-xs max-h-full overflow-auto">
+          {!enhancements || enhancements.length === 0 ? (
+            <BrandSpinner text="Computing enhancements…" />
+          ) : (
+            <>
+              <div className="panel p-2 bg-white/5">
+                <div className="text-white/70 font-medium mb-2 text-[11px]">RECOMMENDED ENHANCEMENTS</div>
+                <div className="space-y-2">
+                  {enhancements.map((e, idx) => {
+                    const checked = selectedEnhancements.has(idx)
+                    return (
+                      <label key={idx} className="flex items-start gap-2 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={checked}
+                          onChange={async (ev) => {
+                            const set = new Set(selectedEnhancements)
+                            if (ev.target.checked) set.add(idx); else set.delete(idx)
+                            setSelectedEnhancements(set)
+                            // Auto-refresh concept overview if it exists
+                            const hasOverview = nodes.some(n => n.id === 'concept-overview')
+                            if (hasOverview) {
+                              try {
+                                await refreshConceptOverview(Array.from(set).map(i => enhancements[i]?.text).filter(Boolean))
+                              } catch {}
+                            }
+                          }}
+                        />
+                        <div>
+                          <div className="text-white/70 text-[10px] group-hover:text-white/90">{e.text}</div>
+                          {e.deltas && (
+                            <div className="text-white/50 text-[9px]">Δ narrative {e.deltas.narrative ?? 0} · Δ ttp {e.deltas.ttp ?? 0} · Δ cross {e.deltas.cross ?? 0} · Δ commercial {e.deltas.commercial ?? 0}</div>
+                          )}
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
             </>
           )}
         </div>
