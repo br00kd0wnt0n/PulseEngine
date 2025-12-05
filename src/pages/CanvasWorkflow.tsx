@@ -182,6 +182,8 @@ function findClearY(nodes: NodeData[], targetX: number, nodeWidth: number, nodeH
 }
 
 const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string | undefined) || ''
+const CANVAS_W = 2200
+const CANVAS_H = 1600
 const USER_ID = '087d78e9-4bbe-49f6-8981-1588ce4934a2'
 const ENABLE_REMOTE_SAVE = Boolean((import.meta as any).env?.VITE_ENABLE_REMOTE_SAVE)
 
@@ -308,17 +310,69 @@ export default function CanvasWorkflow() {
   const [paletteFor, setPaletteFor] = useState<string | null>(null)
   const [paletteAnchor, setPaletteAnchor] = useState<{ x: number; y: number } | null>(null)
 
-  // V3: Available node types (split enforced)
-  const availableNodeTypes = () => [
-    { key: 'debrief', title: 'Debrief' },
-    { key: 'opportunities', title: 'Opportunities' },
-    { key: 'narrative', title: 'Narrative Structure' },
-    { key: 'scoring', title: 'Scoring' },
-    { key: 'enhancements', title: 'Enhancements' },
-    { key: 'concept-overview', title: 'Concept Overview' },
-    { key: 'model-rollout', title: 'Model Rollout' },
-    { key: 'export-pdf', title: 'Export to PDF' },
-  ]
+  // Registry-aware helpers for palette and missing badges
+  const nodeKeyFor = (id: string): string => id.startsWith('course-correct') ? 'course-correct' : id
+  const providesForId = (id: string): string[] => {
+    const key = nodeKeyFor(id)
+    switch (key) {
+      case 'brief-input': return ['concept']
+      case 'debrief': return ['debrief']
+      case 'opportunities': return ['opportunities']
+      case 'narrative': return ['narrative']
+      case 'scoring': return ['scores']
+      case 'enhancements': return ['enhancements']
+      case 'concept-overview': return ['overview']
+      case 'model-rollout': return ['rollout']
+      default: return []
+    }
+  }
+  const upstreamIdsFor = (targetId: string): Set<string> => {
+    const preds = new Map<string, Set<string>>()
+    nodes.forEach(n => (n.connectedTo||[]).forEach(tid => {
+      if (!preds.has(tid)) preds.set(tid, new Set())
+      preds.get(tid)!.add(n.id)
+    }))
+    const visited = new Set<string>()
+    const stack = [targetId]
+    while (stack.length) {
+      const cur = stack.pop()!
+      if (visited.has(cur)) continue
+      visited.add(cur)
+      const ps = preds.get(cur)
+      if (ps) ps.forEach(p => { if (!visited.has(p)) stack.push(p) })
+    }
+    return visited
+  }
+  const upstreamProvidesFor = (targetId: string): Set<string> => {
+    const ids = upstreamIdsFor(targetId)
+    const out = new Set<string>()
+    if (concept && concept.trim().length > 0) out.add('concept')
+    ids.forEach(i => providesForId(i).forEach(tag => out.add(tag)))
+    return out
+  }
+  const missingForNode = (id: string): string[] => {
+    const key = nodeKeyFor(id)
+    const spec = NODE_REGISTRY.find(s => s.key === (key as any))
+    if (!spec) return []
+    const present = upstreamProvidesFor(id)
+    const reqs = spec.requires.includes('any') ? [] : spec.requires
+    return reqs.filter(r => !present.has(r))
+  }
+
+  // V3: Available node types (edge-aware, split enforced)
+  const availableNodeTypes = () => {
+    const srcId = paletteFor || ''
+    if (!srcId) return []
+    const present = upstreamProvidesFor(srcId)
+    const exists = new Set(nodes.map(n => nodeKeyFor(n.id)))
+    const base = filterAvailable(present, exists as any)
+    const filtered = base.filter(opt => {
+      const spec = NODE_REGISTRY.find(s => s.key === opt.key)
+      return !(spec?.unique && exists.has(opt.key))
+    })
+    const cc = { key: `course-correct-${Date.now()}` as any, title: 'Course Correct' }
+    return [ ...filtered, cc ]
+  }
 
   // V3: Add a node of specific type after source node
   const addNodeOfType = (sourceId: string, nodeType: string, title: string) => {
@@ -399,6 +453,11 @@ export default function CanvasWorkflow() {
   const [narrativeRefreshRequested, setNarrativeRefreshRequested] = useState(false)
 
   // Find clear space for a new node (avoids overlap with existing nodes)
+  const clampXY = (x: number, y: number, w: number, h: number) => ({
+    x: Math.max(20, Math.min(CANVAS_W - w - 20, x)),
+    y: Math.max(20, Math.min(CANVAS_H - h - 20, y)),
+  })
+
   const findClearSpace = (sourceNode: NodeData | undefined, newWidth: number, newHeight: number): { x: number; y: number } => {
     // Default position if no source node
     let targetX = 50
@@ -429,13 +488,15 @@ export default function CanvasWorkflow() {
 
     for (const pos of positions) {
       if (!checkOverlap(pos.x, pos.y, newWidth, newHeight)) {
-        return pos
+        const c = clampXY(pos.x, pos.y, newWidth, newHeight)
+        return c
       }
     }
 
     // If all positions overlap, stack below the lowest node
     const lowestY = Math.max(...nodes.map(n => n.y + (n.minimized ? 48 : n.height)), 100)
-    return { x: targetX, y: lowestY + 30 }
+    const c = clampXY(targetX, lowestY + 30, newWidth, newHeight)
+    return c
   }
 
   // Launch Course Correct for a specific node
@@ -1580,8 +1641,9 @@ export default function CanvasWorkflow() {
       )
     }
 
-    if (node.id === 'debrief-opportunities' || node.id === 'debrief') {
-      const showDebriefOnly = node.id === 'debrief'
+    if (node.id === 'debrief') {
+      const showDebriefOnly = true
+      const missing = missingForNode('debrief')
       // Build citation map from sources
       const allSources = [
         ...(debrief?.sources?.core || []),
@@ -1625,6 +1687,9 @@ export default function CanvasWorkflow() {
 
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
+          {missing.length > 0 && (
+            <div className="px-2 py-1 rounded bg-amber-500/15 border border-amber-400/30 text-amber-200 text-[10px]">Missing inputs: {missing.join(', ')}</div>
+          )}
           {loading ? (
             <BrandSpinner text="Analyzing concept and context… generating debrief and ranked opportunities." />
           ) : (!debrief?.brief && (!Array.isArray(debrief?.keyPoints) || debrief.keyPoints.length === 0)) ? (
