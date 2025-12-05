@@ -8,7 +8,7 @@ import { api } from '../services/api'
 import { CitationToken } from '../components/shared/CitationOverlay'
 import BrandSpinner from '../components/shared/BrandSpinner'
 import { exportProjectFull, downloadMarkdown, exportOverviewPdf } from '../utils/export'
-import { filterAvailable } from '../nodes/registry'
+import { filterAvailable, NODE_REGISTRY, NodeSpec } from '../nodes/registry'
 
 function compactScore(sc: any): { narrative?: number; ttpWeeks?: number; cross?: number; commercial?: number; overall?: number } | null {
   try {
@@ -352,11 +352,11 @@ export default function CanvasWorkflow() {
   }
   const missingForNode = (id: string): string[] => {
     const key = nodeKeyFor(id)
-    const spec = NODE_REGISTRY.find(s => s.key === (key as any))
+    const spec = NODE_REGISTRY.find((s: NodeSpec) => s.key === (key as any))
     if (!spec) return []
     const present = upstreamProvidesFor(id)
     const reqs = spec.requires.includes('any') ? [] : spec.requires
-    return reqs.filter(r => !present.has(r))
+    return reqs.filter((r: string) => !present.has(r))
   }
 
   // V3: Available node types (edge-aware, split enforced)
@@ -367,7 +367,7 @@ export default function CanvasWorkflow() {
     const exists = new Set(nodes.map(n => nodeKeyFor(n.id)))
     const base = filterAvailable(present, exists as any)
     const filtered = base.filter(opt => {
-      const spec = NODE_REGISTRY.find(s => s.key === opt.key)
+      const spec = NODE_REGISTRY.find((s: NodeSpec) => s.key === opt.key)
       return !(spec?.unique && exists.has(opt.key))
     })
     const cc = { key: `course-correct-${Date.now()}` as any, title: 'Course Correct' }
