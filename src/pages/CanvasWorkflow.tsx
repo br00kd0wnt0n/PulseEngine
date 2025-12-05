@@ -506,8 +506,7 @@ export default function CanvasWorkflow() {
         height: 140,
         minimized: false,
         zIndex: 1,
-        status: 'idle',
-        connectedTo: ['brief-input']
+        status: 'idle'
       }
     ]
 
@@ -774,6 +773,7 @@ export default function CanvasWorkflow() {
     }
 
     if (!hasDebrief && uploadsAssessed) {
+      // Create Debrief node
       setNodes(prev => ([
         ...prev,
         {
@@ -787,9 +787,18 @@ export default function CanvasWorkflow() {
           minimized: false,
           zIndex: 2,
           status: 'processing' as const,
-          connectedTo: ['brief-input', 'context-upload', 'rkb']
+          connectedTo: []
         }
       ]))
+      // Link sources to Debrief (from Brief, Context, RKB)
+      setNodes(prev => prev.map(n => {
+        if (['brief-input','context-upload','rkb'].includes(n.id)) {
+          const set = new Set(n.connectedTo || [])
+          set.add('debrief')
+          return { ...n, connectedTo: Array.from(set) }
+        }
+        return n
+      }))
     }
     // Course Correct nodes are now launched from the Course Correct button on each node
     // No automatic creation needed
@@ -840,9 +849,11 @@ export default function CanvasWorkflow() {
             minimized: false,
             zIndex: 3,
             status: 'active' as const,
-            connectedTo: ['debrief']
+            connectedTo: []
           }
         ]))
+        // Link Debrief -> Clarifying Questions
+        setNodes(prev => prev.map(n => n.id === 'debrief' ? { ...n, connectedTo: Array.from(new Set([...(n.connectedTo||[]), 'clarifying-questions'])) } : n))
         const questions = await api.clarifyingQuestions(concept, {
           brief: concept,
           debrief: debrief?.brief || '',
@@ -1118,22 +1129,22 @@ export default function CanvasWorkflow() {
         return n
       })
 
-      return [
-        ...updated,
-        {
-          id: 'concept-overview',
-          type: 'ai-content',
-          title: 'Concept Overview',
-          x: overviewX,
-          y: overviewY,
-          width: nodeWidth,
-          height: nodeHeight,
-          minimized: true,
-          zIndex: 6,
-          status: 'processing' as NodeData['status'],
-          connectedTo: ['scoring']
-        }
-      ]
+      const created = {
+        id: 'concept-overview',
+        type: 'ai-content',
+        title: 'Concept Overview',
+        x: overviewX,
+        y: overviewY,
+        width: nodeWidth,
+        height: nodeHeight,
+        minimized: true,
+        zIndex: 6,
+        status: 'processing' as NodeData['status'],
+        connectedTo: []
+      } as NodeData
+      // Link Scoring -> Concept Overview
+      const linked = updated.map(n => n.id === 'scoring' ? { ...n, connectedTo: Array.from(new Set([...(n.connectedTo||[]), 'concept-overview'])) } : n)
+      return [ ...linked, created ]
     })
   }
 
@@ -2226,7 +2237,8 @@ export default function CanvasWorkflow() {
                               if (exists) return prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: true, status: 'processing' as NodeData['status'] } : n)
                               const baseX = Math.max(100, Math.min(window.innerWidth - 520 - 100, window.innerWidth * 0.60))
                               const baseY = findClearY(prev, baseX, 520, 60, 40)
-                              return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Rollout Model (Under Construction)', x: baseX, y: baseY, width: 520, height: 360, minimized: true, zIndex: 6, status: 'processing' as NodeData['status'], connectedTo: ['concept-overview'] } ]
+                              const created = { id: 'model-rollout', type: 'ai-content', title: 'Rollout Model (Under Construction)', x: baseX, y: baseY, width: 520, height: 360, minimized: true, zIndex: 6, status: 'processing' as NodeData['status'], connectedTo: [] } as NodeData
+                              return prev.map(n => n.id === 'concept-overview' ? { ...n, connectedTo: Array.from(new Set([...(n.connectedTo||[]), 'model-rollout'])) } : n).concat(created)
                             })
                             try {
                               setRolloutLoading(true)
@@ -2331,7 +2343,8 @@ export default function CanvasWorkflow() {
                               const exists = prev.find(n => n.id === 'model-rollout')
                               if (exists) return prev.map(n => n.id === 'model-rollout' ? { ...n, minimized: false, status: 'active' as NodeData['status'] } : n)
                               const baseX = Math.max(100, Math.min(window.innerWidth - 520 - 100, window.innerWidth * 0.60))
-                              return [ ...prev, { id: 'model-rollout', type: 'ai-content', title: 'Rollout Model (Under Construction)', x: baseX, y: 480, width: 520, height: 360, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: ['concept-overview'] } ]
+                              const created = { id: 'model-rollout', type: 'ai-content', title: 'Rollout Model (Under Construction)', x: baseX, y: 480, width: 520, height: 360, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: [] } as NodeData
+                              return prev.map(n => n.id === 'concept-overview' ? { ...n, connectedTo: Array.from(new Set([...(n.connectedTo||[]), 'model-rollout'])) } : n).concat(created)
                             })
                           } catch (err) { console.error('[ModelRollout] Failed:', err) }
                           finally { setRolloutLoading(false) }

@@ -175,10 +175,13 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, onAdd, onRe
     && !data.id.startsWith('course-correct')
     && !['brief-input', 'context-upload', 'rkb'].includes(data.id)
 
+  const hideRemoveFor = new Set(['brief-input','context-upload','rkb','clarifying-questions','gwi','glimpse'])
+  const canRemove = !!onRemove && !hideRemoveFor.has(data.id)
+
   return (
     <div
       ref={nodeRef}
-      className={`absolute rounded-lg border-2 backdrop-blur-sm transition-all duration-300 ease-out transform-gpu ${nodeColor} ${hoverGlow}`}
+      className={`absolute rounded-lg border-2 backdrop-blur-sm transition-all duration-300 ease-out transform-gpu relative ${nodeColor} ${hoverGlow}`}
       style={{
         left: data.x,
         top: data.y,
@@ -190,7 +193,7 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, onAdd, onRe
       onMouseDown={handleMouseDown}
     >
       {/* Left/Right side affordances */}
-      {onRemove && (
+      {canRemove && (
         <button
           title="Remove"
           className="absolute left-[-10px] top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/10 border border-white/20 text-white/70 text-xs hover:bg-white/20"
@@ -242,6 +245,14 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, onAdd, onRe
           <div className="node-content p-3 overflow-auto" style={{ height: data.height - 48 - (showCourseCorrectButton ? 36 : 0) }}>
             {children}
           </div>
+          {data.status === 'processing' && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="px-3 py-2 rounded-lg border border-white/10 bg-black/30 backdrop-blur-sm text-center">
+                <div className="mx-auto mb-1 h-7 w-7 rounded-full border-2 border-white/30 border-t-ralph-cyan animate-spin" />
+                <div className="text-[11px] text-white/80">Processing…</div>
+              </div>
+            </div>
+          )}
           {/* Course Correct button - shown on content nodes */}
           {showCourseCorrectButton && data.onCourseCorrect && (
             <div className="absolute bottom-5 left-3 right-3">
