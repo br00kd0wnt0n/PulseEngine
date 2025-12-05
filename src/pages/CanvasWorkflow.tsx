@@ -459,43 +459,52 @@ export default function CanvasWorkflow() {
   })
 
   const findClearSpace = (sourceNode: NodeData | undefined, newWidth: number, newHeight: number): { x: number; y: number } => {
+    // Prefer keeping nodes in visible viewport (~1200x800 effective area)
+    const VISIBLE_MAX_X = 1000
+    const VISIBLE_MAX_Y = 700
+
     // Default position if no source node
-    let targetX = 50
-    let targetY = 360
+    let targetX = 400
+    let targetY = 100
 
     if (sourceNode) {
-      // Try to position to the right of the source node
-      targetX = sourceNode.x + sourceNode.width + 30
+      const srcW = sourceNode.minimized ? 240 : sourceNode.width
+      // Try to position to the right of the source node, but stay in visible area
+      targetX = Math.min(sourceNode.x + srcW + 40, VISIBLE_MAX_X - newWidth)
       targetY = sourceNode.y
     }
 
     // Check for overlaps and adjust
     const checkOverlap = (x: number, y: number, w: number, h: number): boolean => {
+      const margin = 20
       return nodes.some(n => {
         const nw = n.minimized ? 240 : n.width
         const nh = n.minimized ? 48 : n.height
-        return !(x + w < n.x || x > n.x + nw || y + h < n.y || y > n.y + nh)
+        return !(x + w + margin < n.x || x > n.x + nw + margin ||
+                 y + h + margin < n.y || y > n.y + nh + margin)
       })
     }
 
-    // Try positions: right of source, below source, then find any clear spot
+    // Try positions: right of source, below source, below-right, then scan for clear spot
     const positions = [
       { x: targetX, y: targetY }, // Right of source
-      { x: sourceNode?.x || 50, y: (sourceNode?.y || 0) + (sourceNode?.height || 0) + 30 }, // Below source
-      { x: targetX, y: targetY + 200 }, // Further below right
-      { x: 50, y: Math.max(...nodes.map(n => n.y + (n.minimized ? 48 : n.height)), 100) + 30 }, // Bottom of canvas
+      { x: targetX, y: targetY + 100 }, // Slightly below right
+      { x: sourceNode?.x || 400, y: (sourceNode?.y || 0) + (sourceNode?.minimized ? 48 : sourceNode?.height || 0) + 40 }, // Below source
+      { x: 400, y: 50 }, // Center-top area
+      { x: 400, y: 300 }, // Center-middle area
+      { x: 400, y: 500 }, // Center-bottom area
     ]
 
     for (const pos of positions) {
-      if (!checkOverlap(pos.x, pos.y, newWidth, newHeight)) {
+      if (pos.x >= 0 && pos.y >= 0 && !checkOverlap(pos.x, pos.y, newWidth, newHeight)) {
         const c = clampXY(pos.x, pos.y, newWidth, newHeight)
         return c
       }
     }
 
-    // If all positions overlap, stack below the lowest node
+    // If all positions overlap, find lowest existing node and place below it
     const lowestY = Math.max(...nodes.map(n => n.y + (n.minimized ? 48 : n.height)), 100)
-    const c = clampXY(targetX, lowestY + 30, newWidth, newHeight)
+    const c = clampXY(400, lowestY + 40, newWidth, newHeight)
     return c
   }
 
@@ -834,17 +843,17 @@ export default function CanvasWorkflow() {
     }
 
     if (!hasDebrief && uploadsAssessed) {
-      // Create Debrief node
+      // Create Debrief node - position to the right of the minimized left column
       setNodes(prev => ([
         ...prev,
         {
           id: 'debrief',
           type: 'ai-content',
           title: 'Debrief',
-          x: 500,
-          y: 100,
+          x: 400,
+          y: 50,
           width: 450,
-          height: 500,
+          height: 550,
           minimized: false,
           zIndex: 2,
           status: 'processing' as const,

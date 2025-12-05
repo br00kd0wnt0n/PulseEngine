@@ -86,13 +86,15 @@ export default function Canvas({ nodes, onNodesChange, renderNodeContent, onAddN
         const target = nodes.find(n => n.id === targetId)
         if (!target) return
 
-        // Calculate connection points: '+' (right:-10) to '−' (left:-10)
+        // Calculate connection points:
+        // '+' button center is at node's right edge (node.x + width)
+        // '−' button center is at target's left edge (target.x)
         const nodeW = node.minimized ? 240 : node.width
         const nodeH = node.minimized ? 48 : node.height
         const tgtH = target.minimized ? 48 : target.height
-        const sourceX = node.x + nodeW + 10
+        const sourceX = node.x + nodeW  // Right edge = center of + button
         const sourceY = node.y + (nodeH / 2)
-        const targetX = target.x - 10
+        const targetX = target.x  // Left edge = center of - button
         const targetY = target.y + (tgtH / 2)
 
         // Create curved path
