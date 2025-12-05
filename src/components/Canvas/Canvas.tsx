@@ -86,14 +86,13 @@ export default function Canvas({ nodes, onNodesChange, renderNodeContent, onAddN
         const target = nodes.find(n => n.id === targetId)
         if (!target) return
 
-        // Calculate connection points: emanate from '+' (right) and hit '-' (left)
+        // Calculate connection points: '+' (right:-10) to '−' (left:-10)
         const nodeW = node.minimized ? 240 : node.width
         const nodeH = node.minimized ? 48 : node.height
-        const tgtW = target.minimized ? 240 : target.width
         const tgtH = target.minimized ? 48 : target.height
-        const sourceX = node.x + nodeW // approx center of '+' button
+        const sourceX = node.x + nodeW + 10
         const sourceY = node.y + (nodeH / 2)
-        const targetX = target.x // approx center line of '-' button
+        const targetX = target.x - 10
         const targetY = target.y + (tgtH / 2)
 
         // Create curved path
@@ -137,6 +136,11 @@ export default function Canvas({ nodes, onNodesChange, renderNodeContent, onAddN
     try { localStorage.setItem('canvas:scale', String(v)) } catch {}
     ;(window as any).__canvasScale = v
   }
+
+  // Initialize global scale for palette anchoring and connectors
+  useEffect(() => {
+    ;(window as any).__canvasScale = scale
+  }, [scale])
 
   return (
     <div ref={canvasRef} className="relative w-full h-screen overflow-auto bg-charcoal-900">
