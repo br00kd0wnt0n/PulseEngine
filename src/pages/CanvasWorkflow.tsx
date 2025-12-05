@@ -1726,46 +1726,7 @@ export default function CanvasWorkflow() {
                 )}
               </div>
 
-              {!showDebriefOnly && (
-                <div className="panel p-3 bg-white/5">
-                  <div className="text-white/70 font-medium mb-2 text-[11px]">OPPORTUNITIES</div>
-                  <div className="space-y-2">
-                    {opps?.opportunities?.map((o, i) => {
-                      const isSelected = selectedOpportunities.has(o.title)
-                      return (
-                        <label key={i} className="flex items-start gap-2 p-2 bg-white/5 rounded border border-white/10 cursor-pointer hover:border-ralph-cyan/30 transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              e.stopPropagation()
-                              const newSelected = new Set(selectedOpportunities)
-                              if (e.target.checked) {
-                                newSelected.add(o.title)
-                              } else {
-                                newSelected.delete(o.title)
-                              }
-                              setSelectedOpportunities(newSelected)
-                            }}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            className="mt-0.5 shrink-0"
-                          />
-                          <div className="flex-1">
-                            <div className="text-white/90 font-medium text-[10px] mb-1">{o.title}</div>
-                            <div className="text-white/70 text-[10px] leading-relaxed">{o.why}</div>
-                          </div>
-                        </label>
-                      )
-                    })}
-                  </div>
-                  {opps?.rationale && (
-                    <div className="mt-2 text-[10px] text-white/50">{opps.rationale}</div>
-                  )}
-                  <div className="mt-2 text-[10px] text-ralph-cyan">
-                    {selectedOpportunities.size} opportunit{selectedOpportunities.size !== 1 ? 'ies' : 'y'} selected
-                  </div>
-                </div>
-              )}
+              {/* Opportunities moved to standalone node */}
 
               {/* Re-evaluate removed; flow is user-driven via Course Correct or manual node refresh */}
             </>
@@ -1825,41 +1786,7 @@ export default function CanvasWorkflow() {
             <BrandSpinner text="Computing enhancements…" />
           ) : (
             <>
-              <div className="panel p-2 bg-white/5">
-                <div className="text-white/70 font-medium mb-2 text-[11px]">RECOMMENDED ENHANCEMENTS</div>
-                <div className="space-y-2">
-                  {enhancements.map((e, idx) => {
-                    const checked = selectedEnhancements.has(idx)
-                    return (
-                      <label key={idx} className="flex items-start gap-2 cursor-pointer group">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5"
-                          checked={checked}
-                          onChange={async (ev) => {
-                            const set = new Set(selectedEnhancements)
-                            if (ev.target.checked) set.add(idx); else set.delete(idx)
-                            setSelectedEnhancements(set)
-                            // Auto-refresh concept overview if it exists
-                            const hasOverview = nodes.some(n => n.id === 'concept-overview')
-                            if (hasOverview) {
-                              try {
-                                await refreshConceptOverview(Array.from(set).map(i => enhancements[i]?.text).filter(Boolean))
-                              } catch {}
-                            }
-                          }}
-                        />
-                        <div>
-                          <div className="text-white/70 text-[10px] group-hover:text-white/90">{e.text}</div>
-                          {e.deltas && (
-                            <div className="text-white/50 text-[9px]">Δ narrative {e.deltas.narrative ?? 0} · Δ ttp {e.deltas.ttp ?? 0} · Δ cross {e.deltas.cross ?? 0} · Δ commercial {e.deltas.commercial ?? 0}</div>
-                          )}
-                        </div>
-                      </label>
-                    )
-                  })}
-                </div>
-              </div>
+              {/* Enhancements moved to standalone node */}
             </>
           )}
         </div>
@@ -1915,18 +1842,7 @@ export default function CanvasWorkflow() {
                 </div>
               )}
 
-              {/* Approve Button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setNarrativeApproved(true)
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                disabled={narrativeApproved}
-                className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {narrativeApproved ? 'Approved ✓' : 'Approve & Continue to Scoring'}
-              </button>
+              {/* No auto-advance buttons; user selects next node via '+' */}
             </>
           )}
         </div>
