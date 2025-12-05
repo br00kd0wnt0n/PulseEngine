@@ -442,7 +442,7 @@ export async function getNodeConfig(key: string): Promise<NodeConfig> {
 
 export async function setNodeConfig(key: string, value: NodeConfig) {
   const repo = AppDataSource.getRepository(AICache)
-  await repo.upsert({ key: `nodecfg:${key}`, value }, ['key'])
+  await repo.upsert({ key: `nodecfg:${key}`, value: value as any }, ['key'])
 }
 
 export async function listNodeConfigs(): Promise<{ key: string; value: NodeConfig }[]> {
