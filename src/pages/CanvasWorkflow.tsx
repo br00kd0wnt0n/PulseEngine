@@ -1496,7 +1496,8 @@ export default function CanvasWorkflow() {
       )
     }
 
-    if (node.id === 'debrief-opportunities') {
+    if (node.id === 'debrief-opportunities' || node.id === 'debrief') {
+      const showDebriefOnly = node.id === 'debrief'
       // Build citation map from sources
       const allSources = [
         ...(debrief?.sources?.core || []),
@@ -1654,45 +1655,46 @@ export default function CanvasWorkflow() {
                 )}
               </div>
 
-              {/* OPPORTUNITIES Section */}
-              <div className="panel p-3 bg-white/5">
-                <div className="text-white/70 font-medium mb-2 text-[11px]">OPPORTUNITIES</div>
-                <div className="space-y-2">
-                  {opps?.opportunities?.map((o, i) => {
-                    const isSelected = selectedOpportunities.has(o.title)
-                    return (
-                      <label key={i} className="flex items-start gap-2 p-2 bg-white/5 rounded border border-white/10 cursor-pointer hover:border-ralph-cyan/30 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => {
-                            e.stopPropagation()
-                            const newSelected = new Set(selectedOpportunities)
-                            if (e.target.checked) {
-                              newSelected.add(o.title)
-                            } else {
-                              newSelected.delete(o.title)
-                            }
-                            setSelectedOpportunities(newSelected)
-                          }}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          className="mt-0.5 shrink-0"
-                        />
-                        <div className="flex-1">
-                          <div className="text-white/90 font-medium text-[10px] mb-1">{o.title}</div>
-                          <div className="text-white/70 text-[10px] leading-relaxed">{o.why}</div>
-                        </div>
-                      </label>
-                    )
-                  })}
+              {!showDebriefOnly && (
+                <div className="panel p-3 bg-white/5">
+                  <div className="text-white/70 font-medium mb-2 text-[11px]">OPPORTUNITIES</div>
+                  <div className="space-y-2">
+                    {opps?.opportunities?.map((o, i) => {
+                      const isSelected = selectedOpportunities.has(o.title)
+                      return (
+                        <label key={i} className="flex items-start gap-2 p-2 bg-white/5 rounded border border-white/10 cursor-pointer hover:border-ralph-cyan/30 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              const newSelected = new Set(selectedOpportunities)
+                              if (e.target.checked) {
+                                newSelected.add(o.title)
+                              } else {
+                                newSelected.delete(o.title)
+                              }
+                              setSelectedOpportunities(newSelected)
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="mt-0.5 shrink-0"
+                          />
+                          <div className="flex-1">
+                            <div className="text-white/90 font-medium text-[10px] mb-1">{o.title}</div>
+                            <div className="text-white/70 text-[10px] leading-relaxed">{o.why}</div>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  {opps?.rationale && (
+                    <div className="mt-2 text-[10px] text-white/50">{opps.rationale}</div>
+                  )}
+                  <div className="mt-2 text-[10px] text-ralph-cyan">
+                    {selectedOpportunities.size} opportunit{selectedOpportunities.size !== 1 ? 'ies' : 'y'} selected
+                  </div>
                 </div>
-                {opps?.rationale && (
-                  <div className="mt-2 text-[10px] text-white/50">{opps.rationale}</div>
-                )}
-                <div className="mt-2 text-[10px] text-ralph-cyan">
-                  {selectedOpportunities.size} opportunit{selectedOpportunities.size !== 1 ? 'ies' : 'y'} selected
-                </div>
-              </div>
+              )}
 
               {/* Manual Re-evaluate */}
               <div className="panel p-2 bg-white/5 flex items-center justify-between">
@@ -1706,8 +1708,8 @@ export default function CanvasWorkflow() {
                 </button>
               </div>
 
-              {/* Accept Button */}
-              <button
+              {/* Accept Button (only in combined node) */}
+              {node.id === 'debrief-opportunities' && (<button
                 onClick={(e) => {
                   e.stopPropagation()
                   setDebriefAccepted(true)
@@ -1717,7 +1719,7 @@ export default function CanvasWorkflow() {
                 className="w-full px-3 py-2 rounded bg-ralph-cyan/70 hover:bg-ralph-cyan text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {debriefAccepted ? 'Accepted ✓' : 'Accept & Continue to Narrative'}
-              </button>
+              </button>)}
             </>
           )}
         </div>
@@ -1787,6 +1789,26 @@ export default function CanvasWorkflow() {
               </button>
             </>
           )}
+        </div>
+      )
+    }
+
+    if (node.id === 'export-pdf') {
+      return (
+        <div className="space-y-2 text-xs">
+          <div className="text-white/70">Generate a print‑ready PDF of the Concept Overview with current context.</div>
+          <button
+            className="w-full px-3 py-1.5 rounded border border-ralph-cyan/40 bg-ralph-cyan/10 hover:bg-ralph-cyan/20 text-[11px] font-medium"
+            onClick={() => {
+              try {
+                const applied = Array.from(selectedEnhancements).map(i => enhancements[i]?.text).filter(Boolean) as string[]
+                const topOpps = (opps?.opportunities || []).slice(0,6)
+                const overview = conceptOverview || ''
+                ;(window as any).scrollTo(0,0)
+                exportOverviewPdf(concept || 'Untitled', overview, { persona, region, opps: topOpps as any, enhancements: applied, scores })
+              } catch (e) { console.error('Export failed', e) }
+            }}
+          >Export PDF</button>
         </div>
       )
     }
@@ -2724,11 +2746,13 @@ export default function CanvasWorkflow() {
 
   return (
     <div className="relative w-full h-screen">
-      {/* Canvas with Nodes - attach onCourseCorrect callback to each node */}
+      {/* Canvas with Nodes */}
       <Canvas
-        nodes={nodes.map(n => ({ ...n, onCourseCorrect: launchCourseCorrect }))}
+        nodes={nodes}
         onNodesChange={setNodes}
         renderNodeContent={renderNodeContent}
+        onAddNode={(id)=>setPaletteFor(id)}
+        onRemoveNode={handleRemoveNode}
       />
 
       {/* Activity Toasts (top-right of canvas, stacked) */}
@@ -2750,6 +2774,27 @@ export default function CanvasWorkflow() {
           </div>
         ))}
       </div>
+
+      {/* Node palette modal */}
+      {paletteFor && (
+        <div className="fixed inset-0 z-[250] bg-black/50 flex items-center justify-center" onClick={()=>setPaletteFor(null)}>
+          <div className="w-[420px] max-h-[70vh] overflow-auto bg-charcoal-900 border border-white/10 rounded-lg p-3 text-xs text-white/80" onClick={(e)=>e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-white/90 font-medium">Add next node</div>
+              <button className="px-2 py-0.5 rounded border border-white/10 bg-white/10 hover:bg-white/20" onClick={()=>setPaletteFor(null)}>Close</button>
+            </div>
+            <div className="space-y-1">
+              {availableNodeTypes().map(opt => (
+                <button
+                  key={opt.key}
+                  className="w-full text-left px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10"
+                  onClick={()=>addNodeOfType(paletteFor, opt.key, opt.title)}
+                >{opt.title}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Floating assistant removed per new UX */}
 

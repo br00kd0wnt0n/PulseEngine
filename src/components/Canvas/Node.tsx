@@ -20,12 +20,14 @@ type NodeProps = {
   onUpdate: (id: string, updates: Partial<NodeData>) => void
   onFocus: (id: string) => void
   onStartLink?: (id: string) => void
+  onAdd?: (id: string) => void
+  onRemove?: (id: string) => void
   scale?: number
   getCanvasBounds?: () => DOMRect | null
   children: React.ReactNode
 }
 
-export default function Node({ data, onUpdate, onFocus, onStartLink, scale = 1, getCanvasBounds, children }: NodeProps) {
+export default function Node({ data, onUpdate, onFocus, onStartLink, onAdd, onRemove, scale = 1, getCanvasBounds, children }: NodeProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [isResizing, setIsResizing] = useState(false)
@@ -187,6 +189,21 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, scale = 1, 
       }}
       onMouseDown={handleMouseDown}
     >
+      {/* Left/Right side affordances */}
+      {onRemove && (
+        <button
+          title="Remove"
+          className="absolute left-[-10px] top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/10 border border-white/20 text-white/70 text-xs hover:bg-white/20"
+          onMouseDown={(e)=>{ e.stopPropagation(); onRemove(data.id) }}
+        >−</button>
+      )}
+      {onAdd && (
+        <button
+          title="Add next"
+          className="absolute right-[-10px] top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/10 border border-white/20 text-white/70 text-xs hover:bg-white/20"
+          onMouseDown={(e)=>{ e.stopPropagation(); onAdd(data.id) }}
+        >+</button>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between p-2 border-b border-white/10">
         <div className="flex items-center gap-2">

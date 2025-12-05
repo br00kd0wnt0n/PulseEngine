@@ -5,9 +5,11 @@ type CanvasProps = {
   nodes: NodeData[]
   onNodesChange: (nodes: NodeData[]) => void
   renderNodeContent?: (node: NodeData) => React.ReactNode
+  onAddNode?: (sourceId: string) => void
+  onRemoveNode?: (id: string) => void
 }
 
-export default function Canvas({ nodes, onNodesChange, renderNodeContent }: CanvasProps) {
+export default function Canvas({ nodes, onNodesChange, renderNodeContent, onAddNode, onRemoveNode }: CanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
@@ -168,6 +170,8 @@ export default function Canvas({ nodes, onNodesChange, renderNodeContent }: Canv
             onUpdate={handleNodeUpdate}
             onFocus={handleNodeFocus}
             onStartLink={startLink}
+            onAdd={onAddNode}
+            onRemove={onRemoveNode}
             scale={scale}
             getCanvasBounds={() => canvasRef.current?.getBoundingClientRect() || null}
           >
