@@ -79,11 +79,12 @@ export async function generateScoresAI(
   projectId?: string | null,
   targetAudience?: string | null,
   graph?: TrendGraph | null,
+  cfg?: { includeLive?: boolean }
 ) {
   // Retrieve context
   let ctx: RetrievalContext
   try {
-    ctx = await retrieveContext(concept, userId || null, { maxResults: 15, includeCore: true, includeLive: true, projectId: projectId || null })
+    ctx = await retrieveContext(concept, userId || null, { maxResults: 15, includeCore: true, includeLive: cfg?.includeLive !== false, projectId: projectId || null })
   } catch (err) {
     throw new Error('context_unavailable')
   }
@@ -401,19 +402,21 @@ export async function refineDebrief(
 }
 
 // Opportunities: ranked with impact
-export async function generateOpportunities(concept: string, userId?: string | null, persona?: string | null, projectId?: string | null, targetAudience?: string | null) {
+export async function generateOpportunities(concept: string, userId?: string | null, persona?: string | null, projectId?: string | null, targetAudience?: string | null, opts?: { force?: boolean; includeLive?: boolean }) {
   try {
     let ctx
     try {
-      ctx = await retrieveContext(concept, userId || null, { maxResults: 15, includeCore: true, includeLive: true, projectId: projectId || null })
+      ctx = await retrieveContext(concept, userId || null, { maxResults: 15, includeCore: true, includeLive: opts?.includeLive !== false, projectId: projectId || null })
     } catch (err) {
       console.error('[AI] retrieveContext failed for opportunities:', err)
       // Fallback to empty context if retrieval fails
       ctx = { projectContent: [], coreKnowledge: [], liveMetrics: [], predictiveTrends: [], sources: { project: [], core: [], live: [], predictive: [] } }
     }
     const cacheKey = sha({ t: 'opps', concept, s: summarySig(ctx, projectId), persona, targetAudience })
-    const cached = await cacheGet<any>(cacheKey)
-    if (cached) return cached
+    if (!opts?.force) {
+      const cached = await cacheGet<any>(cacheKey)
+      if (cached) return cached
+    }
     const apiKey = process.env.OPENAI_API_KEY
     if (apiKey) {
       try {

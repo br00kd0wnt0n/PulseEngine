@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { listPrompts, getPrompt, setPrompt } from '../services/promptStore.js'
+import { listPrompts, getPrompt, setPrompt, listNodeConfigs, getNodeConfig, setNodeConfig } from '../services/promptStore.js'
 
 const router = Router()
 
@@ -32,3 +32,21 @@ router.put('/:key', async (req, res) => {
 
 export default router
 
+// Additional config routes
+router.get('/config/nodes', async (_req, res) => {
+  const list = await listNodeConfigs()
+  res.json(list)
+})
+
+router.get('/config/nodes/:key', async (req, res) => {
+  const key = String(req.params.key)
+  const cfg = await getNodeConfig(key)
+  res.json({ key, value: cfg })
+})
+
+router.put('/config/nodes/:key', async (req, res) => {
+  const key = String(req.params.key)
+  const value = req.body?.value || {}
+  await setNodeConfig(key, value)
+  res.json({ ok: true })
+})

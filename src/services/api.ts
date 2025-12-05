@@ -108,6 +108,12 @@ export const api = {
     `/prompts/${encodeURIComponent(key)}`,
     { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) }
   ),
+  listNodeConfigs: () => request<any[]>(`/prompts/config/nodes`),
+  getNodeConfig: (key: string) => request<{ key: string; value: any }>(`/prompts/config/nodes/${encodeURIComponent(key)}`),
+  setNodeConfig: (key: string, value: any) => request<{ ok: boolean }>(
+    `/prompts/config/nodes/${encodeURIComponent(key)}`,
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value }) }
+  ),
 
   // APIFY Admin endpoints
   collectTrends: () => request<any>('/admin/collect-trends', { method: 'POST' }),

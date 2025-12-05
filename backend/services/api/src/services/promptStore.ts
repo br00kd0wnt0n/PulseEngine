@@ -426,3 +426,30 @@ export function renderTemplate(tpl: string, vars: Record<string, any>): string {
     // remove simple {{#if var}}...{{/if}} blocks when var is falsy
     .replace(/\{\{#if ([^}]+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (_m, v, inner) => vars[v.trim()] ? inner : '')
 }
+
+// Node configuration (stored in AICache under nodecfg:<key>)
+export type NodeConfig = {
+  repollRKB?: boolean
+  repollLive?: boolean
+}
+
+export async function getNodeConfig(key: string): Promise<NodeConfig> {
+  const repo = AppDataSource.getRepository(AICache)
+  const found = await repo.findOne({ where: { key: `nodecfg:${key}` } })
+  const def: NodeConfig = { repollRKB: true, repollLive: true }
+  try { return { ...def, ...(found?.value || {}) } } catch { return def }
+}
+
+export async function setNodeConfig(key: string, value: NodeConfig) {
+  const repo = AppDataSource.getRepository(AICache)
+  await repo.upsert({ key: `nodecfg:${key}`, value }, ['key'])
+}
+
+export async function listNodeConfigs(): Promise<{ key: string; value: NodeConfig }[]> {
+  const keys = ['debrief','opportunities','narrative','scoring','enhancements','concept_overview','model_rollout','clarifying_questions','course_correct']
+  const out: { key: string; value: NodeConfig }[] = []
+  for (const k of keys) {
+    out.push({ key: k, value: await getNodeConfig(k) })
+  }
+  return out
+}

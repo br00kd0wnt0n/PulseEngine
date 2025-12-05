@@ -325,13 +325,15 @@ export default function CanvasWorkflow() {
     const newWidth = 450
     const newHeight = 400
     const { x, y } = findClearSpace(sourceNode, newWidth, newHeight)
-    const newId = `${nodeType}-${Date.now()}`
+    const requiresGeneration = ['debrief','debrief-opportunities','opportunities','narrative','scoring','enhancements','concept-overview','model-rollout'].includes(nodeType)
+    const uniqueId = ['debrief','opportunities','narrative','scoring','enhancements','concept-overview','model-rollout','export-pdf'].includes(nodeType)
+    const newId = uniqueId ? nodeType : `${nodeType}-${Date.now()}`
 
     setNodes(prev => ([
       ...prev,
       {
         id: newId,
-        type: nodeType === 'wildcard' ? 'wildcard' : 'ai-content',
+        type: nodeType === 'wildcard' ? 'wildcard' : (nodeType === 'export-pdf' ? 'ai-content' : 'ai-content'),
         title,
         x,
         y,
@@ -339,7 +341,7 @@ export default function CanvasWorkflow() {
         height: newHeight,
         minimized: false,
         zIndex: maxZ + 1,
-        status: 'active' as const,
+        status: (nodeType === 'export-pdf' ? 'active' : (requiresGeneration ? 'processing' : 'active')) as any,
         connectedTo: [sourceId]
       }
     ]))
