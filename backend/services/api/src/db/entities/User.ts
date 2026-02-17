@@ -9,7 +9,11 @@ export class User {
   @Index({ unique: true })
   @Column() email!: string
 
-  @Column() passwordHash!: string
+  @Column({ nullable: true }) passwordHash!: string | null
+
+  @Column({ type: 'text', nullable: true }) googleId!: string | null
+  @Column({ type: 'text', nullable: true }) displayName!: string | null
+  @Column({ type: 'text', nullable: true }) avatarUrl!: string | null
 
   @Column({ type: 'text', default: 'user' }) role!: UserRole
 

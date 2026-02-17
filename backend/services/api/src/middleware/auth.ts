@@ -9,7 +9,8 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
   const token = header.startsWith('Bearer ') ? header.slice(7) : null
   if (!token) return res.status(401).json({ error: 'Missing token' })
   try {
-    const secret = process.env.JWT_SECRET || 'dev'
+    const secret = process.env.JWT_SECRET
+    if (!secret) return res.status(500).json({ error: 'Server misconfigured: JWT_SECRET not set' })
     const claims = jwt.verify(token, secret) as JwtClaims
     ;(req as any).user = claims
     return next()

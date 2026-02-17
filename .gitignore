@@ -28,3 +28,6 @@ coverage/
 # Uploads
 uploads/
 
+# Exports (user-generated output)
+exports/
+

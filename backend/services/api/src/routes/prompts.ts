@@ -30,8 +30,6 @@ router.put('/:key', async (req, res) => {
   }
 })
 
-export default router
-
 // Additional config routes
 router.get('/config/nodes', async (_req, res) => {
   const list = await listNodeConfigs()
@@ -50,3 +48,5 @@ router.put('/config/nodes/:key', async (req, res) => {
   await setNodeConfig(key, value)
   res.json({ ok: true })
 })
+
+export default router

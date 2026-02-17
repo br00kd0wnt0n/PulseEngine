@@ -1,9 +1,19 @@
 // Simple fetch wrapper with optional API base url
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 
+export type AuthUser = { id: string; email: string; displayName: string | null; avatarUrl: string | null; role: string }
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`
-  const res = await fetch(url, init)
+  const headers = new Headers(init?.headers)
+  const token = localStorage.getItem('pulse_token')
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  const res = await fetch(url, { ...init, headers })
+  if (res.status === 401) {
+    localStorage.removeItem('pulse_token')
+    localStorage.removeItem('pulse_user')
+    window.dispatchEvent(new CustomEvent('auth-logout'))
+  }
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.json() as Promise<T>
 }
@@ -130,4 +140,11 @@ export const api = {
     '/admin/cleanup-metrics',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days }) }
   ),
+
+  // Auth
+  authGoogle: (credential: string) => request<{ token: string; user: AuthUser }>(
+    '/auth/google',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ credential }) }
+  ),
+  authMe: () => request<{ user: AuthUser }>('/auth/me'),
 }

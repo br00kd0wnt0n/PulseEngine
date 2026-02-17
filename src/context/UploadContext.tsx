@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState } from 'react'
 import { api } from '../services/api'
 import { ProcessedContent } from '../types'
 import { logActivity } from '../utils/activity'
+import { useAuth } from './AuthContext'
 
 type Ctx = {
   processed: ProcessedContent[]
@@ -13,10 +14,11 @@ type Ctx = {
 const UploadCtx = createContext<Ctx | null>(null)
 
 const INGESTION_URL = ((import.meta as any).env?.VITE_INGESTION_URL as string | undefined) || 'https://ingestion-production-c716.up.railway.app'
-const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string | undefined) || 'https://api-production-768d.up.railway.app'
-const USER_ID = '087d78e9-4bbe-49f6-8981-1588ce4934a2' // TODO: Get from auth context
+const FALLBACK_USER_ID = '087d78e9-4bbe-49f6-8981-1588ce4934a2'
 
 export function UploadProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
+  const USER_ID = user?.id || FALLBACK_USER_ID
   const [processed, setProcessed] = useState<ProcessedContent[]>([])
 
   const addFiles = async (files: File[]) => {

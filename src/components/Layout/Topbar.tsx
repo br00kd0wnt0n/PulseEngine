@@ -1,51 +1,37 @@
-import { useTheme } from '../../context/ThemeContext'
 import { Link } from 'react-router-dom'
 import { useLayout } from '../../context/LayoutContext'
 import { useUpload } from '../../context/UploadContext'
-// import LogoMark from '../LogoMark'
+import { useDashboard } from '../../context/DashboardContext'
+import { useAuth } from '../../context/AuthContext'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { api } from '../../services/api'
 
 export default function Topbar() {
-  const { dark, toggle } = useTheme()
   const { toggleSidebar } = useLayout()
   const { processed } = useUpload()
+  const { concept, persona, region } = useDashboard()
+  const { user, logout } = useAuth()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<{ trends: any[]; creators: any[]; assets: any[] }>({ trends: [], creators: [], assets: [] })
-
-  // Read project info from localStorage
-  const [concept, setConcept] = useState('')
-  const [persona, setPersona] = useState('')
-  const [region, setRegion] = useState('')
   const [audience, setAudience] = useState('')
 
   useEffect(() => {
-    // Initial read
-    const updateFromLocalStorage = () => {
-      setConcept(localStorage.getItem('concept') || '')
-      setPersona(localStorage.getItem('persona') || '')
-      setRegion(localStorage.getItem('region') || '')
-      setAudience(localStorage.getItem('targetAudience') || '')
-    }
-
-    updateFromLocalStorage()
-
-    // Poll for changes every 500ms
-    const interval = setInterval(updateFromLocalStorage, 500)
-
-    return () => clearInterval(interval)
+    setAudience(localStorage.getItem('targetAudience') || '')
+    const onUpdate = () => setAudience(localStorage.getItem('targetAudience') || '')
+    window.addEventListener('context-updated', onUpdate)
+    return () => window.removeEventListener('context-updated', onUpdate)
   }, [])
 
-  let timer: any
-  async function runSearch(text: string) {
+  const timerRef = useRef<any>(null)
+  const runSearch = useCallback((text: string) => {
     const query = text.trim()
-    if (timer) clearTimeout(timer)
+    if (timerRef.current) clearTimeout(timerRef.current)
     if (!query) { setResults({ trends: [], creators: [], assets: [] }); setOpen(false); return }
     setLoading(true)
-    timer = setTimeout(async () => {
+    timerRef.current = setTimeout(async () => {
       try {
         const data = await api.search(query)
         setResults({
@@ -59,7 +45,7 @@ export default function Topbar() {
         setOpen(true)
       } finally { setLoading(false) }
     }, 200)
-  }
+  }, [])
   // Check if uploads are still being assessed
   const hasPlaceholders = (files: any[]) => files.some(f => f.summary === '[processing]')
   const showIndexingStatus = processed.length > 0 && hasPlaceholders(processed)
@@ -140,6 +126,17 @@ export default function Topbar() {
               </div>
             )}
           </div>
+          {user && (
+            <div className="flex items-center gap-2 ml-3 shrink-0">
+              {user.avatarUrl && (
+                <img src={user.avatarUrl} alt="" className="w-7 h-7 rounded-full border border-white/20" referrerPolicy="no-referrer" />
+              )}
+              <span className="hidden md:inline text-sm text-white/80 max-w-[120px] truncate">{user.displayName || user.email}</span>
+              <button onClick={logout} className="px-2 py-1 rounded text-xs bg-white/10 hover:bg-white/20 text-white/70 hover:text-white border border-white/10">
+                Sign Out
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Project information row */}

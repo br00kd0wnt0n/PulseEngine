@@ -1,5 +1,4 @@
 import { NavLink } from 'react-router-dom'
-import { useTheme } from '../../context/ThemeContext'
 import { useLayout } from '../../context/LayoutContext'
 import LogoMark from '../LogoMark'
 
@@ -15,7 +14,6 @@ const nav = [
 ]
 
 export default function Sidebar() {
-  const { dark } = useTheme()
   const { sidebarOpen, closeSidebar } = useLayout()
   return (
     <>
@@ -95,7 +93,7 @@ export default function Sidebar() {
             </button>
           </div>
 
-          <div className="mt-2 text-[10px] text-white/40">Dark Mode {dark ? 'On' : 'Off'}</div>
+          <div className="mt-2 text-[10px] text-white/40">Dark Mode</div>
         </div>
       </aside>
     </>

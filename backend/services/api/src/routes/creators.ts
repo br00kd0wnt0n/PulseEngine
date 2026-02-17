@@ -21,7 +21,13 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const repo = AppDataSource.getRepository(Creator)
-  await repo.update({ id: req.params.id }, req.body)
+  const { name, platform, category, metadata } = req.body
+  const allowed: Record<string, any> = {}
+  if (name !== undefined) allowed.name = name
+  if (platform !== undefined) allowed.platform = platform
+  if (category !== undefined) allowed.category = category
+  if (metadata !== undefined) allowed.metadata = metadata
+  await repo.update({ id: req.params.id }, allowed)
   const updated = await repo.findOneByOrFail({ id: req.params.id })
   res.json(updated)
 })

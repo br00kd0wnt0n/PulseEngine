@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTrends } from '../../context/TrendContext'
-import { generateNarrative } from '../../services/ai'
 import { api } from '../../services/api'
 import Tooltip from '../shared/Tooltip'
 import { logActivity } from '../../utils/activity'
@@ -10,10 +9,9 @@ export default function NarrativeOverview() {
   const [text, setText] = useState('')
 
   useEffect(() => {
-    // Try backend OpenAI narrative first; fallback to local mock
     const run = () => api.narrative(snapshot(), null)
       .then((r) => { setText(r.text); try { logActivity('Narrative generated') } catch {} })
-      .catch(() => generateNarrative(snapshot(), null).then(setText))
+      .catch(() => setText('Narrative generation unavailable.'))
     run()
     function refresh(e?: Event) {
       run().then(() => {

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTrends } from '../../context/TrendContext'
-import { generateNarrative } from '../../services/ai'
+import { api } from '../../services/api'
 
 export default function NarrativePanel() {
   const { selected, snapshot } = useTrends()
@@ -9,8 +9,10 @@ export default function NarrativePanel() {
 
   const onGenerate = async () => {
     setLoading(true)
-    const res = await generateNarrative(snapshot(), selected?.id || null)
-    setText(res)
+    try {
+      const res = await api.narrative(snapshot(), selected?.id || null)
+      setText(res.text || '')
+    } catch { setText('Failed to generate narrative.') }
     setLoading(false)
   }
 

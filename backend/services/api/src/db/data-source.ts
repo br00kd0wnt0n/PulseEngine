@@ -19,6 +19,7 @@ import { VectorEmbeddings1710000004000 } from '../db/migrations/1710000004000-Ve
 import { ContentAssetsProjectId1710000005000 } from '../db/migrations/1710000005000-ContentAssetsProjectId.js'
 import { PlatformMetrics1710000006000 } from '../db/migrations/1710000006000-PlatformMetrics.js'
 import { TrendSummaries1710000007000 } from '../db/migrations/1710000007000-TrendSummaries.js'
+import { GoogleOAuth1710000008000 } from '../db/migrations/1710000008000-GoogleOAuth.js'
 
 dotenv.config()
 
@@ -34,7 +35,8 @@ export const AppDataSource = new DataSource({
     VectorEmbeddings1710000004000,
     ContentAssetsProjectId1710000005000,
     PlatformMetrics1710000006000,
-    TrendSummaries1710000007000
+    TrendSummaries1710000007000,
+    GoogleOAuth1710000008000
   ],
   synchronize: false,
   logging: false,
