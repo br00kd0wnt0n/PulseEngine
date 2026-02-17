@@ -154,7 +154,8 @@ function findClearY(nodes: NodeData[], targetX: number, nodeWidth: number, nodeH
   while (!foundClear && candidateY < 2000) {
     // Check if this Y position overlaps with any existing node
     const overlaps = sorted.some(node => {
-      const nodeBottom = node.y + (node.height || 360)
+      const nh = node.minimized ? 48 : (node.height || 360)
+      const nodeBottom = node.y + nh
       const candidateBottom = candidateY + nodeHeight
 
       // Check for vertical overlap
@@ -166,12 +167,14 @@ function findClearY(nodes: NodeData[], targetX: number, nodeWidth: number, nodeH
     } else {
       // Find the next node that blocks this position and position below it
       const blockingNode = sorted.find(node => {
-        const nodeBottom = node.y + (node.height || 360)
+        const nh = node.minimized ? 48 : (node.height || 360)
+        const nodeBottom = node.y + nh
         return candidateY < nodeBottom + 20
       })
 
       if (blockingNode) {
-        candidateY = blockingNode.y + (blockingNode.height || 360) + 20
+        const bh = blockingNode.minimized ? 48 : (blockingNode.height || 360)
+        candidateY = blockingNode.y + bh + 20
       } else {
         candidateY += 60
       }
@@ -286,9 +289,11 @@ export default function CanvasWorkflow() {
           minimized: false,
           zIndex: 3,
           status: 'processing' as const,
-          connectedTo: ['debrief']
+          connectedTo: []
         }
       ]))
+      // Connect debrief → narrative (forward direction)
+      setNodes(prev => prev.map(n => n.id === 'debrief' ? { ...n, connectedTo: Array.from(new Set([...(n.connectedTo||[]), 'narrative'])) } : n))
     }
   }
   const [nodes, setNodes] = useState<NodeData[]>([])
@@ -401,9 +406,11 @@ export default function CanvasWorkflow() {
         minimized: false,
         zIndex: maxZ + 1,
         status: (nodeType === 'export-pdf' ? 'active' : (requiresGeneration ? 'processing' : 'active')) as any,
-        connectedTo: [sourceId]
+        connectedTo: []
       }
     ]))
+    // Connect source → new child (forward direction)
+    setNodes(prev => prev.map(n => n.id === sourceId ? { ...n, connectedTo: Array.from(new Set([...(n.connectedTo||[]), newId])) } : n))
     setPaletteFor(null)
   }
 
@@ -537,9 +544,11 @@ export default function CanvasWorkflow() {
         minimized: false,
         zIndex: maxZ + 1,
         status: 'active' as const,
-        connectedTo: [sourceNodeId] // Connect to the source node
+        connectedTo: []
       }
     ]))
+    // Connect source → course-correct (forward direction)
+    setNodes(prev => prev.map(n => n.id === sourceNodeId ? { ...n, connectedTo: Array.from(new Set([...(n.connectedTo||[]), newCCId])) } : n))
 
     // Pre-fill with context about which node we're correcting
     setCcInputs(prev => ({ ...prev, [newCCId]: '' }))
@@ -958,20 +967,20 @@ export default function CanvasWorkflow() {
       setNodes(prev => prev.map(node => {
         // Minimize and stack the input nodes at top-left
         if (node.id === 'brief-input') {
-          return { ...node, x: 50, y: 100, width: 280, minimized: true }
+          return { ...node, x: 50, y: 50, width: 280, minimized: true }
         }
         if (node.id === 'context-upload') {
-          return { ...node, x: 50, y: 160, width: 280, minimized: true }
+          return { ...node, x: 50, y: 110, width: 280, minimized: true }
         }
-        // Group RKB with GWI and Glimpse at bottom-left
+        // Group RKB with GWI and Glimpse below minimized inputs
         if (node.id === 'rkb') {
-          return { ...node, x: 50, y: 560, width: 300, minimized: false }
+          return { ...node, x: 50, y: 180, width: 300, minimized: false }
         }
         if (node.id === 'gwi') {
-          return { ...node, x: 50, y: 740, height: 120 }
+          return { ...node, x: 50, y: 350, height: 120 }
         }
         if (node.id === 'glimpse') {
-          return { ...node, x: 50, y: 880 }
+          return { ...node, x: 50, y: 490 }
         }
         return node
       }))
@@ -1154,7 +1163,8 @@ export default function CanvasWorkflow() {
       const updated = prev.map(n => {
         // Stack debrief and narrative vertically when minimized to avoid overlap
         if (n.id === 'debrief') return { ...n, minimized: true, x: narrativeX, y: debriefY }
-        if (n.id === 'narrative') return { ...n, minimized: true, x: narrativeX, y: narrativeY }
+        if (n.id === 'narrative') return { ...n, minimized: true, x: narrativeX, y: narrativeY, connectedTo: Array.from(new Set([...(n.connectedTo||[]), 'scoring'])) }
+        if (n.id === 'rkb') return { ...n, connectedTo: Array.from(new Set([...(n.connectedTo||[]), 'scoring'])) }
         return n
       })
       return [
@@ -1170,7 +1180,7 @@ export default function CanvasWorkflow() {
           minimized: false,
           zIndex: 5,
           status: 'processing' as NodeData['status'],
-          connectedTo: ['narrative', 'rkb']
+          connectedTo: []
         }
       ]
     })
@@ -1648,9 +1658,9 @@ export default function CanvasWorkflow() {
       const isLoading = ccLoading === nodeId
       const disabled = isLoading || !concept
 
-      // Get the connected node info for context
-      const connectedNodeId = node.connectedTo?.[0]
-      const connectedNode = connectedNodeId ? nodes.find(n => n.id === connectedNodeId) : null
+      // Get the source node (the node that connects TO this course-correct)
+      const connectedNode = nodes.find(n => (n.connectedTo || []).includes(nodeId)) || null
+      const connectedNodeId = connectedNode?.id || null
 
       return (
         <div className="space-y-2 text-[11px]">
@@ -2307,8 +2317,14 @@ export default function CanvasWorkflow() {
                       const wildcardX = Math.max(margin, Math.min(vw - nodeWidth - margin, scoringRight + 40))
                       const wildcardY = findClearY(prev, wildcardX, nodeWidth, nodeHeight, 40)
 
+                      const withLinks = prev.map(n => {
+                        if (n.id === 'scoring' || n.id === 'rkb') {
+                          return { ...n, connectedTo: Array.from(new Set([...(n.connectedTo||[]), 'wildcard'])) }
+                        }
+                        return n
+                      })
                       return [
-                        ...prev,
+                        ...withLinks,
                         {
                           id: 'wildcard',
                           type: 'ai-content',
@@ -2320,7 +2336,7 @@ export default function CanvasWorkflow() {
                           minimized: false,
                           zIndex: 6,
                           status: 'processing' as NodeData['status'],
-                          connectedTo: ['scoring', 'rkb']
+                          connectedTo: []
                         }
                       ]
                     })
@@ -2484,7 +2500,7 @@ export default function CanvasWorkflow() {
                                 const margin = 80
                                 const partnerX = Math.max(margin, Math.min(vw - 420 - margin, vw * 0.55))
                                 const partnerY = Math.max(margin, Math.min(vh - 380 - margin, vh * 0.40))
-                                return [ ...prev, { id: 'creative-partner', type: 'ai-content', title: 'Creative Partners', x: partnerX, y: partnerY, width: 420, height: 380, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: ['concept-overview'] } ]
+                                return [ ...prev.map(n => n.id === 'concept-overview' ? { ...n, connectedTo: Array.from(new Set([...(n.connectedTo||[]), 'creative-partner'])) } : n), { id: 'creative-partner', type: 'ai-content', title: 'Creative Partners', x: partnerX, y: partnerY, width: 420, height: 380, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: [] } ]
                               })
                             } catch (err) { console.error('[CreativePartner] Failed:', err) }
                           }}
@@ -2581,7 +2597,7 @@ export default function CanvasWorkflow() {
                               const margin = 80
                               const partnerX = Math.max(margin, Math.min(vw - 420 - margin, vw * 0.55))
                               const partnerY = Math.max(margin, Math.min(vh - 380 - margin, vh * 0.40))
-                              return [ ...prev, { id: 'creative-partner', type: 'ai-content', title: 'Creative Partners', x: partnerX, y: partnerY, width: 420, height: 380, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: ['concept-overview'] } ]
+                              return [ ...prev.map(n => n.id === 'concept-overview' ? { ...n, connectedTo: Array.from(new Set([...(n.connectedTo||[]), 'creative-partner'])) } : n), { id: 'creative-partner', type: 'ai-content', title: 'Creative Partners', x: partnerX, y: partnerY, width: 420, height: 380, minimized: false, zIndex: 6, status: 'active' as NodeData['status'], connectedTo: [] } ]
                             })
                           } catch (err) { console.error('[CreativePartner] Failed:', err) }
                         }}

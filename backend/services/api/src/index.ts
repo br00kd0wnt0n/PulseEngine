@@ -22,6 +22,7 @@ import { authMiddleware, attachRls } from './middleware/auth.js'
 import { startTrendCollector } from './services/scheduler/trend-collector.js'
 import trendsSummaryRoutes from './routes/trends-summary.js'
 import gwiRoutes from './routes/gwi.js'
+import publicRoutes from './routes/public.js'
 
 dotenv.config()
 const logger = pino({ level: process.env.NODE_ENV === 'production' ? 'info' : 'debug' })
@@ -83,6 +84,7 @@ async function main() {
   app.use('/trends/summary', trendsSummaryRoutes)
   app.use('/ai', aiRoutes)
   app.use('/gwi', gwiRoutes)
+  app.use('/public', publicRoutes)
 
   // Secure routes (require authentication)
   app.use(authMiddleware, attachRls)
