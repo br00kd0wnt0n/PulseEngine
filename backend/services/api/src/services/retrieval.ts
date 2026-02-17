@@ -609,6 +609,12 @@ function formatMetricContent(metric: any): string {
     case 'fandom':
       return `[${platform}] ${value.title || 'Untitled'} (Entertainment trending)`
 
+    case 'gwi': {
+      const insight = value.description || value.message || JSON.stringify(value).substring(0, 150)
+      const label = value.metric || 'Audience Insight'
+      return `[GWI AUDIENCE] ${label}: ${insight.substring(0, 180)}`
+    }
+
     default:
       return `[${platform}] ${JSON.stringify(value).substring(0, 100)}`
   }

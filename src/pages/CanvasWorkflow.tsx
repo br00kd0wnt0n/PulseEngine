@@ -184,12 +184,11 @@ function findClearY(nodes: NodeData[], targetX: number, nodeWidth: number, nodeH
 const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string | undefined) || ''
 const CANVAS_W = 2200
 const CANVAS_H = 1600
-const USER_ID = '087d78e9-4bbe-49f6-8981-1588ce4934a2'
 const ENABLE_REMOTE_SAVE = Boolean((import.meta as any).env?.VITE_ENABLE_REMOTE_SAVE)
 
 export default function CanvasWorkflow() {
   const { concept, setConcept, activated, setActivated, persona, setPersona, region, setRegion } = useDashboard() as any
-  const { addFiles, addUrl, processed } = useUpload()
+  const { addFiles, processed } = useUpload()
   const { snapshot, nodes: trendNodes } = useTrends()
   const [rkbActivity, setRkbActivity] = useState<{ id: number; text: string; kind?: 'rkb'|'project'|'trends'|'ai' }[]>([])
   const [stats, setStats] = useState<{ trends?: number; creators?: number; assets?: number } | null>(null)
@@ -220,7 +219,6 @@ export default function CanvasWorkflow() {
   const [rolloutEditMode, setRolloutEditMode] = useState<boolean>(false)
   const [hoveredMoment, setHoveredMoment] = useState<number | null>(null)
   const [overviewLoading, setOverviewLoading] = useState<boolean>(false)
-  const [showUnderHood, setShowUnderHood] = useState<boolean>(false)
 
   // Track if we've already positioned scoring/narrative nodes to prevent repositioning on re-render
   const nodesPositionedRef = useRef(false)
@@ -302,6 +300,11 @@ export default function CanvasWorkflow() {
   const [clarifyingQs, setClarifyingQs] = useState<string[] | null>(null)
   const [clarifyingAns, setClarifyingAns] = useState<string[]>([])
   const [clarifyingLoading, setClarifyingLoading] = useState<boolean>(false)
+  // GWI Audience Intelligence
+  const [gwiInsights, setGwiInsights] = useState<{ message: string; insights: any[]; sources: string[]; chatId?: string } | null>(null)
+  const [gwiConnectedTo, setGwiConnectedTo] = useState<string | null>(null)
+  const [gwiAvailable, setGwiAvailable] = useState<boolean>(false)
+
   // Course Correct - per-node state for multiple instances
   const [ccInputs, setCcInputs] = useState<Record<string, string>>({})
   const [ccLoading, setCcLoading] = useState<string | null>(null) // node id that is loading
@@ -381,7 +384,7 @@ export default function CanvasWorkflow() {
     const newWidth = 450
     const newHeight = 400
     const { x, y } = findClearSpace(sourceNode, newWidth, newHeight)
-    const requiresGeneration = ['debrief','debrief-opportunities','opportunities','narrative','scoring','enhancements','concept-overview','model-rollout'].includes(nodeType)
+    const requiresGeneration = ['debrief','opportunities','narrative','scoring','enhancements','concept-overview','model-rollout'].includes(nodeType)
     const uniqueId = ['debrief','opportunities','narrative','scoring','enhancements','concept-overview','model-rollout','export-pdf'].includes(nodeType)
     const newId = uniqueId ? nodeType : `${nodeType}-${Date.now()}`
 
@@ -678,6 +681,22 @@ export default function CanvasWorkflow() {
     return () => { cancelled = true }
   }, [])
 
+  // GWI availability check on mount
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const status = await api.gwiStatus().catch(() => null)
+        if (cancelled || !status) return
+        setGwiAvailable(status.configured)
+        if (status.configured) {
+          setNodes(prev => prev.map(n => n.id === 'gwi' ? { ...n, title: 'GWI Audience Intelligence', status: 'active' as const } : n))
+        }
+      } catch {}
+    })()
+    return () => { cancelled = true }
+  }, [])
+
   // Record context ingestion activity from uploads/URL adds
   useEffect(() => {
     const onContext = () => addActivity('New context ingested from uploads', 'project')
@@ -687,6 +706,60 @@ export default function CanvasWorkflow() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // GWI connection handler — trigger query when GWI is connected to a new node
+  useEffect(() => {
+    if (!gwiAvailable || !concept) return
+    const gwiNode = nodes.find(n => n.id === 'gwi')
+    if (!gwiNode?.connectedTo?.length) return
+    const targetId = gwiNode.connectedTo[gwiNode.connectedTo.length - 1]
+    if (targetId === gwiConnectedTo) return // already processed this connection
+
+    const targetNode = nodes.find(n => n.id === targetId)
+    if (!targetNode) return
+
+    setGwiConnectedTo(targetId)
+
+    // Build context from connected node's data
+    let nodeContext = ''
+    const nodeType = nodeKeyFor(targetId)
+    if (nodeType === 'debrief' && debrief) {
+      nodeContext = debrief.brief?.substring(0, 400) || ''
+    } else if (nodeType === 'scoring' && scores) {
+      nodeContext = `Overall score: ${scores.overall || 'N/A'}, Narrative: ${scores.narrative || 'N/A'}`
+    } else if (nodeType === 'narrative' && narrative) {
+      nodeContext = narrative.text?.substring(0, 400) || ''
+    } else if (nodeType === 'opportunities' && opps) {
+      nodeContext = opps.opportunities?.map((o: any) => o.title).join(', ') || ''
+    }
+
+    // Set processing state
+    setNodes(prev => prev.map(n => n.id === 'gwi' ? { ...n, status: 'processing' as const } : n))
+    addActivity(`Querying GWI audience intelligence for ${targetNode.title}…`, 'ai')
+
+    let projectId: string | null = null
+    try { projectId = localStorage.getItem('activeProjectId') } catch {}
+
+    api.gwiQuery(concept, {
+      targetAudience,
+      nodeType,
+      nodeContext,
+      region,
+      persona,
+      projectId: projectId || undefined,
+    }).then(result => {
+      setGwiInsights({ message: result.message, insights: result.insights, sources: result.sources, chatId: result.chatId })
+      setNodes(prev => prev.map(n => n.id === 'gwi' ? { ...n, status: 'complete' as const } : n))
+      addActivity(`GWI: ${result.insights?.length || 0} audience data points enriched`, 'ai')
+      // Trigger re-evaluation so downstream AI picks up new GWI data
+      window.dispatchEvent(new CustomEvent('context-updated'))
+    }).catch(err => {
+      console.error('[GWI] Query failed:', err)
+      setNodes(prev => prev.map(n => n.id === 'gwi' ? { ...n, status: 'active' as const } : n))
+      addActivity('GWI query failed — check API configuration', 'ai')
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, gwiAvailable, concept])
 
   // Call real backend APIs when workflow is activated (wait for assessed context if any uploads exist)
   useEffect(() => {
@@ -819,7 +892,7 @@ export default function CanvasWorkflow() {
         }
       } catch (e) {
         console.error('[PersonaSwitch] Re-evaluation failed:', e)
-        setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'active' as const } : n))
+        setNodes(prev => prev.map(n => n.id === 'debrief' ? { ...n, status: 'active' as const } : n))
       }
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -836,9 +909,9 @@ export default function CanvasWorkflow() {
     if (!hasRkb) {
       setNodes(prev => ([
         ...prev,
-        { id: 'rkb', type: 'rkb', title: 'Ralph Knowledge Base', x: 50, y: 620, width: 300, height: 150, minimized: false, zIndex: 2, status: 'idle' as const },
-        { id: 'gwi', type: 'integration', title: 'GWI (inactive)', x: 50, y: 800, width: 260, height: 80, minimized: false, zIndex: 1, status: 'idle' as const },
-        { id: 'glimpse', type: 'integration', title: 'GLIMPSE (inactive)', x: 50, y: 900, width: 260, height: 80, minimized: false, zIndex: 1, status: 'idle' as const },
+        { id: 'rkb', type: 'rkb', title: 'Ralph Knowledge Base', x: 50, y: 560, width: 300, height: 150, minimized: false, zIndex: 2, status: 'idle' as const },
+        { id: 'gwi', type: 'integration', title: gwiAvailable ? 'GWI Audience Intelligence' : 'GWI (inactive)', x: 50, y: 740, width: 260, height: 120, minimized: false, zIndex: 1, status: gwiAvailable ? 'active' as const : 'idle' as const },
+        { id: 'glimpse', type: 'integration', title: 'GLIMPSE (inactive)', x: 50, y: 880, width: 260, height: 80, minimized: false, zIndex: 1, status: 'idle' as const },
       ]))
     }
 
@@ -879,15 +952,22 @@ export default function CanvasWorkflow() {
     if (activated && !nodesStacked && nodes.find(n => n.id === 'debrief')) {
       setNodesStacked(true)
       setNodes(prev => prev.map(node => {
-        // Minimize and stack the three left nodes
+        // Minimize and stack the input nodes at top-left
         if (node.id === 'brief-input') {
           return { ...node, x: 50, y: 100, width: 280, minimized: true }
         }
         if (node.id === 'context-upload') {
           return { ...node, x: 50, y: 160, width: 280, minimized: true }
         }
+        // Group RKB with GWI and Glimpse at bottom-left
         if (node.id === 'rkb') {
-          return { ...node, x: 50, y: 220, width: 300, minimized: false }
+          return { ...node, x: 50, y: 560, width: 300, minimized: false }
+        }
+        if (node.id === 'gwi') {
+          return { ...node, x: 50, y: 740 }
+        }
+        if (node.id === 'glimpse') {
+          return { ...node, x: 50, y: 840 }
         }
         return node
       }))
@@ -905,7 +985,7 @@ export default function CanvasWorkflow() {
     ;(async () => {
       try {
         setClarifyingLoading(true)
-        // Place node on left, below RKB stack
+        // Place node on left, below minimized input nodes but above RKB group
         setNodes(prev => ([
           ...prev,
           {
@@ -913,9 +993,9 @@ export default function CanvasWorkflow() {
             type: 'input',
             title: 'Clarifying Questions',
             x: 50,
-            y: 300,
+            y: 220,
             width: 320,
-            height: 240,
+            height: 320,
             minimized: false,
             zIndex: 3,
             status: 'active' as const,
@@ -1069,7 +1149,7 @@ export default function CanvasWorkflow() {
 
       const updated = prev.map(n => {
         // Stack debrief and narrative vertically when minimized to avoid overlap
-        if (n.id === 'debrief-opportunities') return { ...n, minimized: true, x: narrativeX, y: debriefY }
+        if (n.id === 'debrief') return { ...n, minimized: true, x: narrativeX, y: debriefY }
         if (n.id === 'narrative') return { ...n, minimized: true, x: narrativeX, y: narrativeY }
         return n
       })
@@ -1338,7 +1418,7 @@ export default function CanvasWorkflow() {
       if (debriefRefreshInFlight.current) return
       let projectId: string | null = null
       try { projectId = localStorage.getItem('activeProjectId') } catch {}
-      setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'processing' as const } : n))
+      setNodes(prev => prev.map(n => n.id === 'debrief' ? { ...n, status: 'processing' as const } : n))
       addActivity('Re-evaluating with new project context…', 'ai')
       if (t) clearTimeout(t)
       t = setTimeout(async () => {
@@ -1354,7 +1434,7 @@ export default function CanvasWorkflow() {
           try { if (projectId) localStorage.setItem(`debrief:${projectId}`, JSON.stringify(d)) } catch {}
           try { if (projectId) localStorage.setItem(`opps:${projectId}`, JSON.stringify(o)) } catch {}
           const insufficient = !d || (!(d.brief && String(d.brief).trim().length >= 8) && !(Array.isArray(d.keyPoints) && d.keyPoints.length > 0))
-          setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: (insufficient ? 'active' : 'complete') as NodeData['status'] } : n))
+          setNodes(prev => prev.map(n => n.id === 'debrief' ? { ...n, status: (insufficient ? 'active' : 'complete') as NodeData['status'] } : n))
           addActivity('Debrief updated with project context', 'ai')
           // If narrative was accepted previously, refresh it as well
           if (debriefAccepted) {
@@ -1363,7 +1443,7 @@ export default function CanvasWorkflow() {
           }
         } catch {
           addActivity('Re-evaluation failed — check connection', 'ai')
-          setNodes(prev => prev.map(n => n.id === 'debrief-opportunities' ? { ...n, status: 'active' as const } : n))
+          setNodes(prev => prev.map(n => n.id === 'debrief' ? { ...n, status: 'active' as const } : n))
         } finally {
           debriefRefreshInFlight.current = false
         }
@@ -1515,6 +1595,51 @@ export default function CanvasWorkflow() {
       )
     }
 
+    // GWI Audience Intelligence node
+    if (node.id === 'gwi') {
+      if (!gwiAvailable) {
+        return (
+          <div className="space-y-1 text-xs">
+            <div className="text-white/40 text-[10px]">GWI Spark API not configured</div>
+            <div className="text-white/30 text-[9px]">Set GWI_API_TOKEN in backend environment</div>
+          </div>
+        )
+      }
+      if (!gwiConnectedTo) {
+        return (
+          <div className="space-y-1 text-xs">
+            <div className="text-emerald-300/70 text-[11px]">GWI Audience Intelligence ready</div>
+            <div className="text-white/50 text-[10px]">Drag the connection handle to any node to enrich it with audience insights</div>
+          </div>
+        )
+      }
+      if (node.status === 'processing') {
+        return (
+          <div className="space-y-2 text-xs">
+            <BrandSpinner text="Querying GWI audience data…" />
+          </div>
+        )
+      }
+      if (gwiInsights) {
+        const connectedNode = nodes.find(n => n.id === gwiConnectedTo)
+        return (
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="text-emerald-300/80 text-[11px]">Connected to {connectedNode?.title || gwiConnectedTo}</span>
+              {gwiInsights.insights?.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 text-[9px]">{gwiInsights.insights.length} insights</span>
+              )}
+            </div>
+            <div className="text-white/60 text-[10px] leading-relaxed max-h-[80px] overflow-y-auto">{gwiInsights.message?.substring(0, 600)}</div>
+            {gwiInsights.sources?.length > 0 && (
+              <div className="text-white/30 text-[9px]">Topics: {gwiInsights.sources.slice(0, 3).join(', ')}</div>
+            )}
+          </div>
+        )
+      }
+      return null
+    }
+
     // Course Correct nodes (can have multiple)
     if (node.id.startsWith('course-correct')) {
       const nodeId = node.id
@@ -1569,11 +1694,11 @@ export default function CanvasWorkflow() {
                   const actions = (resp && resp.actions) || {}
                   // 1) Refine Debrief
                   if (actions.refineDebrief && concept) {
-                    setNodes(prev=>prev.map(n=>n.id==='debrief-opportunities'?{...n, status:'processing' as const}:n))
+                    setNodes(prev=>prev.map(n=>n.id==='debrief'?{...n, status:'processing' as const}:n))
                     const updated = await api.refineDebrief(concept, debrief, actions.refineDebrief, { persona, projectId: pid, targetAudience })
                     setDebrief(updated)
                     try { if (pid) localStorage.setItem(`debrief:${pid}`, JSON.stringify(updated)) } catch {}
-                    setNodes(prev=>prev.map(n=>n.id==='debrief-opportunities'?{...n, status:'complete' as const}:n))
+                    setNodes(prev=>prev.map(n=>n.id==='debrief'?{...n, status:'complete' as const}:n))
                     addActivity('Debrief updated via Course Correct', 'ai')
                   }
                   // 2) Opportunities refresh with hint
@@ -1650,6 +1775,14 @@ export default function CanvasWorkflow() {
       )
     }
 
+    // GWI enrichment badge for connected nodes
+    const gwiEnrichmentBadge = gwiConnectedTo === node.id && gwiInsights ? (
+      <div className="flex items-center gap-1 mb-2 px-2 py-1 rounded bg-emerald-400/10 border border-emerald-400/20">
+        <span className="text-emerald-300 text-[9px] font-medium">GWI Audience Intelligence connected</span>
+        <span className="px-1 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 text-[8px]">{gwiInsights.insights?.length || 0} data points</span>
+      </div>
+    ) : null
+
     if (node.id === 'debrief') {
       const showDebriefOnly = true
       const missing = missingForNode('debrief')
@@ -1696,6 +1829,7 @@ export default function CanvasWorkflow() {
 
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
+          {gwiEnrichmentBadge}
           {missing.length > 0 && (
             <div className="px-2 py-1 rounded bg-amber-500/15 border border-amber-400/30 text-amber-200 text-[10px]">Missing inputs: {missing.join(', ')}</div>
           )}
@@ -1825,6 +1959,7 @@ export default function CanvasWorkflow() {
     if (node.id === 'opportunities') {
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
+          {gwiEnrichmentBadge}
           {!opps ? (
             <BrandSpinner text="Finding high-impact opportunities…" />
           ) : (
@@ -1883,6 +2018,7 @@ export default function CanvasWorkflow() {
     if (node.id === 'narrative') {
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
+          {gwiEnrichmentBadge}
           {narrativeLoading || !narrative ? (
             <BrandSpinner text="Composing narrative structure with selected opportunities…" />
           ) : (
@@ -2035,6 +2171,7 @@ export default function CanvasWorkflow() {
     if (node.id === 'scoring') {
       return (
         <div className="space-y-3 text-xs max-h-full overflow-auto">
+          {gwiEnrichmentBadge}
           {node.status === 'processing' ? (
             <BrandSpinner text="Calculating metrics and analyzing enhancements…" />
           ) : (
@@ -2944,114 +3081,7 @@ export default function CanvasWorkflow() {
 
       {/* Floating assistant removed per new UX */}
 
-      {/* Under the Hood Overlay */}
-      {showUnderHood && (
-        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center" onClick={() => setShowUnderHood(false)}>
-          <div className="w-[900px] max-h-[80vh] overflow-auto bg-charcoal-900 border border-white/10 rounded-lg p-4 text-xs text-white/80" onClick={(e)=>e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-white/90 font-medium">Under the Hood</div>
-              <button className="px-2 py-1 rounded border border-white/10 bg-white/10 hover:bg-white/20" onClick={()=>setShowUnderHood(false)}>Close</button>
-            </div>
-            {renderUnderHood()}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
-function readLS(key: string) { try { return JSON.parse(localStorage.getItem(key) || 'null') } catch { return null } }
-
-function linkList(arr?: any[]) {
-  if (!Array.isArray(arr) || !arr.length) return <span className="text-white/40">—</span>
-  return (
-    <ul className="list-disc pl-4 space-y-0.5">
-      {arr.map((x, i) => <li key={i}>{String(x)}</li>)}
-    </ul>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="panel p-3 bg-white/5 border border-white/10 mb-2">
-      <div className="text-white/70 font-medium mb-1">{title}</div>
-      {children}
-    </div>
-  )
-}
-
-function renderUnderHood() {
-  const pid = (() => { try { return localStorage.getItem('activeProjectId') || 'local' } catch { return 'local' } })()
-  const concept = localStorage.getItem('concept') || ''
-  const persona = localStorage.getItem('persona') || ''
-  const region = localStorage.getItem('region') || ''
-  const audience = localStorage.getItem('targetAudience') || ''
-  const debrief = readLS(`debrief:${pid}`)
-  const opps = readLS(`opps:${pid}`)
-  const recs = readLS(`recs:${pid}`)
-  const wild = readLS(`wild:${pid}`)
-  const overview = readLS(`overview:${pid}`)
-
-  return (
-    <div>
-      <Section title="Project">
-        <div>Concept: {concept || <span className="text-white/40">—</span>}</div>
-        <div>Persona: {persona || <span className="text-white/40">—</span>} • Region: {region || <span className="text-white/40">—</span>} • Audience: {audience || <span className="text-white/40">—</span>}</div>
-      </Section>
-
-      <Section title="Debrief Sources (used in Debrief)">
-        <div className="grid md:grid-cols-3 gap-3">
-          <div><div className="text-white/60 mb-1">Project Files</div>{linkList(debrief?.sources?.project)}</div>
-          <div><div className="text-white/60 mb-1">RKB</div>{linkList(debrief?.sources?.core)}</div>
-          <div><div className="text-white/60 mb-1">Live Trends</div>{linkList(debrief?.sources?.live)}</div>
-        </div>
-      </Section>
-
-      <Section title="Opportunities Sources (used in Opportunities)">
-        <div className="grid md:grid-cols-3 gap-3">
-          <div><div className="text-white/60 mb-1">Project Files</div>{linkList(opps?.sources?.project)}</div>
-          <div><div className="text-white/60 mb-1">RKB</div>{linkList(opps?.sources?.core)}</div>
-          <div><div className="text-white/60 mb-1">Live Trends</div>{linkList(opps?.sources?.live)}</div>
-        </div>
-      </Section>
-
-      <Section title="Recommendations Sources (used in Recommendations)">
-        <div className="grid md:grid-cols-3 gap-3">
-          <div><div className="text-white/60 mb-1">Project Files</div>{linkList(recs?.sources?.project)}</div>
-          <div><div className="text-white/60 mb-1">RKB</div>{linkList(recs?.sources?.core)}</div>
-          <div><div className="text-white/60 mb-1">Live Trends</div>{linkList(recs?.sources?.live)}</div>
-        </div>
-      </Section>
-
-      <Section title="Wildcard Evidence">
-        {Array.isArray(wild?.ideas) && wild.ideas.length ? (
-          <div className="space-y-2">
-            {wild.ideas.map((idea: any, i: number) => (
-              <div key={i} className="p-2 bg-white/5 rounded border border-white/10">
-                <div className="text-white/80 font-medium">{idea.title}</div>
-                <div className="mt-1 text-white/60">Evidence: {Array.isArray(idea.evidence)?idea.evidence.join(', '):'—'}</div>
-              </div>
-            ))}
-          </div>
-        ) : <div className="text-white/40">—</div>}
-      </Section>
-
-      <Section title="Prompts (latest run)">
-        <div className="space-y-2">
-          {debrief?._debug?.prompt && (
-            <details><summary className="cursor-pointer text-white/70">Debrief Prompt</summary><pre className="mt-1 whitespace-pre-wrap text-white/60">{debrief._debug.prompt}</pre></details>
-          )}
-          {opps?._debug?.prompt && (
-            <details><summary className="cursor-pointer text-white/70">Opportunities Prompt</summary><pre className="mt-1 whitespace-pre-wrap text-white/60">{opps._debug.prompt}</pre></details>
-          )}
-          {recs?._debug?.prompt && (
-            <details><summary className="cursor-pointer text-white/70">Recommendations Prompt</summary><pre className="mt-1 whitespace-pre-wrap text-white/60">{recs._debug.prompt}</pre></details>
-          )}
-          {wild?._debug?.prompt && (
-            <details><summary className="cursor-pointer text-white/70">Wildcard Prompt</summary><pre className="mt-1 whitespace-pre-wrap text-white/60">{wild._debug.prompt}</pre></details>
-          )}
-        </div>
-      </Section>
-    </div>
-  )
-}

@@ -120,8 +120,14 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, onAdd, onRe
     if (data.type === 'wildcard') {
       return 'border-yellow-400/40 bg-yellow-400/10'
     }
-    // Integrations (inactive): subtle greyed
+    // Integrations: status-aware styling
     if (data.type === 'integration') {
+      if (data.status === 'active' || data.status === 'complete') {
+        return 'border-emerald-400/50 bg-emerald-400/10'
+      }
+      if (data.status === 'processing') {
+        return 'border-emerald-400/30 bg-emerald-400/5 animate-pulse'
+      }
       return 'border-dashed border-white/20 bg-white/5 opacity-60'
     }
     // RKB only - orange
@@ -150,6 +156,9 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, onAdd, onRe
       return 'hover:ring-2 hover:ring-yellow-400/50 hover:shadow-xl hover:shadow-yellow-400/40'
     }
     if (data.type === 'integration') {
+      if (data.status === 'active' || data.status === 'complete' || data.status === 'processing') {
+        return 'hover:ring-2 hover:ring-emerald-400/50 hover:shadow-xl hover:shadow-emerald-400/40'
+      }
       return 'hover:ring-2 hover:ring-white/20 hover:shadow-xl hover:shadow-white/10'
     }
     if (data.type === 'rkb') {

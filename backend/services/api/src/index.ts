@@ -12,17 +12,16 @@ import trendRoutes from './routes/trends.js'
 import assetRoutes from './routes/assets.js'
 import aiRoutes from './routes/ai.js'
 import statusRoutes from './routes/status.js'
-import publicRoutes from './routes/public.js'
 import promptsRoutes from './routes/prompts.js'
 import searchRoutes from './routes/search.js'
 import adminRoutes from './routes/admin.js'
 import projectRoutes from './routes/projects.js'
 import versionsRoutes from './routes/versions.js'
 import conversationRoutes from './routes/conversation.js'
-import ingestionRoutes from './routes/ingestion.js'
 import { authMiddleware, attachRls } from './middleware/auth.js'
 import { startTrendCollector } from './services/scheduler/trend-collector.js'
 import trendsSummaryRoutes from './routes/trends-summary.js'
+import gwiRoutes from './routes/gwi.js'
 
 dotenv.config()
 const logger = pino({ level: process.env.NODE_ENV === 'production' ? 'info' : 'debug' })
@@ -77,26 +76,24 @@ async function main() {
 
   app.get('/health', (_req, res) => res.json({ ok: true }))
 
-  // Public routes
+  // Public routes (no auth)
   app.use('/auth', authRoutes)
   app.use('/status', statusRoutes)
-  app.use('/admin', adminRoutes)
-  // Public AI endpoints for MVP (no auth required)
-  app.use('/ai', aiRoutes)
-  app.use('/public', publicRoutes)
   app.use('/search', searchRoutes)
   app.use('/trends/summary', trendsSummaryRoutes)
-  app.use('/prompts', promptsRoutes)
+  app.use('/ai', aiRoutes)
+  app.use('/gwi', gwiRoutes)
 
   // Secure routes (require authentication)
   app.use(authMiddleware, attachRls)
+  app.use('/admin', adminRoutes)
+  app.use('/prompts', promptsRoutes)
   app.use('/creators', creatorRoutes)
   app.use('/trends', trendRoutes)
   app.use('/assets', assetRoutes)
   app.use('/projects', projectRoutes)
   app.use('/projects/:id/versions', versionsRoutes)
   app.use('/projects/:id/conversation', conversationRoutes)
-  app.use('/ingest', ingestionRoutes)
 
   // error handler
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

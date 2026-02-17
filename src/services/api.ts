@@ -115,6 +115,13 @@ export const api = {
     { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value }) }
   ),
 
+  // GWI Audience Intelligence
+  gwiQuery: (concept: string, opts?: { targetAudience?: string; nodeType?: string; nodeContext?: string; region?: string; persona?: string; projectId?: string }) => request<any>(
+    '/gwi/query',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ concept, ...(opts||{}) }) }
+  ),
+  gwiStatus: () => request<{ configured: boolean }>('/gwi/status'),
+
   // APIFY Admin endpoints
   collectTrends: () => request<any>('/admin/collect-trends', { method: 'POST' }),
   getCollectionStatus: () => request<any>('/admin/collect-trends/status'),
