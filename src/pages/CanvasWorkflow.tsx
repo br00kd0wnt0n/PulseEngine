@@ -682,12 +682,16 @@ export default function CanvasWorkflow() {
   }, [])
 
   // GWI availability check on mount
+  const gwiCheckedRef = useRef(false)
   useEffect(() => {
+    if (gwiCheckedRef.current) return
     let cancelled = false
     ;(async () => {
       try {
         const status = await api.gwiStatus().catch(() => null)
-        if (cancelled || !status) return
+        if (cancelled) return
+        if (!status) return // backend not available yet, will retry
+        gwiCheckedRef.current = true
         setGwiAvailable(status.configured)
         if (status.configured) {
           setNodes(prev => prev.map(n => n.id === 'gwi' ? { ...n, title: 'GWI Audience Intelligence', status: 'active' as const } : n))
@@ -695,7 +699,7 @@ export default function CanvasWorkflow() {
       } catch {}
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [nodes.length])
 
   // Record context ingestion activity from uploads/URL adds
   useEffect(() => {
@@ -964,10 +968,10 @@ export default function CanvasWorkflow() {
           return { ...node, x: 50, y: 560, width: 300, minimized: false }
         }
         if (node.id === 'gwi') {
-          return { ...node, x: 50, y: 740 }
+          return { ...node, x: 50, y: 740, height: 120 }
         }
         if (node.id === 'glimpse') {
-          return { ...node, x: 50, y: 840 }
+          return { ...node, x: 50, y: 880 }
         }
         return node
       }))
@@ -1597,22 +1601,6 @@ export default function CanvasWorkflow() {
 
     // GWI Audience Intelligence node
     if (node.id === 'gwi') {
-      if (!gwiAvailable) {
-        return (
-          <div className="space-y-1 text-xs">
-            <div className="text-white/40 text-[10px]">GWI Spark API not configured</div>
-            <div className="text-white/30 text-[9px]">Set GWI_API_TOKEN in backend environment</div>
-          </div>
-        )
-      }
-      if (!gwiConnectedTo) {
-        return (
-          <div className="space-y-1 text-xs">
-            <div className="text-emerald-300/70 text-[11px]">GWI Audience Intelligence ready</div>
-            <div className="text-white/50 text-[10px]">Drag the connection handle to any node to enrich it with audience insights</div>
-          </div>
-        )
-      }
       if (node.status === 'processing') {
         return (
           <div className="space-y-2 text-xs">
@@ -1620,11 +1608,11 @@ export default function CanvasWorkflow() {
           </div>
         )
       }
-      if (gwiInsights) {
+      if (gwiInsights && gwiConnectedTo) {
         const connectedNode = nodes.find(n => n.id === gwiConnectedTo)
         return (
           <div className="space-y-2 text-xs">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-emerald-300/80 text-[11px]">Connected to {connectedNode?.title || gwiConnectedTo}</span>
               {gwiInsights.insights?.length > 0 && (
                 <span className="px-1.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 text-[9px]">{gwiInsights.insights.length} insights</span>
@@ -1637,7 +1625,20 @@ export default function CanvasWorkflow() {
           </div>
         )
       }
-      return null
+      if (gwiAvailable) {
+        return (
+          <div className="space-y-1 text-xs">
+            <div className="text-emerald-300/70 text-[11px]">GWI Audience Intelligence ready</div>
+            <div className="text-white/50 text-[10px]">Drag the connection handle to any node to enrich it with audience insights</div>
+          </div>
+        )
+      }
+      return (
+        <div className="space-y-1 text-xs">
+          <div className="text-white/50 text-[10px]">GWI Audience Intelligence</div>
+          <div className="text-white/30 text-[9px]">Set GWI_API_TOKEN in backend to activate</div>
+        </div>
+      )
     }
 
     // Course Correct nodes (can have multiple)

@@ -231,6 +231,8 @@ export default function Node({ data, onUpdate, onFocus, onStartLink, onAdd, onRe
           <div className={`w-2 h-2 rounded-full ${
             (data.status === 'active' && data.type === 'wildcard') ? 'bg-yellow-400' :
             (data.status === 'active' && data.type === 'course-correct') ? 'bg-purple-400' :
+            (data.status === 'active' && data.type === 'integration') ? 'bg-emerald-400' :
+            ((data.status === 'complete' || data.status === 'processing') && data.type === 'integration') ? 'bg-emerald-400' :
             data.status === 'active' ? 'bg-ralph-cyan' :
             data.status === 'complete' ? 'bg-ralph-pink' :
             data.status === 'processing' ? 'bg-ralph-pink animate-pulse' :
