@@ -27,7 +27,8 @@ import { PreferencesProvider } from './context/PreferencesContext'
 import { DashboardProvider } from './context/DashboardContext'
 import { ToastProvider } from './context/ToastContext'
 
-const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || ''
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+if (!GOOGLE_CLIENT_ID) console.warn('[Auth] VITE_GOOGLE_CLIENT_ID is not set — Google Sign-In will fail')
 
 const router = createBrowserRouter([
   {
